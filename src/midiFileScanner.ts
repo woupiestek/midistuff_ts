@@ -1,3 +1,30 @@
+export type MidiEventType =
+  | "note_off"
+  | "note_on"
+  | "polyphonic_pressure"
+  | "controller"
+  | "program_change"
+  | "channel_pressure"
+  | "pitch_bend"
+  | "sequence_number"
+  | "text"
+  | "copyright"
+  | "sequence_name"
+  | "instrument_name"
+  | "lyrics"
+  | "marker"
+  | "cue_point"
+  | "program_name"
+  | "device_name"
+  | "midi_channel_prefix"
+  | "midi_port"
+  | "end_of_track"
+  | "tempo"
+  | "smpte_offset"
+  | "time_signature"
+  | "key_signature"
+  | "sequencer_specific";
+
 export class Scanner {
   start = 0;
   current = 0;
@@ -28,19 +55,15 @@ export class Scanner {
   }
 
   file() {
-    const header = this.header();
+    const { timing, numberOfTracks, format } = this.header();
     const tracks = [];
-    for(let i = 0; i<header.numberOfTracks; i++){
-      tracks[i]=this.track();
+    for (let i = 0; i < numberOfTracks; i++) {
+      tracks[i] = this.track();
     }
-    if(!this.done()){
-      throw new Error('Unexpected data in file');
+    if (!this.done()) {
+      throw new Error("Unexpected data in file");
     }
-    return {
-      timing: header.timing,
-      formate: header.format,
-      tracks
-    }
+    return { timing, format, tracks };
   }
 
   static #MThd6 = [77, 84, 104, 100, 0, 0, 0, 6];
@@ -48,21 +71,23 @@ export class Scanner {
     for (const c of Scanner.#MThd6) {
       this.consume(c);
     }
-    const result = {
+    return {
       format: this.fixedLengthNumber(2),
       numberOfTracks: this.fixedLengthNumber(2),
-      timing: {},
+      timing: this.timing(),
     };
+  }
+
+  timing() {
     if ((this.top() & 0x80) === 0) {
-      result.timing = { type: "metrical", ppqn: this.fixedLengthNumber(2) };
+      return { type: "metrical", ppqn: this.fixedLengthNumber(2) };
     } else {
-      result.timing = {
+      return {
         type: "timecode",
         fps: 0x80 - this.pop(),
         subdivisions: this.pop(),
       };
     }
-    return result;
   }
 
   static #MTrk = [77, 84, 114, 107];
@@ -117,9 +142,9 @@ export class Scanner {
   static #meta: Record<number, string> = {
     0: "sequence_number",
     1: "text",
-    2: "copy_right",
+    2: "copyright",
     3: "sequence_name",
-    4: "instrument name",
+    4: "instrument_name",
     5: "lyrics",
     6: "marker",
     7: "cue_point",
@@ -132,7 +157,7 @@ export class Scanner {
     0x54: "smpte_offset",
     0x58: "time_signature",
     0x59: "key_signature",
-    0x7f: "sequencer specific",
+    0x7f: "sequencer_specific",
   };
   event() {
     const byte = this.pop();
@@ -189,7 +214,7 @@ export class Scanner {
   metaData() {
     const subtype = this.pop();
     const type = Scanner.#meta[subtype] || `meta_${subtype}`;
-    if (subtype >= 1 && subtype <= 9) {
+    if (subtype >= 1 && subtype <= 0xf) {
       return { type, value: this.text() };
     }
     switch (subtype) {
