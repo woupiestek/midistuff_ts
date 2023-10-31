@@ -213,7 +213,7 @@ export class Scanner {
 
   metaData() {
     const subtype = this.pop();
-    const type = Scanner.#meta[subtype] || `meta_${subtype}`;
+    const type = Scanner.#meta[subtype] || "meta";
     if (subtype >= 1 && subtype <= 0xf) {
       return { type, value: this.text() };
     }
@@ -271,7 +271,7 @@ export class Scanner {
     // lacking specs, must ignore
     const l = this.variableLengthNumber();
     this.current += l;
-    return { type };
+    return { type, subtype };
   }
 
   #decoder = new TextDecoder();
