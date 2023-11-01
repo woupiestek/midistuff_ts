@@ -260,10 +260,10 @@ export class Scanner {
     return { type: "meta", value: subtype };
   }
 
-  #decoder = new TextDecoder();
+  static #decoder = new TextDecoder();
   text(): string {
     const l = this.variableLengthNumber();
-    const result = this.#decoder.decode(
+    const result = Scanner.#decoder.decode(
       this.source.slice(this.current, this.current + l),
     );
     this.current += l;

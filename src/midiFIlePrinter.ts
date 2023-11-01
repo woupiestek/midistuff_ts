@@ -1,166 +1,191 @@
 import { MidiEvent, MidiFile, Timing, Track } from "./midiTypes.ts";
 
-export type Bytes = number | Bytes[];
+export class Printer {
+  #bytes: number[] = [];
 
-export function flatten(_in: Bytes, out: number[] = []) {
-  if (typeof _in === "number") {
-    out.push(_in);
-  } else {
-    for (const b of _in) {
-      flatten(b, out);
+  pop() {
+    const b = this.#bytes;
+    this.#bytes = [];
+    return b;
+  }
+
+  #push(...bytes: number[]) {
+    this.#bytes.push(...bytes);
+  }
+
+  file(file: MidiFile): void {
+    this.header(file.format, file.tracks.length, file.timing);
+    for (const track of file.tracks) {
+      this.track(track);
     }
   }
-  return out;
-}
 
-export function serializeFile(file: MidiFile): Bytes {
-  return [
-    serializeHeader(file.format, file.tracks.length, file.timing),
-    file.tracks.map(serializeTrack),
-  ];
-}
-
-export function serializeHeader(
-  format: 0 | 1 | 2,
-  numberOfTracks: number,
-  timing: Timing
-): Bytes {
-  const bytes = [
-    77,
-    84,
-    104,
-    100,
-    0,
-    0,
-    0,
-    6,
-    0,
-    format,
-    serializeFixedLengthNumber(numberOfTracks, 2),
-  ];
-  switch (timing.type) {
-    case "metrical":
-      bytes.push(serializeFixedLengthNumber(timing.ppqn, 2));
-      break;
-    case "timecode":
-      bytes.push(0x80 - timing.fps);
-      bytes.push(timing.subdivisions);
-      break;
+  header(format: 0 | 1 | 2, numberOfTracks: number, timing: Timing): void {
+    this.#push(77, 84, 104, 100, 0, 0, 0, 6, 0, format);
+    this.fixedLengthNumber(numberOfTracks, 2);
+    switch (timing.type) {
+      case "metrical":
+        this.fixedLengthNumber(timing.ppqn, 2);
+        break;
+      case "timecode":
+        this.#push(0x80 - timing.fps);
+        this.#push(timing.subdivisions);
+        break;
+    }
   }
-  return bytes;
-}
 
-export function serializeTrack(track: Track): Bytes {
-  const bytes: number[] = [];
-  for (const { wait, event } of track) {
-    flatten(serializeVariableLengthNumber(wait), bytes);
-    flatten(serializeEvent(event), bytes);
+  track(track: Track): void {
+    this.#push(77, 84, 114, 107, 0, 0, 0, 0);
+    const offset = this.#bytes.length;
+    for (const { wait, event } of track) {
+      this.variableLengthNumber(wait);
+      this.event(event);
+    }
+    this.fixedLengthNumber(this.#bytes.length - offset, 4, offset - 4);
   }
-  return [77, 84, 114, 107, serializeFixedLengthNumber(bytes.length, 4), bytes];
-}
 
-export function serializeEvent(event: MidiEvent): Bytes {
-  switch (event.type) {
-    case "note_off":
-      return [0x80 + event.channel, event.note, event.velocity];
-    case "note_on":
-      return [0x90 + event.channel, event.note, event.velocity];
-    case "polyphonic_pressure":
-      return [0xa0 + event.channel, event.note, event.pressure];
-    case "controller":
-      return [0xb0 + event.channel, event.controller, event.value];
-    case "program_change":
-      return [0xc0 + event.channel, event.program];
-    case "channel_pressure":
-      return [0xd0 + event.channel, event.pressure];
-    case "pitch_bend":
-      // todo: check!
-      return [
-        0xe0 + event.channel,
-        0x7f & event.value,
-        (event.value >> 7) + 0x40,
-      ];
-    case "sequence_number":
-      return [0xff, 0, 2, serializeFixedLengthNumber(event.value, 2)];
-    // to be continued
-    case "text":
-      return [0xff, 1, serializeText(event.value)];
-    case "copyright":
-      return [0xff, 2, serializeText(event.value)];
-    case "sequence_name":
-      return [0xff, 3, serializeText(event.value)];
-    case "instrument_name":
-      return [0xff, 4, serializeText(event.value)];
-    case "lyrics":
-      return [0xff, 5, serializeText(event.value)];
-    case "marker":
-      return [0xff, 6, serializeText(event.value)];
-    case "cue_point":
-      return [0xff, 7, serializeText(event.value)];
-    case "program_name":
-      return [0xff, 8, serializeText(event.value)];
-    case "device_name":
-      return [0xff, 9, serializeText(event.value)];
-    case "midi_channel_prefix":
-      return [0xff, 0x20, 1, event.value];
-    case "midi_port":
-      return [0xff, 0x21, 1, event.value];
-    case "end_of_track":
-      return [0xff, 0x2f, 0];
-    case "tempo":
-      return [0xff, 0x51, 3, serializeFixedLengthNumber(event.value, 3)];
-    case "smpte_offset":
-      return [
-        0xff,
-        0x54,
-        5,
-        event.hour,
-        event.minute,
-        event.second,
-        event.frame,
-        event.centiframe,
-      ];
-    case "time_signature":
-      return [
-        0xff,
-        0x58,
-        4,
-        event.numerator,
-        Math.log2(event.denominator),
-        event.clocks,
-        event.quarterIn32nds,
-      ];
-    case "key_signature":
-      return [0xff, 0x59, 2, event.sharps & 0xff, event.major ? 0 : 1];
-    default: // ignore the rest
-      return [];
+  event(event: MidiEvent): void {
+    switch (event.type) {
+      case "note_off":
+        this.#push(0x80 + event.channel, event.note, event.velocity);
+        break;
+      case "note_on":
+        this.#push(0x90 + event.channel, event.note, event.velocity);
+        break;
+      case "polyphonic_pressure":
+        this.#push(0xa0 + event.channel, event.note, event.pressure);
+        break;
+      case "controller":
+        this.#push(0xb0 + event.channel, event.controller, event.value);
+        break;
+      case "program_change":
+        this.#push(0xc0 + event.channel, event.program);
+        break;
+      case "channel_pressure":
+        this.#push(0xd0 + event.channel, event.pressure);
+        break;
+      case "pitch_bend":
+        // todo: check!
+        this.#push(
+          0xe0 + event.channel,
+          0x7f & event.value,
+          (event.value >> 7) + 0x40,
+        );
+        break;
+      case "sequence_number":
+        this.#push(0xff, 0, 2);
+        this.fixedLengthNumber(event.value, 2);
+        break;
+      // to be continued
+      case "text":
+        this.#push(0xff, 1);
+        this.text(event.value);
+        break;
+      case "copyright":
+        this.#push(0xff, 2);
+        this.text(event.value);
+        break;
+      case "sequence_name":
+        this.#push(0xff, 3);
+        this.text(event.value);
+        break;
+      case "instrument_name":
+        this.#push(0xff, 4);
+        this.text(event.value);
+        break;
+      case "lyrics":
+        this.#push(0xff, 5);
+        this.text(event.value);
+        break;
+      case "marker":
+        this.#push(0xff, 6);
+        this.text(event.value);
+        break;
+      case "cue_point":
+        this.#push(0xff, 7);
+        this.text(event.value);
+        break;
+      case "program_name":
+        this.#push(0xff, 8);
+        this.text(event.value);
+        break;
+      case "device_name":
+        this.#push(0xff, 9);
+        this.text(event.value);
+        break;
+      case "midi_channel_prefix":
+        this.#push(0xff, 0x20, 1, event.value);
+        break;
+      case "midi_port":
+        this.#push(0xff, 0x21, 1, event.value);
+        break;
+      case "end_of_track":
+        this.#push(0xff, 0x2f, 0);
+        break;
+      case "tempo":
+        this.#push(0xff, 0x51, 3);
+        this.fixedLengthNumber(event.value, 3);
+        break;
+      case "smpte_offset":
+        this.#push(
+          0xff,
+          0x54,
+          5,
+          event.hour,
+          event.minute,
+          event.second,
+          event.frame,
+          event.centiframe,
+        );
+        break;
+      case "time_signature":
+        this.#push(
+          0xff,
+          0x58,
+          4,
+          event.numerator,
+          Math.log2(event.denominator),
+          event.clocks,
+          event.quarterIn32nds,
+        );
+        break;
+      case "key_signature":
+        this.#push(0xff, 0x59, 2, event.sharps & 0xff, event.major ? 0 : 1);
+        break;
+      default: // ignore the rest
+        break;
+    }
   }
-}
 
-export function serializeFixedLengthNumber(value: number, length: number): Bytes {
-  const result = [];
-  for (let i = length - 1; i >= 0; i--) {
-    result[i] = 0xff & value;
-    value >>= 8;
+  fixedLengthNumber(
+    value: number,
+    length: number,
+    offset = this.#bytes.length,
+  ): void {
+    for (let i = length - 1; i >= 0; i--) {
+      this.#bytes[offset + i] = 0xff & value;
+      value >>= 8;
+    }
   }
-  return result;
-}
 
-export function serializeVariableLengthNumber(value: number): Bytes {
-  const result = [];
-  do {
-    result.push(value & 0x7f);
-    value >>= 7;
-  } while (value > 0);
-  result.reverse();
-  for (let i = 0; i < result.length - 1; i++) {
-    result[i] += 0x80;
+  variableLengthNumber(value: number): void {
+    const result = [];
+    do {
+      result.push(value & 0x7f);
+      value >>= 7;
+    } while (value > 0);
+    while (result.length > 1) {
+      this.#bytes.push(0x80 + (result.pop() || 0));
+    }
+    this.#bytes.push(result.pop() || 0);
   }
-  return result;
-}
 
-const encoder = new TextEncoder();
-export function serializeText(value: string): Bytes {
-  const text = encoder.encode(value);
-  return [serializeVariableLengthNumber(text.length), ...text];
+  static #encoder = new TextEncoder();
+  text(value: string): void {
+    const text = Printer.#encoder.encode(value);
+    this.variableLengthNumber(text.length);
+    for (const byte of text) {
+      this.#bytes.push(byte);
+    }
+  }
 }
