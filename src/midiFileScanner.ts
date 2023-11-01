@@ -1,29 +1,10 @@
-export type MidiEventType =
-  | "note_off"
-  | "note_on"
-  | "polyphonic_pressure"
-  | "controller"
-  | "program_change"
-  | "channel_pressure"
-  | "pitch_bend"
-  | "sequence_number"
-  | "text"
-  | "copyright"
-  | "sequence_name"
-  | "instrument_name"
-  | "lyrics"
-  | "marker"
-  | "cue_point"
-  | "program_name"
-  | "device_name"
-  | "midi_channel_prefix"
-  | "midi_port"
-  | "end_of_track"
-  | "tempo"
-  | "smpte_offset"
-  | "time_signature"
-  | "key_signature"
-  | "sequencer_specific";
+import {
+  MidiEvent,
+  MidiFile,
+  TextEventType,
+  Timing,
+  Track,
+} from "./midiTypes.ts";
 
 export class Scanner {
   start = 0;
@@ -54,9 +35,9 @@ export class Scanner {
     }
   }
 
-  file() {
+  file(): MidiFile {
     const { timing, numberOfTracks, format } = this.header();
-    const tracks = [];
+    const tracks: Track[] = [];
     for (let i = 0; i < numberOfTracks; i++) {
       tracks[i] = this.track();
     }
@@ -67,18 +48,30 @@ export class Scanner {
   }
 
   static #MThd6 = [77, 84, 104, 100, 0, 0, 0, 6];
-  header() {
+  header(): { format: 0 | 1 | 2; numberOfTracks: number; timing: Timing } {
     for (const c of Scanner.#MThd6) {
       this.consume(c);
     }
     return {
-      format: this.fixedLengthNumber(2),
+      format: this.format(),
       numberOfTracks: this.fixedLengthNumber(2),
       timing: this.timing(),
     };
   }
 
-  timing() {
+  format(): 0 | 1 | 2 {
+    const format = this.fixedLengthNumber(2);
+    switch (format) {
+      case 0:
+      case 1:
+      case 2:
+        return format;
+      default:
+        throw new Error(`Unknown midi file format ${format}`);
+    }
+  }
+
+  timing(): Timing {
     if ((this.top() & 0x80) === 0) {
       return { type: "metrical", ppqn: this.fixedLengthNumber(2) };
     } else {
@@ -91,7 +84,7 @@ export class Scanner {
   }
 
   static #MTrk = [77, 84, 114, 107];
-  track() {
+  track(): Track {
     for (const c of Scanner.#MTrk) {
       this.consume(c);
     }
@@ -139,27 +132,7 @@ export class Scanner {
     "pitch_bend",
   ];
 
-  static #meta: Record<number, string> = {
-    0: "sequence_number",
-    1: "text",
-    2: "copyright",
-    3: "sequence_name",
-    4: "instrument_name",
-    5: "lyrics",
-    6: "marker",
-    7: "cue_point",
-    8: "program_name",
-    9: "device_name",
-    0x20: "midi_channel_prefix",
-    0x21: "midi_port",
-    0x2f: "end_of_track",
-    0x51: "tempo",
-    0x54: "smpte_offset",
-    0x58: "time_signature",
-    0x59: "key_signature",
-    0x7f: "sequencer_specific",
-  };
-  event() {
+  event(): MidiEvent {
     const byte = this.pop();
 
     if (byte < 0x80) {
@@ -186,7 +159,7 @@ export class Scanner {
           if (lsb >= 0x80) throw new Error("Unexpected lsb in pitch bend");
           const msb = this.pop();
           if (msb >= 0x80) throw new Error("Unexpected msb in pitch bend");
-          return { type, channel, bend: (msb << 7) + lsb - 0x2000 };
+          return { type, channel, value: (msb << 7) + lsb - 0x2000 };
         }
       }
     }
@@ -211,34 +184,47 @@ export class Scanner {
     throw new Error(`unsupported status byte ${byte} at ${this.current - 1}`);
   }
 
-  metaData() {
+  static #textEventType: TextEventType[] = [
+    "text",
+    "copyright",
+    "sequence_name",
+    "instrument_name",
+    "lyrics",
+    "marker",
+    "cue_point",
+    "program_name",
+    "device_name",
+  ];
+
+  metaData(): MidiEvent {
     const subtype = this.pop();
-    const type = Scanner.#meta[subtype] || "meta";
     if (subtype >= 1 && subtype <= 0xf) {
-      return { type, value: this.text() };
+      return { type: Scanner.#textEventType[subtype - 1], value: this.text() };
     }
     switch (subtype) {
       case 0:
         this.consume(2);
-        return { type, value: this.fixedLengthNumber(2) };
+        return { type: "sequence_number", value: this.fixedLengthNumber(2) };
 
       case 0x20:
+        this.consume(1);
+        return { type: "midi_channel_prefix", value: this.pop() };
       case 0x21:
         this.consume(1);
-        return { type, value: this.pop() };
+        return { type: "midi_port", value: this.pop() };
 
       case 0x2f:
         this.consume(0);
-        return { type };
+        return { type: "end_of_track" };
 
       case 0x51:
         this.consume(3);
-        return { type, value: this.fixedLengthNumber(3) };
+        return { type: "tempo", value: this.fixedLengthNumber(3) };
 
       case 0x54:
         this.consume(5);
         return {
-          type,
+          type: "smpte_offset",
           hour: this.pop(),
           minute: this.pop(),
           second: this.pop(),
@@ -249,7 +235,7 @@ export class Scanner {
       case 0x58:
         this.consume(4);
         return {
-          type,
+          type: "time_signature",
           numerator: this.pop(),
           denominator: 1 << this.pop(),
           // midi is weird
@@ -261,7 +247,7 @@ export class Scanner {
         this.consume(2);
         const sharps = this.pop();
         return {
-          type,
+          type: "key_signature",
           sharps: sharps < 0x80 ? sharps : 0x80 - sharps,
           major: this.pop() === 0,
         };
@@ -271,7 +257,7 @@ export class Scanner {
     // lacking specs, must ignore
     const l = this.variableLengthNumber();
     this.current += l;
-    return { type, subtype };
+    return { type: "meta", value: subtype };
   }
 
   #decoder = new TextDecoder();

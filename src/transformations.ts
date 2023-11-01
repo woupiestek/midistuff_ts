@@ -1,4 +1,6 @@
-export function transform1({ format, timing, tracks }) {
+import { MidiFile } from "./midiTypes.ts";
+
+export function transform1({ format, timing, tracks }: MidiFile) {
   const content = [];
 
   for (let track = 0; track < tracks.length; track++) {

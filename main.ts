@@ -1,12 +1,19 @@
+import { flatten, serializeFile } from "./src/midiFIlePrinter.ts";
 import { Scanner } from "./src/midiFileScanner.ts";
-import { transform1 } from "./src/transformations.ts";
+// import { transform1 } from "./src/transformations.ts";
 
-if (Deno.args.length === 0) {
+if (Deno.args.length < 1) {
   console.error("Usage: main [path]\n");
   Deno.exit(64);
 }
 
 const data = await Deno.readFile(Deno.args[0]);
 const scanner = new Scanner(data);
+const file = scanner.file();
+const data2 = new Uint8Array(flatten(serializeFile(file)));
 
-console.log(transform1(scanner.file()));
+const file2 = new Scanner(data2).file();
+
+console.log(file, file2);
+
+await Deno.writeFile("test.mid", data2);
