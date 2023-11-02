@@ -1,5 +1,18 @@
 # Midistuff logs
 
+## 2023-11-2
+
+Reorganize the file by program: the program determines how the notes sound.
+Takes hashes for deduplication.
+
+### trying to play midi
+
+Frustration is increasing. Can Deno not do midi?
+
+- not with web midi api directly
+- not with web midi api in the browser
+- not with web midi api served via https...
+
 ## 2023-11-1
 
 There is a web midi api, maybe it works in deno as well. I could also run it in
