@@ -1,68 +1,92 @@
 export type TextEventType =
-  | "text"
-  | "copyright"
-  | "sequence_name"
-  | "instrument_name"
-  | "lyrics"
-  | "marker"
-  | "cue_point"
-  | "program_name"
-  | "device_name";
+  | MetaType.text
+  | MetaType.copyright
+  | MetaType.sequenceName
+  | MetaType.instrumentName
+  | MetaType.lyrics
+  | MetaType.marker
+  | MetaType.cuePoint
+  | MetaType.programName
+  | MetaType.deviceName;
 
-export type MidiEventType =
-  | "note_off"
-  | "note_on"
-  | "polyphonic_pressure"
-  | "controller"
-  | "program_change"
-  | "channel_pressure"
-  | "pitch_bend"
-  | "sequence_number"
-  | TextEventType
-  | "sys_ex"
-  | "escape"
-  | "midi_channel_prefix"
-  | "midi_port"
-  | "end_of_track"
-  | "tempo"
-  | "smpte_offset"
-  | "time_signature"
-  | "key_signature"
-  | "meta";
+export enum MessageType {
+  noteOff = 8,
+  noteOn,
+  polyphonicPressure,
+  controller,
+  programChange,
+  channelPressure,
+  pitchBend,
+  meta,
+}
+
+export enum MetaType {
+  sequenceNumber,
+  text,
+  copyright,
+  sequenceName,
+  instrumentName,
+  lyrics,
+  marker,
+  cuePoint,
+  programName,
+  deviceName,
+  midiChannelPrefix = 0x20,
+  midiPort,
+  endOfTrack = 0x2f,
+  tempo = 0x51,
+  smpteOffset = 0x54,
+  timeSignature = 0x58,
+  keySignature,
+}
 
 export type MidiEvent =
   | {
-    type: "note_off" | "note_on";
+    type: MessageType.noteOff | MessageType.noteOn;
     channel: number;
     note: number;
     velocity: number;
   }
   | {
-    type: "polyphonic_pressure";
+    type: MessageType.polyphonicPressure;
     channel: number;
     note: number;
     pressure: number;
   }
-  | { type: "controller"; channel: number; controller: number; value: number }
-  | { type: "program_change"; channel: number; program: number }
-  | { type: "channel_pressure"; channel: number; pressure: number }
-  | { type: "pitch_bend"; channel: number; value: number }
   | {
-    type:
-      | "sequence_number"
-      | "midi_channel_prefix"
-      | "midi_port"
-      | "tempo"
-      | "meta";
+    type: MessageType.controller;
+    channel: number;
+    controller: number;
+    value: number;
+  }
+  | { type: MessageType.programChange; channel: number; program: number }
+  | { type: MessageType.channelPressure; channel: number; pressure: number }
+  | { type: MessageType.pitchBend; channel: number; value: number }
+  | MetaEvent
+  | null;
+
+export type MetaEvent =
+  | {
+    type: MessageType.meta;
+    metaType:
+      | MetaType.sequenceNumber
+      | MetaType.midiChannelPrefix
+      | MetaType.midiPort
+      | MetaType.tempo;
     value: number;
   }
   | {
-    type: TextEventType;
+    type: MessageType.meta;
+    metaType: TextEventType;
     value: string;
   }
-  | { type: "end_of_track" | "sys_ex" | "escape" }
   | {
-    type: "smpte_offset";
+    type: MessageType.meta;
+    metaType: MetaType.endOfTrack;
+  }
+  | {
+    type: MessageType.meta;
+    metaType: MetaType.smpteOffset;
     hour: number;
     minute: number;
     second: number;
@@ -70,14 +94,19 @@ export type MidiEvent =
     centiframe: number;
   }
   | {
-    type: "time_signature";
+    type: MessageType.meta;
+    metaType: MetaType.timeSignature;
     numerator: number;
     denominator: number;
     clocks: number;
     quarterIn32nds: number;
   }
-  | { type: "key_signature"; sharps: number; major: boolean }
-  | { type: "meta"; subtype: number };
+  | {
+    type: MessageType.meta;
+    metaType: MetaType.keySignature;
+    sharps: number;
+    major: boolean;
+  };
 
 export type Timing =
   | {

@@ -1,4 +1,12 @@
-import { MidiEvent, MidiFile, Timing, Track } from "./midiTypes.ts";
+import {
+  MessageType,
+  MetaEvent,
+  MetaType,
+  MidiEvent,
+  MidiFile,
+  Timing,
+  Track,
+} from "./midiTypes.ts";
 
 export class Printer {
   #bytes: number[] = [];
@@ -45,26 +53,27 @@ export class Printer {
   }
 
   event(event: MidiEvent): void {
+    if (event == null) return;
     switch (event.type) {
-      case "note_off":
+      case MessageType.noteOff:
         this.#push(0x80 + event.channel, event.note, event.velocity);
         break;
-      case "note_on":
+      case MessageType.noteOn:
         this.#push(0x90 + event.channel, event.note, event.velocity);
         break;
-      case "polyphonic_pressure":
+      case MessageType.polyphonicPressure:
         this.#push(0xa0 + event.channel, event.note, event.pressure);
         break;
-      case "controller":
+      case MessageType.controller:
         this.#push(0xb0 + event.channel, event.controller, event.value);
         break;
-      case "program_change":
+      case MessageType.programChange:
         this.#push(0xc0 + event.channel, event.program);
         break;
-      case "channel_pressure":
+      case MessageType.channelPressure:
         this.#push(0xd0 + event.channel, event.pressure);
         break;
-      case "pitch_bend":
+      case MessageType.pitchBend:
         // todo: check!
         this.#push(
           0xe0 + event.channel,
@@ -72,61 +81,68 @@ export class Printer {
           (event.value >> 7) + 0x40,
         );
         break;
-      case "sequence_number":
+      case MessageType.meta:
+        this.metaEvent(event);
+        break;
+    }
+  }
+  metaEvent(event: MetaEvent) {
+    switch (event.metaType) {
+      case MetaType.sequenceNumber:
         this.#push(0xff, 0, 2);
         this.fixedLengthNumber(event.value, 2);
         break;
       // to be continued
-      case "text":
+      case MetaType.text:
         this.#push(0xff, 1);
         this.text(event.value);
         break;
-      case "copyright":
+      case MetaType.copyright:
         this.#push(0xff, 2);
         this.text(event.value);
         break;
-      case "sequence_name":
+      case MetaType.sequenceName:
         this.#push(0xff, 3);
         this.text(event.value);
         break;
-      case "instrument_name":
+      case MetaType.instrumentName:
         this.#push(0xff, 4);
         this.text(event.value);
         break;
-      case "lyrics":
+      case MetaType.lyrics:
         this.#push(0xff, 5);
         this.text(event.value);
         break;
-      case "marker":
+      case MetaType.marker:
         this.#push(0xff, 6);
         this.text(event.value);
         break;
-      case "cue_point":
+      case MetaType.cuePoint:
         this.#push(0xff, 7);
         this.text(event.value);
         break;
-      case "program_name":
+      case MetaType.programName:
         this.#push(0xff, 8);
         this.text(event.value);
         break;
-      case "device_name":
+      case MetaType.deviceName:
         this.#push(0xff, 9);
         this.text(event.value);
         break;
-      case "midi_channel_prefix":
+      case MetaType.midiChannelPrefix:
         this.#push(0xff, 0x20, 1, event.value);
         break;
-      case "midi_port":
+      case MetaType.midiPort:
         this.#push(0xff, 0x21, 1, event.value);
         break;
-      case "end_of_track":
+      case MetaType.endOfTrack:
         this.#push(0xff, 0x2f, 0);
         break;
-      case "tempo":
+      case MetaType.tempo:
         this.#push(0xff, 0x51, 3);
         this.fixedLengthNumber(event.value, 3);
         break;
-      case "smpte_offset":
+      case MetaType.smpteOffset:
         this.#push(
           0xff,
           0x54,
@@ -138,7 +154,7 @@ export class Printer {
           event.centiframe,
         );
         break;
-      case "time_signature":
+      case MetaType.timeSignature:
         this.#push(
           0xff,
           0x58,
@@ -149,7 +165,7 @@ export class Printer {
           event.quarterIn32nds,
         );
         break;
-      case "key_signature":
+      case MetaType.keySignature:
         this.#push(0xff, 0x59, 2, event.sharps & 0xff, event.major ? 0 : 1);
         break;
       default: // ignore the rest

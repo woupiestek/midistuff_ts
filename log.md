@@ -1,5 +1,10 @@
 # Midistuff logs
 
+## 2023-11-1
+
+There is a web midi api, maybe it works in deno as well. I could also run it in
+chrome, by setting up a web app.
+
 ## 2023-10-29
 
 All data is in events in tracks even if some of the data does not belong to a

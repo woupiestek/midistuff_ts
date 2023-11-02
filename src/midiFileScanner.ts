@@ -1,7 +1,8 @@
 import {
+  MessageType,
+  MetaType,
   MidiEvent,
   MidiFile,
-  TextEventType,
   Timing,
   Track,
 } from "./midiTypes.ts";
@@ -122,16 +123,6 @@ export class Scanner {
     throw new Error("more than 4 bytes in a variable length number");
   }
 
-  static #type = [
-    "note_off",
-    "note_on",
-    "polyphonic_pressure",
-    "controller",
-    "program_change",
-    "channel_pressure",
-    "pitch_bend",
-  ];
-
   event(): MidiEvent {
     const byte = this.pop();
 
@@ -141,20 +132,20 @@ export class Scanner {
 
     if (byte < 0xf0) {
       const channel = byte & 0xf;
-      const type = Scanner.#type[(byte >> 4) & 0x7];
+      const type = byte >> 4;
       switch (type) {
-        case "note_on":
-        case "note_off":
+        case MessageType.noteOff:
+        case MessageType.noteOn:
           return { type, channel, note: this.pop(), velocity: this.pop() };
-        case "polyphonic_pressure":
+        case MessageType.polyphonicPressure:
           return { type, channel, note: this.pop(), pressure: this.pop() };
-        case "controller":
+        case MessageType.controller:
           return { type, channel, controller: this.pop(), value: this.pop() };
-        case "program_change":
+        case MessageType.programChange:
           return { type, channel, program: this.pop() };
-        case "channel_pressure":
+        case MessageType.channelPressure:
           return { type, channel, pressure: this.pop() };
-        case "pitch_bend": {
+        case MessageType.pitchBend: {
           const lsb = this.pop();
           if (lsb >= 0x80) throw new Error("Unexpected lsb in pitch bend");
           const msb = this.pop();
@@ -169,12 +160,12 @@ export class Scanner {
         // due to side effects, inlining changes what this does.
         const l = this.variableLengthNumber();
         this.current += l;
-        return { type: "sys_ex" };
+        return null;
       }
       case 0xf7: {
         const l = this.variableLengthNumber();
         this.current += l;
-        return { type: "escape" };
+        return null;
       }
       case 0xff: {
         return this.metaData();
@@ -184,47 +175,38 @@ export class Scanner {
     throw new Error(`unsupported status byte ${byte} at ${this.current - 1}`);
   }
 
-  static #textEventType: TextEventType[] = [
-    "text",
-    "copyright",
-    "sequence_name",
-    "instrument_name",
-    "lyrics",
-    "marker",
-    "cue_point",
-    "program_name",
-    "device_name",
-  ];
-
   metaData(): MidiEvent {
-    const subtype = this.pop();
-    if (subtype >= 1 && subtype <= 0xf) {
-      return { type: Scanner.#textEventType[subtype - 1], value: this.text() };
+    const type = MessageType.meta;
+    const metaType = this.pop();
+
+    if (metaType >= 1 && metaType <= 0xf) {
+      return { type, metaType, value: this.text() };
     }
-    switch (subtype) {
-      case 0:
+    switch (metaType) {
+      case MetaType.sequenceNumber:
         this.consume(2);
-        return { type: "sequence_number", value: this.fixedLengthNumber(2) };
+        return { type, metaType, value: this.fixedLengthNumber(2) };
 
-      case 0x20:
+      case MetaType.midiChannelPrefix:
         this.consume(1);
-        return { type: "midi_channel_prefix", value: this.pop() };
-      case 0x21:
+        return { type, metaType, value: this.pop() };
+      case MetaType.midiPort:
         this.consume(1);
-        return { type: "midi_port", value: this.pop() };
+        return { type, metaType, value: this.pop() };
 
-      case 0x2f:
+      case MetaType.endOfTrack:
         this.consume(0);
-        return { type: "end_of_track" };
+        return { type, metaType };
 
-      case 0x51:
+      case MetaType.tempo:
         this.consume(3);
-        return { type: "tempo", value: this.fixedLengthNumber(3) };
+        return { type, metaType, value: this.fixedLengthNumber(3) };
 
-      case 0x54:
+      case MetaType.smpteOffset:
         this.consume(5);
         return {
-          type: "smpte_offset",
+          type,
+          metaType,
           hour: this.pop(),
           minute: this.pop(),
           second: this.pop(),
@@ -232,10 +214,11 @@ export class Scanner {
           centiframe: this.pop(),
         };
 
-      case 0x58:
+      case MetaType.timeSignature:
         this.consume(4);
         return {
-          type: "time_signature",
+          type,
+          metaType,
           numerator: this.pop(),
           denominator: 1 << this.pop(),
           // midi is weird
@@ -243,11 +226,12 @@ export class Scanner {
           quarterIn32nds: this.pop(),
         };
 
-      case 0x59: {
+      case MetaType.keySignature: {
         this.consume(2);
         const sharps = this.pop();
         return {
-          type: "key_signature",
+          type,
+          metaType,
           sharps: sharps < 0x80 ? sharps : 0x80 - sharps,
           major: this.pop() === 0,
         };
@@ -257,7 +241,7 @@ export class Scanner {
     // lacking specs, must ignore
     const l = this.variableLengthNumber();
     this.current += l;
-    return { type: "meta", value: subtype };
+    return null;
   }
 
   static #decoder = new TextDecoder();

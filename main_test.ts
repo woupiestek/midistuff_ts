@@ -4,6 +4,7 @@ import {
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Printer } from "./src/midiFIlePrinter.ts";
 import { Scanner } from "./src/midiFileScanner.ts";
+import { MessageType } from "./src/midiTypes.ts";
 
 function scanner(printer: Printer): Scanner {
   return new Scanner(new Uint8Array(printer.pop()));
@@ -49,11 +50,11 @@ Deno.test(function printAndScanTrack() {
   const printer = new Printer();
   printer.track([{
     wait: 10,
-    event: { type: "note_on", channel: 5, note: 64, velocity: 64 },
+    event: { type: MessageType.noteOn, channel: 5, note: 64, velocity: 64 },
   }]);
   const { wait, event } = scanner(printer).track()[0];
   assertEquals(wait, 10);
-  if (event.type !== "note_on") fail("unexpected event type");
+  if (event?.type !== MessageType.noteOn) fail("unexpected event type");
   assertEquals(event.channel, 5);
   assertEquals(event.note, 64);
   assertEquals(event.velocity, 64);
