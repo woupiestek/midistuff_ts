@@ -1,3 +1,4 @@
+// deno-lint-ignore-file
 async function checkAudio() {
   try {
     const access = await navigator.requestMIDIAccess();
@@ -7,4 +8,4 @@ async function checkAudio() {
   } catch (e) {
     console.error(e);
   }
-};
+}

@@ -91,19 +91,18 @@ export class Scanner {
     }
     const stop = this.current + this.fixedLengthNumber(4) + 4;
     const result = [];
-    while (this.current < stop) {
-      const wait = this.variableLengthNumber();
-      const event = this.event();
-      result.push({ wait, event });
+    try {
+      while (this.current < stop) {
+        result.push({ wait: this.variableLengthNumber(), event: this.event() });
+      }
+    } catch (e) {
+      console.error(e);
     }
     this.current = stop;
     return result;
   }
 
   fixedLengthNumber(size: number): number {
-    if (this.source.length < this.current + size) {
-      throw new Error("expected 4 more bytes");
-    }
     let value = 0;
     for (let i = 0; i < size; i++) {
       value = (value << 8) + this.pop();
@@ -116,46 +115,73 @@ export class Scanner {
     for (let i = 0; i < 4; i++) {
       const v = this.pop();
       value = (value << 7) + (v & 0x7f);
-      if ((v & 0x80) === 0) {
+      if (v < 0x80) {
         return value;
       }
     }
     throw new Error("more than 4 bytes in a variable length number");
   }
 
-  event(): MidiEvent {
-    const byte = this.pop();
-
-    if (byte < 0x80) {
-      throw new Error(`invalid status byte ${byte} at ${this.current - 1}`);
+  positive() {
+    const value = this.pop();
+    if (value >= 0x80) {
+      throw new Error(`expected a positive value, got ${value - 0x100}`);
     }
+    return value;
+  }
 
-    if (byte < 0xf0) {
-      const channel = byte & 0xf;
-      const type = byte >> 4;
+  #status = 0;
+
+  status() {
+    if (this.top() >= 0x80) {
+      this.#status = this.pop();
+    }
+    return this.#status;
+  }
+
+  event(): MidiEvent {
+    const status = this.status();
+    if (status < 0xf0) {
+      const channel = status & 0xf;
+      const type = status >> 4;
       switch (type) {
         case MessageType.noteOff:
         case MessageType.noteOn:
-          return { type, channel, note: this.pop(), velocity: this.pop() };
+          return {
+            type,
+            channel,
+            note: this.positive(),
+            velocity: this.positive(),
+          };
         case MessageType.polyphonicPressure:
-          return { type, channel, note: this.pop(), pressure: this.pop() };
+          return {
+            type,
+            channel,
+            note: this.positive(),
+            pressure: this.positive(),
+          };
         case MessageType.controller:
-          return { type, channel, controller: this.pop(), value: this.pop() };
+          return {
+            type,
+            channel,
+            controller: this.positive(),
+            value: this.positive(),
+          };
         case MessageType.programChange:
-          return { type, channel, program: this.pop() };
+          return { type, channel, program: this.positive() };
         case MessageType.channelPressure:
-          return { type, channel, pressure: this.pop() };
+          return { type, channel, pressure: this.positive() };
         case MessageType.pitchBend: {
-          const lsb = this.pop();
+          const lsb = this.positive();
           if (lsb >= 0x80) throw new Error("Unexpected lsb in pitch bend");
-          const msb = this.pop();
+          const msb = this.positive();
           if (msb >= 0x80) throw new Error("Unexpected msb in pitch bend");
           return { type, channel, value: (msb << 7) + lsb - 0x2000 };
         }
       }
     }
 
-    switch (byte) {
+    switch (status) {
       case 0xf0: {
         // due to side effects, inlining changes what this does.
         const l = this.variableLengthNumber();
@@ -172,12 +198,12 @@ export class Scanner {
       }
     }
 
-    throw new Error(`unsupported status byte ${byte} at ${this.current - 1}`);
+    throw new Error(`unsupported status byte ${status} at ${this.current - 1}`);
   }
 
   metaData(): MidiEvent {
     const type = MessageType.meta;
-    const metaType = this.pop();
+    const metaType = this.positive();
 
     if (metaType >= 1 && metaType <= 0xf) {
       return { type, metaType, value: this.text() };
@@ -187,12 +213,17 @@ export class Scanner {
         this.consume(2);
         return { type, metaType, value: this.fixedLengthNumber(2) };
 
-      case MetaType.midiChannelPrefix:
+      case MetaType.midiChannelPrefix: {
         this.consume(1);
-        return { type, metaType, value: this.pop() };
+        const value = this.pop();
+        if (value > 0xf) {
+          throw new Error(`channel ${value} does not exist.`);
+        }
+        return { type, metaType, value };
+      }
       case MetaType.midiPort:
         this.consume(1);
-        return { type, metaType, value: this.pop() };
+        return { type, metaType, value: this.positive() };
 
       case MetaType.endOfTrack:
         this.consume(0);
@@ -207,6 +238,7 @@ export class Scanner {
         return {
           type,
           metaType,
+          // todo: validate
           hour: this.pop(),
           minute: this.pop(),
           second: this.pop(),

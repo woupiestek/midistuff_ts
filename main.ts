@@ -1,6 +1,7 @@
 import { Printer } from "./src/midiFIlePrinter.ts";
 import { Scanner } from "./src/midiFileScanner.ts";
-// import { transform1 } from "./src/transformations.ts";
+import { transform1 } from "./src/transformations.ts";
+import { midi } from "https://deno.land/x/deno_midi/mod.ts";
 
 if (Deno.args.length < 1) {
   console.error("Usage: main [path]\n");
@@ -10,9 +11,16 @@ if (Deno.args.length < 1) {
 const data = await Deno.readFile(Deno.args[0]);
 const scanner = new Scanner(data);
 const file = scanner.file();
+const messages = transform1(file);
+const midi_out = new midi.Output();
+midi_out.openPort(0);
+
+for (const { realTime, message } of messages) {
+  setTimeout(() => midi_out.sendMessage(message), realTime);
+}
+
 const printer = new Printer();
 printer.file(file);
 const data2 = new Uint8Array(printer.pop());
-const file2 = new Scanner(data2).file();
-console.log(file, file2);
+new Scanner(data2).file();
 await Deno.writeFile("test.mid", data2);

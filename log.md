@@ -9,6 +9,26 @@ Midi sound achieved! Added:
 
 Use `.\run_midi.ps1 -file .\deno_midi.ts` to hear.
 
+And now I am playing midi files!
+
+### thoughts on the interface
+
+It should be possible to play short sequences in isolation and so on, so maybe a
+structured text document of some sort: like you just see the text, clicking
+opens up an editor, that produces sounds when new events are added or something.
+
+### lingering
+
+Let's test all the midi files.
+
+- BALLADE, CANYON, Exhil, FANTASIE, ochtend, ases_dood, griegs..., JAZZ, MINUET,
+  REGGAE, trouwdag..., zaal_van_de_bergkoning: scan failure
+- others: unexpected abrupt endings...
+
+'trollenmars' sounds odd, but mediaplayer does the same thing.
+
+The mystery is solved: midi uses 'running status', to compress its files.
+
 ## 2023-11-2
 
 Reorganize the file by program: the program determines how the notes sound.

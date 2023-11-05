@@ -52,100 +52,77 @@ export class Printer {
     this.fixedLengthNumber(this.#bytes.length - offset, 4, offset - 4);
   }
 
+  #status = 0xff;
+
   event(event: MidiEvent): void {
     if (event == null) return;
+    if (event.type === MessageType.meta) {
+      this.metaEvent(event);
+      return;
+    }
+    const status = (event.type << 4) + event.channel;
+    if (status !== this.#status) {
+      this.#push(status);
+      this.#status = status;
+    }
     switch (event.type) {
       case MessageType.noteOff:
-        this.#push(0x80 + event.channel, event.note, event.velocity);
-        break;
       case MessageType.noteOn:
-        this.#push(0x90 + event.channel, event.note, event.velocity);
+        this.#push(event.note, event.velocity);
         break;
       case MessageType.polyphonicPressure:
-        this.#push(0xa0 + event.channel, event.note, event.pressure);
+        this.#push(event.note, event.pressure);
         break;
       case MessageType.controller:
-        this.#push(0xb0 + event.channel, event.controller, event.value);
+        this.#push(event.controller, event.value);
         break;
       case MessageType.programChange:
-        this.#push(0xc0 + event.channel, event.program);
+        this.#push(event.program);
         break;
       case MessageType.channelPressure:
-        this.#push(0xd0 + event.channel, event.pressure);
+        this.#push(event.pressure);
         break;
       case MessageType.pitchBend:
         // todo: check!
         this.#push(
-          0xe0 + event.channel,
           0x7f & event.value,
           (event.value >> 7) + 0x40,
         );
         break;
-      case MessageType.meta:
-        this.metaEvent(event);
-        break;
     }
   }
   metaEvent(event: MetaEvent) {
+    this.#status = 0xff;
+    this.#push(this.#status, event.metaType);
     switch (event.metaType) {
       case MetaType.sequenceNumber:
-        this.#push(0xff, 0, 2);
+        this.#push(2);
         this.fixedLengthNumber(event.value, 2);
         break;
-      // to be continued
       case MetaType.text:
-        this.#push(0xff, 1);
-        this.text(event.value);
-        break;
       case MetaType.copyright:
-        this.#push(0xff, 2);
-        this.text(event.value);
-        break;
       case MetaType.sequenceName:
-        this.#push(0xff, 3);
-        this.text(event.value);
-        break;
       case MetaType.instrumentName:
-        this.#push(0xff, 4);
-        this.text(event.value);
-        break;
       case MetaType.lyrics:
-        this.#push(0xff, 5);
-        this.text(event.value);
-        break;
       case MetaType.marker:
-        this.#push(0xff, 6);
-        this.text(event.value);
-        break;
       case MetaType.cuePoint:
-        this.#push(0xff, 7);
-        this.text(event.value);
-        break;
       case MetaType.programName:
-        this.#push(0xff, 8);
-        this.text(event.value);
-        break;
       case MetaType.deviceName:
-        this.#push(0xff, 9);
         this.text(event.value);
         break;
       case MetaType.midiChannelPrefix:
-        this.#push(0xff, 0x20, 1, event.value);
-        break;
       case MetaType.midiPort:
-        this.#push(0xff, 0x21, 1, event.value);
+        this.#push(1, event.value);
         break;
       case MetaType.endOfTrack:
-        this.#push(0xff, 0x2f, 0);
+        this.#push(0);
         break;
       case MetaType.tempo:
-        this.#push(0xff, 0x51, 3);
+        this.#push(3);
         this.fixedLengthNumber(event.value, 3);
         break;
       case MetaType.smpteOffset:
         this.#push(
-          0xff,
-          0x54,
           5,
           event.hour,
           event.minute,
@@ -156,8 +133,6 @@ export class Printer {
         break;
       case MetaType.timeSignature:
         this.#push(
-          0xff,
-          0x58,
           4,
           event.numerator,
           Math.log2(event.denominator),
@@ -166,7 +141,7 @@ export class Printer {
         );
         break;
       case MetaType.keySignature:
-        this.#push(0xff, 0x59, 2, event.sharps & 0xff, event.major ? 0 : 1);
+        this.#push(2, event.sharps & 0xff, event.major ? 0 : 1);
         break;
       default: // ignore the rest
         break;

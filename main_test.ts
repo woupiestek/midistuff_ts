@@ -59,3 +59,28 @@ Deno.test(function printAndScanTrack() {
   assertEquals(event.note, 64);
   assertEquals(event.velocity, 64);
 });
+
+Deno.test(function printAndScanTrackWithRunningStatus() {
+  const printer = new Printer();
+  printer.track([{
+    wait: 10,
+    event: { type: MessageType.noteOn, channel: 5, note: 64, velocity: 64 },
+  }, {
+    wait: 10,
+    event: { type: MessageType.noteOn, channel: 5, note: 60, velocity: 64 },
+  }]);
+  const track = scanner(printer).track();
+  const { wait, event } = track[0];
+  assertEquals(wait, 10);
+  if (event?.type !== MessageType.noteOn) fail("unexpected event type");
+  assertEquals(event.channel, 5);
+  assertEquals(event.note, 64);
+  assertEquals(event.velocity, 64);
+
+  const { wait: w2, event: e2 } = track[1];
+  assertEquals(w2, 10);
+  if (e2?.type !== MessageType.noteOn) fail("unexpected event type");
+  assertEquals(e2.channel, 5);
+  assertEquals(e2.note, 60);
+  assertEquals(e2.velocity, 64);
+});
