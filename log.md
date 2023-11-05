@@ -1,5 +1,14 @@
 # Midistuff logs
 
+## 2013-11-5
+
+Midi sound achieved! Added:
+
+- `deno_midi.ts` for the code that makes the sound
+- `run_midi.ps1` to deal with the necessary permissions
+
+Use `.\run_midi.ps1 -file .\deno_midi.ts` to hear.
+
 ## 2023-11-2
 
 Reorganize the file by program: the program determines how the notes sound.

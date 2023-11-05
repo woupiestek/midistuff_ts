@@ -13,7 +13,7 @@ Deno.serve(
     let contentType: string;
     if (_req.url === "https://localhost/try_midi.js") {
       path = ".\\web\\try_midi.js";
-      contentType = "application/js";
+      contentType = "text/javascript";
     } else {
       path = ".\\web\\index.html";
       contentType = "text/html";
