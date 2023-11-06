@@ -2,9 +2,9 @@ import {
   assertEquals,
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Printer } from "./src/midiFIlePrinter.ts";
-import { Scanner } from "./src/midiFileScanner.ts";
-import { MessageType } from "./src/midiTypes.ts";
+import { Printer } from "./midiFIlePrinter.ts";
+import { Scanner } from "./midiFileScanner.ts";
+import { MessageType } from "./midiTypes.ts";
 
 function scanner(printer: Printer): Scanner {
   return new Scanner(new Uint8Array(printer.pop()));

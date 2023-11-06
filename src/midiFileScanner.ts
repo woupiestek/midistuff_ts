@@ -8,7 +8,6 @@ import {
 } from "./midiTypes.ts";
 
 export class Scanner {
-  start = 0;
   current = 0;
   constructor(readonly source: Uint8Array) {}
 
