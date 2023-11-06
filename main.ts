@@ -15,8 +15,12 @@ const messages = transform1(file);
 const midi_out = new midi.Output();
 midi_out.openPort(0);
 
+const RATE = 23;
 for (const { realTime, message } of messages) {
-  setTimeout(() => midi_out.sendMessage(message), realTime);
+  setTimeout(
+    () => midi_out.sendMessage(message),
+    (Math.floor((realTime * RATE) / 1000) * 1000) / RATE,
+  );
 }
 
 const printer = new Printer();

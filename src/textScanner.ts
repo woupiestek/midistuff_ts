@@ -1,26 +1,5 @@
 import { MessageType } from "./midiTypes.ts";
 
-const NOTES = {
-  c: 0,
-  d: 2,
-  e: 4,
-  f: 5,
-  g: 7,
-  a: 9,
-  b: 11,
-};
-
-// I kind of just feel like affixing + and - ...
-const ACCIDENTALS = {
-  __: -2,
-  _: -1,
-  "=": 0,
-  "^": 1,
-  "^^": 2,
-};
-
-// # and &?
-
 const DYNAMICS = {
   pppp: 1,
   ppp: 15,
@@ -177,7 +156,7 @@ export class TextScanner {
       throw this.error(`octave ${octave} out of range`);
     }
     tone += (octave + 1) * 12;
-    this.consume(CODES["&"]);
+    this.consume(CODES[";"]);
     return { type: TokenType.NOTE, tone, duration: this.duration() };
   }
 

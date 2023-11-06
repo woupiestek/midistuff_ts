@@ -1,6 +1,51 @@
 # Midistuff logs
 
-## 2013-11-5
+## 2023-11-6
+
+Where to take the notation from here?
+
+- Parallellism for chords.
+- Tempo.
+- Pedals.
+- More dynamic options.
+- Comments.
+- Repeats.
+- Instruments. (well... midi programs)
+
+### the imperative route
+
+Have labels and goto's to navigate the score A, but how can a jump be
+conditional?
+
+### crossing off ideas
+
+- Parallellism is about having two way to acculutae events: given two
+  collections, the can be put end to end, or combined from the same starting
+  point. The interpreter for the second state just resets the realTime. `{...}`
+  to collect, `,` for parallel combination. Spaces for sequencing.
+- Tempo. combined with parallelism, this could be confusing: does the change in
+  tempo carry over to other collections? A more declarative method groups a
+  collection of events and sets the tempo for all of the. Measured in ms for a
+  whole note... `\tempo 1500` e.g. ordinary numbers here.
+- Pedals. Postpone (and maybe deduplicate) note off events. Once again, not as a
+  background parameter, I imagine. `\pedal {...}`.
+- More dynamic options. Like dynamic accent, crescendo & decrescendo. We have
+  dynamic events now. A stateful interpretation may be confusing. `\dyn ff {}`,
+  `\cresc p f {}` special values.
+- Comments: that is nowhere. `%` to got to end, some blokc comment option.
+- Repeats: simple literal repeats help, but aren't enough. Label parts of the
+  score to repeat later, _so_ `\set bla {...}` is an expression, that links bla
+  with the collection behind it. `\get bla` put the same notes in elsewhere.
+  This is an exception to the anti-stateful rule. labels could be numbers, but
+  why not general identifiers.
+- Instruments: once again, the stateful interpretation can be confusing.
+  `\program number`. Yes, numbers.
+
+### status byte issues
+
+Back in REGGAE? at 22?
+
+## 2023-11-5
 
 Midi sound achieved! Added:
 
