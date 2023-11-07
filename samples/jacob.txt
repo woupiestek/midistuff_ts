@@ -1,0 +1,7 @@
+\tempo =1500 \dyn f {
+  \mark $A {3c;.2 3d;.4 3e;.4 3c;.4 r;.2} \repeat $A
+  \mark $B {3e;.2 3f;.4 3g;.8 r;.2} \repeat $B
+  % this was a puzzle to get right!
+  \mark $C {3g;.2 3a;.1 3g;.2 3f;.1 3e;.4 3c;.4 r;.2} \repeat $C
+  \mark $D {3c;.2 2g;.4 3c;.8 r;.2} \repeat $D 
+}

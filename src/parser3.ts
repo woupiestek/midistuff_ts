@@ -4,6 +4,7 @@ import { TrieMap } from "./trieMap.ts";
 export enum NodeType {
   CRESC,
   DYN,
+  ERROR,
   JOIN,
   MARK,
   NOTE,
@@ -16,38 +17,43 @@ export enum NodeType {
 
 export type Node =
   | {
-      type: NodeType.JOIN | NodeType.SEQUENCE;
-      children: Node[];
-    }
+    type: NodeType.JOIN | NodeType.SEQUENCE;
+    children: Node[];
+  }
   | {
-      type: NodeType.CRESC;
-      from: number;
-      to: number;
-      next: Node;
-    }
+    type: NodeType.CRESC;
+    from: number;
+    to: number;
+    next: Node;
+  }
   | {
-      type: NodeType.DYN | NodeType.PROGRAM | NodeType.TEMPO;
-      value: number;
-      next: Node;
-    }
+    type: NodeType.DYN | NodeType.PROGRAM | NodeType.TEMPO;
+    value: number;
+    next: Node;
+  }
   | {
-      type: NodeType.REPEAT;
-      value: string;
-    }
+    type: NodeType.REPEAT;
+    mark: string;
+  }
   | {
-      type: NodeType.MARK;
-      value: string;
-      next: Node;
-    }
+    type: NodeType.MARK;
+    mark: string;
+    next: Node;
+  }
   | {
-      type: NodeType.REST;
-      duration: number;
-    }
+    type: NodeType.REST;
+    duration: number;
+  }
   | {
-      type: NodeType.NOTE;
-      pitch: number;
-      duration: number;
-    };
+    type: NodeType.NOTE;
+    pitch: number;
+    duration: number;
+  }
+  | {
+    type: NodeType.ERROR;
+    token: Token;
+    error: Error;
+  };
 
 const KEYWORDS: TrieMap<NodeType> = new TrieMap();
 KEYWORDS.put("cresc", NodeType.CRESC);
@@ -69,9 +75,18 @@ export class Parser {
     return this.#current.type === TokenType.END;
   }
 
+  #error(message: string) {
+    const type = TokenType[this.#current.type];
+    const line = this.#current.line;
+    const lexeme = Parser.#decoder.decode(
+      this.source.slice(this.#current.from, this.#current.to),
+    );
+    return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
+  }
+
   parse() {
     const result = this.#node();
-    if (result === null || !this.#done()) throw new Error("parse failure");
+    if (!this.#done()) throw this.#error("input left over");
     return result;
   }
 
@@ -91,36 +106,26 @@ export class Parser {
 
   #consume(type: TokenType) {
     if (!this.#match(type)) {
-      throw new Error(
-        `Expected a ${TokenType[type]}, actual ${Token.stringify(
-          this.#current
-        )}`
-      );
+      throw this.#error(`Expected a ${TokenType[type]}`);
     }
   }
 
-  #slice(): Uint8Array {
-    if (this.#current.type !== TokenType.OPERAND) {
-      throw new Error("Operand expected");
+  #mark(): string {
+    if (this.#current.type !== TokenType.MARK) {
+      throw this.#error(`Mark expected`);
     }
-    const value = this.source.slice(this.#current.from, this.#current.to);
+    const value = this.source.slice(this.#current.from + 1, this.#current.to);
     this.#advance();
-    return value;
-  }
-
-  #string(): string {
-    return Parser.#decoder.decode(this.#slice());
+    return Parser.#decoder.decode(value);
   }
 
   #value(type: TokenType): number {
     if (this.#current.type !== type) {
-      throw new Error(
-        `Expected ${type}, actual ${Token.stringify(this.#current)}`
-      );
+      throw this.#error(`Expected ${type}`);
     }
     const value = this.#current.value;
     if (value === undefined) {
-      throw new Error(`Expected ${type} to have a value`);
+      throw this.#error(`Expected ${type} to have a value`);
     }
     this.#current = this.#scanner.next();
     return value;
@@ -128,17 +133,12 @@ export class Parser {
 
   static #decoder = new TextDecoder();
 
-  #next(): Node {
-    const node = this.#node();
-    if (node === null) throw new Error("Missing argument");
-    return node;
-  }
   // use triemap and test the whole thing
   #operation(): Node {
     const type = KEYWORDS.getByArray(
-      this.source.slice(this.#current.from + 1, this.#current.to)
+      this.source.slice(this.#current.from + 1, this.#current.to),
     );
-    if (type === null) throw new Error(`Bad keyword`);
+    if (type === null) throw this.#error(`Bad keyword`);
     this.#advance();
     switch (type) {
       case NodeType.CRESC: {
@@ -146,48 +146,48 @@ export class Parser {
           type,
           from: this.#value(TokenType.VELOCITY),
           to: this.#value(TokenType.VELOCITY),
-          next: this.#next(),
+          next: this.#node(),
         };
       }
       case NodeType.DYN: {
         return {
           type,
           value: this.#value(TokenType.VELOCITY),
-          next: this.#next(),
+          next: this.#node(),
         };
       }
       case NodeType.REPEAT:
         return {
           type,
-          value: this.#string(),
+          mark: this.#mark(),
         };
       case NodeType.PROGRAM: {
         return {
           type: NodeType.PROGRAM,
-          value: Number.parseInt(this.#string()),
-          next: this.#next(),
+          value: this.#value(TokenType.DEC),
+          next: this.#node(),
         };
       }
       case NodeType.MARK: {
         return {
           type: NodeType.MARK,
-          value: this.#string(),
-          next: this.#next(),
+          mark: this.#mark(),
+          next: this.#node(),
         };
       }
       case NodeType.TEMPO: {
         return {
           type: NodeType.TEMPO,
-          value: Number.parseFloat(this.#string()),
-          next: this.#next(),
+          value: this.#value(TokenType.DEC),
+          next: this.#node(),
         };
       }
       default:
-        throw new Error(`Unknown operator ${name}`);
+        throw this.#error(`Unknown operator ${name}`);
     }
   }
 
-  #node(): Node | null {
+  #node(): Node {
     switch (this.#current.type) {
       case TokenType.LBRACE: {
         this.#advance();
@@ -198,7 +198,7 @@ export class Parser {
       case TokenType.PITCH: {
         const pitch = this.#current.value;
         if (pitch === undefined) {
-          throw new Error(`missing pitch value`);
+          throw this.#error(`missing pitch value`);
         }
         this.#advance();
         return {
@@ -214,16 +214,46 @@ export class Parser {
           duration: this.#value(TokenType.HEX),
         };
       default:
-        return null;
+        throw this.#error(
+          "expected a collection '{', an operation '...', a rest 'r...' or a note '3c...'",
+        );
     }
   }
 
+  #sequencEnd() {
+    return [TokenType.END, TokenType.COMMA, TokenType.RBRACE].includes(
+      this.#current.type,
+    );
+  }
+
   #sequence(): Node {
-    const children: Node[] = [];
-    for (;;) {
-      const child = this.#node();
-      if (child === null) return { type: NodeType.SEQUENCE, children };
-      children.push(child);
+    try {
+      const children: Node[] = [];
+      while (!this.#sequencEnd()) {
+        children.push(this.#node());
+      }
+      return { type: NodeType.SEQUENCE, children };
+    } catch (error) {
+      const token = this.#current;
+      this.#panic();
+      return { type: NodeType.ERROR, token, error };
+    }
+  }
+
+  #panic() {
+    while (!this.#sequencEnd()) {
+      if (this.#current.type === TokenType.LBRACE) {
+        let depth = 1;
+        while (depth > 0 && !this.#done()) {
+          this.#advance();
+          if (this.#current.type === TokenType.LBRACE) {
+            depth++;
+          } else if (this.#current.type === TokenType.RBRACE) {
+            depth--;
+          }
+        }
+      }
+      this.#advance();
     }
   }
 

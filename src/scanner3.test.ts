@@ -12,6 +12,16 @@ Deno.test(function scanComma() {
   assertEquals(line, 1);
 });
 
+Deno.test(function scanDec() {
+  const scanner = new Scanner(textEncoder.encode("=17.39"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.DEC);
+  assertEquals(value, 17.39);
+  assertEquals(from, 0);
+  assertEquals(to, 6);
+  assertEquals(line, 1);
+});
+
 Deno.test(function scanEnd() {
   const scanner = new Scanner(textEncoder.encode(""));
   const { type, from, to, line } = scanner.next();
@@ -62,10 +72,10 @@ Deno.test(function scanLBrace() {
   assertEquals(line, 1);
 });
 
-Deno.test(function scanOperand() {
+Deno.test(function scanError() {
   const scanner = new Scanner(textEncoder.encode("1234567890asdfghjklz"));
   const { type, from, to, line } = scanner.next();
-  assertEquals(type, TokenType.OPERAND);
+  assertEquals(type, TokenType.ERROR);
   assertEquals(from, 0);
   assertEquals(to, 20);
   assertEquals(line, 1);
@@ -115,5 +125,14 @@ Deno.test(function scanVelocity() {
   assertEquals(value, 57);
   assertEquals(from, 0);
   assertEquals(to, 2);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanMark() {
+  const scanner = new Scanner(textEncoder.encode("$line_1"));
+  const { type, from, to, line } = scanner.next();
+  assertEquals(type, TokenType.MARK);
+  assertEquals(from, 0);
+  assertEquals(to, 7);
   assertEquals(line, 1);
 });

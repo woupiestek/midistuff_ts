@@ -17,7 +17,7 @@ separate token types. Main exception is duration: every note and rest has one,
 and a lot is allowed. There are non hex numbers too, for tempo and program, etc.
 
 This could be split up: the normal pattern becomes (rest/note duration)*,
-seprated with spaces if needed. durection follows, because the note or rest
+seperated with spaces if needed. duration follows, because the note or rest
 applies to it i.e. they are not themselves the events.
 
 Abiguity is a bitch. Maybe durations should just always be preceded by a `;`
@@ -51,6 +51,15 @@ ways to write them down.
 - Tempos: sticking to this milliseconds per whole note idea...
 
 Aside from that, markers, which should just be identifier strings. `$`?
+
+### next step: generate messages!
+
+The marks etc. are now the interesting parts. Is the scope of a mark limited?
+
+Maybe add something to the parser?
+
+Panic mode would be good as well, but what are the boundaries if everything is
+an expression? `,` and `}` maybe?
 
 ## 2023-11-6
 

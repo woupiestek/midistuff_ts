@@ -3,18 +3,18 @@ import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
   COMMA,
+  DEC,
   END,
   ERROR,
   HEX,
   LBRACE,
-  OPERAND,
+  MARK,
   OPERATOR,
   PITCH,
   REST,
   RBRACE,
   VELOCITY,
 }
-
 export type Token = {
   type: TokenType;
   from: number;
@@ -24,8 +24,8 @@ export type Token = {
 };
 
 export const Token = {
-  stringify({ type, from, to, line }: Token) {
-    return `${TokenType[type]} [${from},${to}[ (line ${line})`;
+  stringify({ type, from, to, line, value }: Token) {
+    return `${TokenType[type]} [${from},${to}[ (line ${line} value ${value})`;
   },
 };
 
@@ -108,9 +108,7 @@ export class Scanner {
   }
 
   #comment() {
-    while (!this.done() && !this.#match(CODES["\n"])) {
-      this.#current++;
-    }
+    while (!this.done() && this.#pop() !== CODES["\n"]);
   }
 
   #skip() {
@@ -121,15 +119,16 @@ export class Scanner {
     }
   }
 
-  static #isLetterOrCipher(ch: number): boolean {
+  static #isLetterOrDigit(ch: number): boolean {
     return (
       (CODES[0] <= ch && ch <= CODES[9]) ||
       (CODES.A <= ch && ch <= CODES.Z) ||
+      CODES._ === ch ||
       (CODES.a <= ch && ch <= CODES.z)
     );
   }
   static #ic(ch: number) {
-    return Scanner.#isLetterOrCipher(ch);
+    return Scanner.#isLetterOrDigit(ch);
   }
 
   #identifier() {
@@ -138,10 +137,38 @@ export class Scanner {
     }
   }
 
+  #decDigit(): number | null {
+    if (this.done()) return null;
+    const code = this.source[this.#current++];
+    if (CODES[0] <= code && code <= CODES[9]) return code - CODES[0];
+    this.#current--;
+    return null;
+  }
+
+  #dec() {
+    let value = 0;
+    for (;;) {
+      const digit = this.#decDigit();
+      if (digit === null) break;
+      value = 10 * value + digit;
+    }
+    if (this.#match(CODES["."])) {
+      let f = 1 / 10;
+      for (;;) {
+        const digit = this.#decDigit();
+        if (digit === null) break;
+        value += f * digit;
+        f /= 10;
+      }
+    }
+    return value;
+  }
+
   #hexDigit(): number | null {
     if (this.done()) return null;
     const code = this.source[this.#current++];
     if (CODES[0] <= code && code <= CODES[9]) return code - CODES[0];
+    if (CODES.A <= code && code <= CODES.F) return code - CODES.A + 10;
     if (CODES.a <= code && code <= CODES.f) return code - CODES.a + 10;
     this.#current--;
     return null;
@@ -183,20 +210,23 @@ export class Scanner {
         return this.#token(TokenType.OPERATOR);
       case CODES[";"]:
         return this.#token(TokenType.HEX, this.#hex());
+      case CODES["$"]:
+        this.#identifier();
+        return this.#token(TokenType.MARK);
+      case CODES["="]:
+        return this.#token(TokenType.DEC, this.#dec());
       default:
-        if (Scanner.#ic(ch)) {
-          this.#identifier();
-          const token = this.#token(TokenType.OPERAND);
-          const specific = OPERANDS.getByArray(
-            this.source.slice(token.from, token.to),
-          );
-          if (specific === null) return token;
-          token.type = specific[0];
-          token.value = specific[1];
-          return token;
-        }
-        // todo: this is effectively unreachable
-        return this.#token(TokenType.ERROR);
+        break;
     }
+    if (Scanner.#ic(ch)) {
+      this.#identifier();
+      const specific = OPERANDS.getByArray(
+        this.source.slice(this.#from, this.#current),
+      );
+      if (specific !== null) {
+        return this.#token(...specific);
+      }
+    }
+    return this.#token(TokenType.ERROR);
   }
 }
