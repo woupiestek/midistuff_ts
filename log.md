@@ -1,5 +1,57 @@
 # Midistuff logs
 
+## 2023-11-7
+
+### left out
+
+- pedals
+- accents
+- ...
+
+Accents is interesting: something that can only be attached to a note. Not that
+a crescendo over an empty sequence or a chord with rests is meaningful, but is
+seem we have a case for splitting up two types of note.
+
+Note: perhaps the ultimate solution is to build a trie of operands, each with
+separate token types. Main exception is duration: every note and rest has one,
+and a lot is allowed. There are non hex numbers too, for tempo and program, etc.
+
+This could be split up: the normal pattern becomes (rest/note duration)*,
+seprated with spaces if needed. durection follows, because the note or rest
+applies to it i.e. they are not themselves the events.
+
+Abiguity is a bitch. Maybe durations should just always be preceded by a `;`
+That way, other tokens are free to start with `abcdef`. This could be a general
+rule: use a marker to set all numbers apart from other operands. Have different
+markers for different numbers.
+
+Mark and repeat introduce variable names, so, `$` for them right? Maybe backtick
+or `'`, or something.
+
+### notation of pitch
+
+Pitches actually are the default kind of number, ironically. Currently
+octave-tone-accidental: big to small, like numbers. The note names are absolute,
+sothe accidentals are no issue. If we introduced keys signatures, there is a
+choice: add naturals, of keep the relative accidentals. Advantage of key
+signatures: less accidentals to note down, Downside: misleading note names.
+
+This is the part that can change the most.
+
+### inventorize
+
+Pitches, dynamics, durations, programs, tempos: different numbers with different
+ways to write them down.
+
+- Pitches and dynamics have their own little systems, for which i'd like the
+  trees.
+- Duration: floating hexadecimals...
+- Programs: limited range like pitches and dynamics, but I am not feeling like
+  working them out. Up for change down the line.
+- Tempos: sticking to this milliseconds per whole note idea...
+
+Aside from that, markers, which should just be identifier strings.
+
 ## 2023-11-6
 
 Where to take the notation from here?

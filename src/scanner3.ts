@@ -17,10 +17,24 @@ export type Token = {
   line: number;
 };
 
-const CODES: Record<string, number> = {};
-for (let i = 33; i < 127; i++) {
-  CODES[String.fromCharCode(i)] = i;
-}
+export const Token = {
+  stringify({ type, from, to, line }: Token) {
+    return `${TokenType[type]} [${from},${to}[ (line ${line})`;
+  },
+};
+
+// "%\\,{}"
+const CODES: Record<string, number> = {
+  "\n": "\n".charCodeAt(0),
+  "%": "%".charCodeAt(0),
+  "\\": "\\".charCodeAt(0),
+  ",": ",".charCodeAt(0),
+  "{": "{".charCodeAt(0),
+  "}": "}".charCodeAt(0),
+};
+// for (let i = 33; i < 127; i++) {
+//   CODES[String.fromCharCode(i)] = i;
+// }
 
 export class Scanner {
   #current = 0;
@@ -55,7 +69,7 @@ export class Scanner {
   #whitespace() {
     while (!this.done()) {
       const value = this.source[this.#current];
-      if ((value >= 9 && value <= 13) || value === 32) {
+      if (Scanner.#white(value)) {
         this.#current++;
         if (value === 10) {
           this.#line++;
@@ -64,6 +78,10 @@ export class Scanner {
         return;
       }
     }
+  }
+
+  static #white(value: number) {
+    return (value >= 9 && value <= 13) || value === 32;
   }
 
   #comment() {
@@ -80,15 +98,8 @@ export class Scanner {
     }
   }
 
-  // '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\x7F'
-  //      x x     x                                                                               xxx
   static #ic(ch: number) {
-    return (
-      (CODES["'"] <= ch && ch <= CODES["$"]) ||
-      (CODES[0] <= ch && ch <= CODES[";"]) ||
-      (CODES["?"] <= ch && ch <= CODES.Z) ||
-      (CODES["^"] <= ch && ch <= CODES.z)
-    );
+    return !(Scanner.#white(ch) || Object.values(CODES).includes(ch));
   }
 
   #identifier() {
@@ -102,10 +113,6 @@ export class Scanner {
     this.#from = this.#current;
     if (this.done()) return this.#token(TokenType.END);
     const ch = this.#pop();
-    if (Scanner.#ic(ch)) {
-      this.#identifier();
-      return this.#token(TokenType.OPERAND);
-    }
     switch (ch) {
       case CODES[","]:
         return this.#token(TokenType.COMMA);
@@ -117,6 +124,11 @@ export class Scanner {
         this.#identifier();
         return this.#token(TokenType.OPERATOR);
       default:
+        if (Scanner.#ic(ch)) {
+          this.#identifier();
+          return this.#token(TokenType.OPERAND);
+        }
+        // todo: this is effectively unreachable
         return this.#token(TokenType.ERROR);
     }
   }
