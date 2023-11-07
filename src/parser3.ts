@@ -6,10 +6,9 @@ export enum NodeType {
   DYN,
   ERROR,
   JOIN,
-  MARK,
+  INSERT,
   NOTE,
   PROGRAM,
-  REPEAT,
   REST,
   SEQUENCE,
   TEMPO,
@@ -32,13 +31,8 @@ export type Node =
     next: Node;
   }
   | {
-    type: NodeType.REPEAT;
-    mark: string;
-  }
-  | {
-    type: NodeType.MARK;
-    mark: string;
-    next: Node;
+    type: NodeType.INSERT;
+    index: number;
   }
   | {
     type: NodeType.REST;
@@ -55,17 +49,28 @@ export type Node =
     error: Error;
   };
 
-const KEYWORDS: TrieMap<NodeType> = new TrieMap();
-KEYWORDS.put("cresc", NodeType.CRESC);
-KEYWORDS.put("dyn", NodeType.DYN);
-KEYWORDS.put("mark", NodeType.MARK);
-KEYWORDS.put("program", NodeType.PROGRAM);
-KEYWORDS.put("repeat", NodeType.REPEAT);
-KEYWORDS.put("tempo", NodeType.TEMPO);
+enum Operation {
+  CRESC,
+  DYN,
+  MARK,
+  PROGRAM,
+  REPEAT,
+  TEMPO,
+}
+
+const KEYWORDS: TrieMap<Operation> = new TrieMap();
+KEYWORDS.put("cresc", Operation.CRESC);
+KEYWORDS.put("dyn", Operation.DYN);
+KEYWORDS.put("mark", Operation.MARK);
+KEYWORDS.put("program", Operation.PROGRAM);
+KEYWORDS.put("repeat", Operation.REPEAT);
+KEYWORDS.put("tempo", Operation.TEMPO);
 
 export class Parser {
   #scanner;
   #current;
+  #sections: { mark: string; node: Node }[] = [];
+  #bindings: { mark: string; index: number }[] = [];
   constructor(private readonly source: Uint8Array) {
     this.#scanner = new Scanner(source);
     this.#current = this.#scanner.next();
@@ -84,10 +89,17 @@ export class Parser {
     return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
   }
 
-  parse() {
-    const result = this.#node();
-    if (!this.#done()) throw this.#error("input left over");
-    return result;
+  parse(): { main: Node; sections: { mark: string; node: Node }[] } {
+    try {
+      const main = this.#node();
+      if (!this.#done()) throw this.#error("input left over");
+      return { main, sections: this.#sections };
+    } catch (error) {
+      return {
+        main: { type: NodeType.ERROR, token: this.#current, error },
+        sections: this.#sections,
+      };
+    }
   }
 
   #advance() {
@@ -133,6 +145,13 @@ export class Parser {
 
   static #decoder = new TextDecoder();
 
+  #resolve(mark: string): number {
+    for (let i = this.#bindings.length - 1; i >= 0; i--) {
+      if (this.#bindings[i].mark === mark) return this.#bindings[i].index;
+    }
+    throw this.#error(`Could not resolve ${mark}`);
+  }
+
   // use triemap and test the whole thing
   #operation(): Node {
     const type = KEYWORDS.getByArray(
@@ -141,41 +160,45 @@ export class Parser {
     if (type === null) throw this.#error(`Bad keyword`);
     this.#advance();
     switch (type) {
-      case NodeType.CRESC: {
+      case Operation.CRESC: {
         return {
-          type,
+          type: NodeType.CRESC,
           from: this.#value(TokenType.VELOCITY),
           to: this.#value(TokenType.VELOCITY),
           next: this.#node(),
         };
       }
-      case NodeType.DYN: {
+      case Operation.DYN: {
         return {
-          type,
+          type: NodeType.DYN,
           value: this.#value(TokenType.VELOCITY),
           next: this.#node(),
         };
       }
-      case NodeType.REPEAT:
+      case Operation.REPEAT:
+        // todo: change node structure
         return {
-          type,
-          mark: this.#mark(),
+          type: NodeType.INSERT,
+          index: this.#resolve(this.#mark()),
         };
-      case NodeType.PROGRAM: {
+      case Operation.PROGRAM: {
         return {
           type: NodeType.PROGRAM,
           value: this.#value(TokenType.DEC),
           next: this.#node(),
         };
       }
-      case NodeType.MARK: {
+      case Operation.MARK: {
+        const mark = this.#mark();
+        const index = this.#sections.push({ mark, node: this.#node() }) - 1;
+        this.#bindings.push({ mark, index });
+        // todo: change node structure
         return {
-          type: NodeType.MARK,
-          mark: this.#mark(),
-          next: this.#node(),
+          type: NodeType.INSERT,
+          index,
         };
       }
-      case NodeType.TEMPO: {
+      case Operation.TEMPO: {
         return {
           type: NodeType.TEMPO,
           value: this.#value(TokenType.DEC),
@@ -191,7 +214,10 @@ export class Parser {
     switch (this.#current.type) {
       case TokenType.LBRACE: {
         this.#advance();
-        return { type: NodeType.JOIN, children: this.#collection() };
+        const scope = this.#bindings.length;
+        const children = this.#collection();
+        this.#bindings.length = scope; // bindings go out of scope
+        return { type: NodeType.JOIN, children };
       }
       case TokenType.OPERATOR:
         return this.#operation();

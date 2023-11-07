@@ -52,14 +52,34 @@ ways to write them down.
 
 Aside from that, markers, which should just be identifier strings. `$`?
 
-### next step: generate messages!
+### next goals
+
+Panic mode would be good as well, but what are the boundaries if everything is
+an expression? `,` and `}` maybe?
+
+### variable resolution
 
 The marks etc. are now the interesting parts. Is the scope of a mark limited?
 
 Maybe add something to the parser?
 
-Panic mode would be good as well, but what are the boundaries if everything is
-an expression? `,` and `}` maybe?
+The keyword is repeat. Some perhaps doubling a part with another instrument is
+an unusual way to 'repeat' a section, but this is an ok use.
+
+We can do something more powerful:
+
+- put marked sections in a list.
+- replace mark & repeat nodes with nodes the refer to the list.
+- refer back to the position in the list.
+
+This changes the return type (a node with a list of subsections) And creates
+resolution errors.
+
+The sections are in place. They can of course refer to each other, but this only
+goes backward: resolutions fails unless there was something to refer to, but
+when section n was stored, only sections < n could be found.
+
+Main is the last one in a sense, but has no mark, so it does not simply fit in.
 
 ## 2023-11-6
 
