@@ -13,6 +13,5 @@ Deno.test(function scan() {
   } catch (e) {
     console.error(e);
   }
-  console.log(...tokens);
   assertEquals(tokens.length, 11);
 });

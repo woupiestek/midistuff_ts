@@ -47,10 +47,10 @@ ways to write them down.
   trees.
 - Duration: floating hexadecimals...
 - Programs: limited range like pitches and dynamics, but I am not feeling like
-  working them out. Up for change down the line.
+  working them out. Up for change down the line. `=` for decimal numbers?
 - Tempos: sticking to this milliseconds per whole note idea...
 
-Aside from that, markers, which should just be identifier strings.
+Aside from that, markers, which should just be identifier strings. `$`?
 
 ## 2023-11-6
 

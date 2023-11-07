@@ -7,7 +7,7 @@ import { NodeType, Parser } from "./parser3.ts";
 const textEncoder = new TextEncoder();
 
 Deno.test(function parseRest() {
-  const node = new Parser(textEncoder.encode("r.4")).parse();
+  const node = new Parser(textEncoder.encode("r;.4")).parse();
   if (node.type !== NodeType.REST) fail("wrong type");
   assertEquals(node.duration, 0.25);
 });
@@ -20,7 +20,7 @@ Deno.test(function parseNote() {
 });
 
 Deno.test(function parseSequence() {
-  const node = new Parser(textEncoder.encode("{ 3c;.2 3d;.4 3e;.4 3c;.4 r.2 }"))
+  const node = new Parser(textEncoder.encode("{ 3c;.2 3d;.4 3e;.4 3c;.4 r;.2 }"))
     .parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(node.children.length, 1);

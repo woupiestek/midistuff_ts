@@ -1,4 +1,5 @@
 import { Scanner, Token, TokenType } from "./scanner3.ts";
+import { TrieMap } from "./trieMap.ts";
 
 export enum NodeType {
   CRESC,
@@ -15,86 +16,38 @@ export enum NodeType {
 
 export type Node =
   | {
-    type: NodeType.JOIN | NodeType.SEQUENCE;
-    children: Node[];
-  }
-  | {
-    type: NodeType.CRESC;
-    from: number;
-    to: number;
-    next: Node;
-  }
-  | {
-    type: NodeType.DYN | NodeType.PROGRAM | NodeType.TEMPO;
-    value: number;
-    next: Node;
-  }
-  | {
-    type: NodeType.REPEAT;
-    value: string;
-  }
-  | {
-    type: NodeType.MARK;
-    value: string;
-    next: Node;
-  }
-  | {
-    type: NodeType.REST;
-    duration: number;
-  }
-  | {
-    type: NodeType.NOTE;
-    pitch: number;
-    duration: number;
-  };
-
-class TrieMap<V> {
-  #tries: Record<number, TrieMap<V>> = {};
-  #value: V | null = null;
-  static #path(key: string): number[] {
-    return Array.from(key)
-      .map((_, i) => key.charCodeAt(i))
-      .reverse();
-  }
-  #put(path: number[], value: V) {
-    const index = path.pop();
-    if (index === undefined) {
-      this.#value = value;
-      return;
+      type: NodeType.JOIN | NodeType.SEQUENCE;
+      children: Node[];
     }
-    (this.#tries[index] ||= new TrieMap()).#put(path, value);
-  }
-  put(key: string, value: V) {
-    this.#put(TrieMap.#path(key), value);
-  }
-  #get(path: number[]): V | null {
-    const index = path.pop();
-    if (index === undefined) {
-      return this.#value;
+  | {
+      type: NodeType.CRESC;
+      from: number;
+      to: number;
+      next: Node;
     }
-    const trie = this.#tries[index];
-    if (trie === null) return null;
-    return trie.#get(path);
-  }
-  get(key: string): V | null {
-    return this.#get(TrieMap.#path(key));
-  }
-  getByArray(key: Uint8Array): V | null {
-    return this.#get([...key].reverse());
-  }
-}
-
-const DYNAMICS: TrieMap<number> = new TrieMap();
-DYNAMICS.put("pppp", 1);
-DYNAMICS.put("ppp", 15);
-DYNAMICS.put("pp", 29);
-DYNAMICS.put("p", 43);
-DYNAMICS.put("mp", 57);
-DYNAMICS.put("mf", 71);
-DYNAMICS.put("f", 85);
-DYNAMICS.put("ff", 99);
-DYNAMICS.put("fff", 113);
-DYNAMICS.put("ffff", 127);
+  | {
+      type: NodeType.DYN | NodeType.PROGRAM | NodeType.TEMPO;
+      value: number;
+      next: Node;
+    }
+  | {
+      type: NodeType.REPEAT;
+      value: string;
+    }
+  | {
+      type: NodeType.MARK;
+      value: string;
+      next: Node;
+    }
+  | {
+      type: NodeType.REST;
+      duration: number;
+    }
+  | {
+      type: NodeType.NOTE;
+      pitch: number;
+      duration: number;
+    };
 
 const KEYWORDS: TrieMap<NodeType> = new TrieMap();
 KEYWORDS.put("cresc", NodeType.CRESC);
@@ -117,7 +70,7 @@ export class Parser {
   }
 
   parse() {
-    const result = this.#next();
+    const result = this.#node();
     if (result === null || !this.#done()) throw new Error("parse failure");
     return result;
   }
@@ -139,11 +92,9 @@ export class Parser {
   #consume(type: TokenType) {
     if (!this.#match(type)) {
       throw new Error(
-        `Expected a ${TokenType[type]}, actual ${
-          Token.stringify(
-            this.#current,
-          )
-        }`,
+        `Expected a ${TokenType[type]}, actual ${Token.stringify(
+          this.#current
+        )}`
       );
     }
   }
@@ -161,10 +112,18 @@ export class Parser {
     return Parser.#decoder.decode(this.#slice());
   }
 
-  #dynamic(): number {
-    const velocity = DYNAMICS.getByArray(this.#slice());
-    if (velocity === null) throw new Error("Expected dynamic");
-    return velocity;
+  #value(type: TokenType): number {
+    if (this.#current.type !== type) {
+      throw new Error(
+        `Expected ${type}, actual ${Token.stringify(this.#current)}`
+      );
+    }
+    const value = this.#current.value;
+    if (value === undefined) {
+      throw new Error(`Expected ${type} to have a value`);
+    }
+    this.#current = this.#scanner.next();
+    return value;
   }
 
   static #decoder = new TextDecoder();
@@ -177,7 +136,7 @@ export class Parser {
   // use triemap and test the whole thing
   #operation(): Node {
     const type = KEYWORDS.getByArray(
-      this.source.slice(this.#current.from + 1, this.#current.to),
+      this.source.slice(this.#current.from + 1, this.#current.to)
     );
     if (type === null) throw new Error(`Bad keyword`);
     this.#advance();
@@ -185,15 +144,15 @@ export class Parser {
       case NodeType.CRESC: {
         return {
           type,
-          from: this.#dynamic(),
-          to: this.#dynamic(),
+          from: this.#value(TokenType.VELOCITY),
+          to: this.#value(TokenType.VELOCITY),
           next: this.#next(),
         };
       }
       case NodeType.DYN: {
         return {
           type,
-          value: this.#dynamic(),
+          value: this.#value(TokenType.VELOCITY),
           next: this.#next(),
         };
       }
@@ -228,10 +187,6 @@ export class Parser {
     }
   }
 
-  #noteOrRest(): Node {
-    return new NoteOrRestScanner(this.#slice()).node();
-  }
-
   #node(): Node | null {
     switch (this.#current.type) {
       case TokenType.LBRACE: {
@@ -240,8 +195,24 @@ export class Parser {
       }
       case TokenType.OPERATOR:
         return this.#operation();
-      case TokenType.OPERAND:
-        return this.#noteOrRest();
+      case TokenType.PITCH: {
+        const pitch = this.#current.value;
+        if (pitch === undefined) {
+          throw new Error(`missing pitch value`);
+        }
+        this.#advance();
+        return {
+          type: NodeType.NOTE,
+          pitch,
+          duration: this.#value(TokenType.HEX),
+        };
+      }
+      case TokenType.REST:
+        this.#advance();
+        return {
+          type: NodeType.REST,
+          duration: this.#value(TokenType.HEX),
+        };
       default:
         return null;
     }
@@ -265,111 +236,5 @@ export class Parser {
     }
     this.#consume(TokenType.RBRACE);
     return children;
-  }
-}
-
-const CODES = {
-  0: "0".charCodeAt(0),
-  8: "8".charCodeAt(0),
-  9: "9".charCodeAt(0),
-  a: "a".charCodeAt(0),
-  f: "f".charCodeAt(0),
-  g: "g".charCodeAt(0),
-  r: "r".charCodeAt(0),
-  s: "s".charCodeAt(0),
-  ".": ".".charCodeAt(0),
-  ";": ";".charCodeAt(0),
-};
-
-class NoteOrRestScanner {
-  #current = 0;
-  constructor(private readonly source: Uint8Array) {}
-  done() {
-    return this.#current >= this.source.length;
-  }
-
-  #match(code: number): boolean {
-    if (this.done() || this.source[this.#current] !== code) return false;
-    this.#current++;
-    return true;
-  }
-
-  #pop(): number | null {
-    if (this.done()) return null;
-    return this.source[this.#current++];
-  }
-
-  #hex(): number | null {
-    const code = this.#pop();
-    if (code === null) return null;
-    if (CODES[0] <= code && code <= CODES[9]) return code - CODES[0];
-    if (CODES.a <= code && code <= CODES.f) return code - CODES.a + 10;
-    this.#current--;
-    return null;
-  }
-
-  #duration(): number {
-    let value = 0;
-    for (;;) {
-      const hex = this.#hex();
-      if (hex === null) break;
-      value = value * 16 + hex;
-    }
-    if (!this.#match(CODES["."])) {
-      return value;
-    }
-    let f = 1 / 16;
-    for (;;) {
-      const hex = this.#hex();
-      if (hex === null) break;
-      value += f * hex;
-      f /= 16;
-    }
-    return value;
-  }
-
-  #pitch(): number {
-    const code = this.#pop();
-    // octave
-    if (code === null || CODES[0] > code || code > CODES[8]) {
-      throw new Error("bad octave");
-    }
-    let tone = (code - CODES[0] + 1) * 12;
-    // note
-    const code2 = this.#pop();
-    if (code2 === null || CODES.a > code2 || code2 > CODES.g) {
-      throw new Error("bad pitch");
-    }
-    tone += [9, 11, 0, 2, 4, 5, 7][code2 - CODES.a];
-    // accidentals
-    if (this.#match(CODES.s)) {
-      tone++;
-      while (this.#match(CODES.s)) {
-        tone++;
-      }
-    } else if (this.#match(CODES.f)) {
-      tone--;
-      while (this.#match(CODES.f)) {
-        tone--;
-      }
-    }
-    if (!this.#match(CODES[";"])) throw new Error('Expected ";');
-    return tone;
-  }
-
-  node(): Node {
-    // rest
-    if (this.#match(CODES.r)) {
-      const duration = this.#duration();
-      if (this.done()) return { type: NodeType.REST, duration };
-      throw new Error("bad rest");
-    }
-    // note
-    const pitch = this.#pitch();
-    const duration = this.#duration();
-    if (this.done()) {
-      return { type: NodeType.NOTE, pitch, duration };
-    }
-    throw new Error("bad rest");
   }
 }

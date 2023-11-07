@@ -43,14 +43,15 @@ Deno.test(function scanLines() {
   assertEquals(line, 6);
 });
 
-// Deno.test(function scanError() {
-//   const scanner = new Scanner(textEncoder.encode("}{"));
-//   const { type, from, to, line } = scanner.next();
-//   assertEquals(type, TokenType.ERROR);
-//   assertEquals(from, 0);
-//   assertEquals(to, 1);
-//   assertEquals(line, 1);
-// });
+Deno.test(function scanHex() {
+  const scanner = new Scanner(textEncoder.encode(";1a.f9"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.HEX);
+  assertEquals(value, 26.97265625);
+  assertEquals(from, 0);
+  assertEquals(to, 6);
+  assertEquals(line, 1);
+});
 
 Deno.test(function scanLBrace() {
   const scanner = new Scanner(textEncoder.encode("{ "));
@@ -62,7 +63,7 @@ Deno.test(function scanLBrace() {
 });
 
 Deno.test(function scanOperand() {
-  const scanner = new Scanner(textEncoder.encode("1234567890.asdfghjkl"));
+  const scanner = new Scanner(textEncoder.encode("1234567890asdfghjklz"));
   const { type, from, to, line } = scanner.next();
   assertEquals(type, TokenType.OPERAND);
   assertEquals(from, 0);
@@ -79,11 +80,40 @@ Deno.test(function scanOperator() {
   assertEquals(line, 1);
 });
 
+Deno.test(function scanPitch() {
+  const scanner = new Scanner(textEncoder.encode("3cs"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.PITCH);
+  assertEquals(value, 49);
+  assertEquals(from, 0);
+  assertEquals(to, 3);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanRest() {
+  const scanner = new Scanner(textEncoder.encode("r"));
+  const { type, from, to, line } = scanner.next();
+  assertEquals(type, TokenType.REST);
+  assertEquals(from, 0);
+  assertEquals(to, 1);
+  assertEquals(line, 1);
+});
+
 Deno.test(function scanRBrace() {
   const scanner = new Scanner(textEncoder.encode(" }"));
   const { type, from, to, line } = scanner.next();
   assertEquals(type, TokenType.RBRACE);
   assertEquals(from, 1);
+  assertEquals(to, 2);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanVelocity() {
+  const scanner = new Scanner(textEncoder.encode("mp"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.VELOCITY);
+  assertEquals(value, 57);
+  assertEquals(from, 0);
   assertEquals(to, 2);
   assertEquals(line, 1);
 });
