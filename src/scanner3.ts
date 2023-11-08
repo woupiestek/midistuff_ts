@@ -3,29 +3,32 @@ import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
   COMMA,
-  DEC,
+  DOUBLE_MINUS,
+  DOUBLE_PLUS,
   END,
   ERROR,
   HEX,
+  INT,
   LBRACE,
   MARK,
+  MINUS,
   OPERATOR,
-  PITCH,
-  REST,
+  PLUS,
   RBRACE,
+  REST,
   VELOCITY,
 }
 export type Token = {
   type: TokenType;
   from: number;
   to: number;
-  value?: number;
   line: number;
+  value?: number;
 };
 
 export const Token = {
   stringify({ type, from, to, line, value }: Token) {
-    return `${TokenType[type]} [${from},${to}[ (line ${line} value ${value})`;
+    return `${TokenType[type]}(${value || ""}) [${from},${to}[ (line ${line})`;
   },
 };
 
@@ -33,20 +36,8 @@ const CODES: Record<string, number> = Object.fromEntries(
   Array.from(Array(0x7e)).map((_, i) => [String.fromCharCode(i), i]),
 );
 
-const OPERANDS: TrieMap<[TokenType, number?]> = new TrieMap();
+const OPERANDS: TrieMap<[TokenType, ...number[]]> = new TrieMap();
 OPERANDS.put("r", [TokenType.REST]);
-for (let octave = 0; octave <= 8; octave++) {
-  const t1 = (octave + 1) * 12;
-  for (let i = 0; i < 7; i++) {
-    const letter = "abcdefg"[i];
-    const t2 = [9, 11, 0, 2, 4, 5, 7][i] + t1;
-    for (let j = 0; j < 5; j++) {
-      const accidental = ["ff", "f", "", "s", "ss"][j];
-      const t3 = [-2, -1, 0, 1, 2][j] + t2;
-      OPERANDS.put(`${octave}${letter}${accidental}`, [TokenType.PITCH, t3]);
-    }
-  }
-}
 OPERANDS.put("pppp", [TokenType.VELOCITY, 1]);
 OPERANDS.put("ppp", [TokenType.VELOCITY, 15]);
 OPERANDS.put("pp", [TokenType.VELOCITY, 29]);
@@ -78,8 +69,8 @@ export class Scanner {
     return this.#current >= this.source.length;
   }
 
-  #match(code: number): boolean {
-    if (this.done() || this.source[this.#current] !== code) return false;
+  #match(char: string): boolean {
+    if (this.done() || this.source[this.#current] !== CODES[char]) return false;
     this.#current++;
     return true;
   }
@@ -94,7 +85,7 @@ export class Scanner {
       const value = this.source[this.#current];
       if (Scanner.#white(value)) {
         this.#current++;
-        if (value === 10) {
+        if (value === CODES["\n"]) {
           this.#line++;
         }
       } else {
@@ -108,27 +99,40 @@ export class Scanner {
   }
 
   #comment() {
-    while (!this.done() && this.#pop() !== CODES["\n"]);
+    while (!this.done()) {
+      if (this.#pop() === CODES["\n"]) {
+        this.#line++;
+        break;
+      }
+    }
   }
 
   #skip() {
     for (;;) {
       this.#whitespace();
-      if (this.#match(CODES["%"])) this.#comment();
+      if (this.#match("%")) this.#comment();
       else return;
     }
   }
 
-  static #isLetterOrDigit(ch: number): boolean {
-    return (
-      (CODES[0] <= ch && ch <= CODES[9]) ||
-      (CODES.A <= ch && ch <= CODES.Z) ||
-      CODES._ === ch ||
-      (CODES.a <= ch && ch <= CODES.z)
-    );
+  static #isLetter(code: number): boolean {
+    if ((code & 192) === 64) {
+      const c31 = code & 31;
+      return c31 > 0 && c31 <= 26;
+    }
+    return false;
   }
+
+  static #isDigit(code: number): boolean {
+    return code >= CODES[0] && code <= CODES[9];
+  }
+
+  static #isLetterOrDigit(ch: number): boolean {
+    return Scanner.#isLetter(ch) || Scanner.#isDigit(ch);
+  }
+
   static #ic(ch: number) {
-    return Scanner.#isLetterOrDigit(ch);
+    return ch === CODES["_"] || Scanner.#isLetterOrDigit(ch);
   }
 
   #identifier() {
@@ -137,39 +141,12 @@ export class Scanner {
     }
   }
 
-  #decDigit(): number | null {
-    if (this.done()) return null;
-    const code = this.source[this.#current++];
-    if (CODES[0] <= code && code <= CODES[9]) return code - CODES[0];
-    this.#current--;
-    return null;
-  }
-
-  #dec() {
-    let value = 0;
-    for (;;) {
-      const digit = this.#decDigit();
-      if (digit === null) break;
-      value = 10 * value + digit;
-    }
-    if (this.#match(CODES["."])) {
-      let f = 1 / 10;
-      for (;;) {
-        const digit = this.#decDigit();
-        if (digit === null) break;
-        value += f * digit;
-        f /= 10;
-      }
-    }
-    return value;
-  }
-
   #hexDigit(): number | null {
     if (this.done()) return null;
     const code = this.source[this.#current++];
-    if (CODES[0] <= code && code <= CODES[9]) return code - CODES[0];
-    if (CODES.A <= code && code <= CODES.F) return code - CODES.A + 10;
-    if (CODES.a <= code && code <= CODES.f) return code - CODES.a + 10;
+    const c15 = code & 15;
+    if ((code & 240) === 48 && c15 <= 9) return c15;
+    if ((code & 216) === 64 && c15 !== 0 && c15 !== 7) return c15 + 9;
     this.#current--;
     return null;
   }
@@ -181,7 +158,7 @@ export class Scanner {
       if (digit === null) break;
       value = 16 * value + digit;
     }
-    if (this.#match(CODES["."])) {
+    if (this.#match(".")) {
       let f = 1 / 16;
       for (;;) {
         const digit = this.#hexDigit();
@@ -193,12 +170,30 @@ export class Scanner {
     return value;
   }
 
+  #integer(value: number): number {
+    while (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
+      value = 10 * value + (this.source[this.#current++] - 48);
+    }
+    return value;
+  }
+
   next(): Token {
     this.#skip();
     this.#from = this.#current;
     if (this.done()) return this.#token(TokenType.END);
-    const ch = this.#pop();
-    switch (ch) {
+    const code = this.#pop();
+    if (Scanner.#isDigit(code)) {
+      return this.#token(TokenType.INT, this.#integer(code - 48));
+    }
+    switch (code) {
+      case CODES["-"]:
+        return this.#token(
+          this.#match("-") ? TokenType.DOUBLE_MINUS : TokenType.MINUS,
+        );
+      case CODES["+"]:
+        return this.#token(
+          this.#match("+") ? TokenType.DOUBLE_PLUS : TokenType.PLUS,
+        );
       case CODES[","]:
         return this.#token(TokenType.COMMA);
       case CODES["{"]:
@@ -213,12 +208,10 @@ export class Scanner {
       case CODES["$"]:
         this.#identifier();
         return this.#token(TokenType.MARK);
-      case CODES["="]:
-        return this.#token(TokenType.DEC, this.#dec());
       default:
         break;
     }
-    if (Scanner.#ic(ch)) {
+    if (Scanner.#ic(code)) {
       this.#identifier();
       const specific = OPERANDS.getByArray(
         this.source.slice(this.#from, this.#current),

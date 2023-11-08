@@ -2,31 +2,24 @@ import { Scanner, Token, TokenType } from "./scanner3.ts";
 import { TrieMap } from "./trieMap.ts";
 
 export enum NodeType {
-  CRESC,
   DYN,
   ERROR,
-  JOIN,
   INSERT,
+  JOIN,
+  KEY,
   NOTE,
   PROGRAM,
   REST,
   SEQUENCE,
   TEMPO,
 }
-
 export type Node =
   | {
     type: NodeType.JOIN | NodeType.SEQUENCE;
     children: Node[];
   }
   | {
-    type: NodeType.CRESC;
-    from: number;
-    to: number;
-    next: Node;
-  }
-  | {
-    type: NodeType.DYN | NodeType.PROGRAM | NodeType.TEMPO;
+    type: NodeType.DYN | NodeType.KEY | NodeType.PROGRAM | NodeType.TEMPO;
     value: number;
     next: Node;
   }
@@ -40,7 +33,8 @@ export type Node =
   }
   | {
     type: NodeType.NOTE;
-    pitch: number;
+    degree: number;
+    accident: -2 | -1 | 0 | 1 | 2;
     duration: number;
   }
   | {
@@ -49,22 +43,13 @@ export type Node =
     error: Error;
   };
 
-enum Operation {
-  CRESC,
-  DYN,
-  MARK,
-  PROGRAM,
-  REPEAT,
-  TEMPO,
-}
-
-const KEYWORDS: TrieMap<Operation> = new TrieMap();
-KEYWORDS.put("cresc", Operation.CRESC);
-KEYWORDS.put("dyn", Operation.DYN);
-KEYWORDS.put("mark", Operation.MARK);
-KEYWORDS.put("program", Operation.PROGRAM);
-KEYWORDS.put("repeat", Operation.REPEAT);
-KEYWORDS.put("tempo", Operation.TEMPO);
+const KEYWORDS: TrieMap<string> = new TrieMap();
+KEYWORDS.put("dyn", "dyn");
+KEYWORDS.put("key", "key");
+KEYWORDS.put("mark", "mark");
+KEYWORDS.put("program", "program");
+KEYWORDS.put("repeat", "repeat");
+KEYWORDS.put("tempo", "tempo");
 
 export class Parser {
   #scanner;
@@ -133,11 +118,11 @@ export class Parser {
 
   #value(type: TokenType): number {
     if (this.#current.type !== type) {
-      throw this.#error(`Expected ${type}`);
+      throw this.#error(`Expected a ${TokenType[type]}`);
     }
     const value = this.#current.value;
     if (value === undefined) {
-      throw this.#error(`Expected ${type} to have a value`);
+      throw this.#error(`Expected ${TokenType[type]} to have a value`);
     }
     this.#current = this.#scanner.next();
     return value;
@@ -157,56 +142,72 @@ export class Parser {
     const type = KEYWORDS.getByArray(
       this.source.slice(this.#current.from + 1, this.#current.to),
     );
-    if (type === null) throw this.#error(`Bad keyword`);
+    if (type === undefined) throw this.#error(`Bad keyword`);
     this.#advance();
     switch (type) {
-      case Operation.CRESC: {
-        return {
-          type: NodeType.CRESC,
-          from: this.#value(TokenType.VELOCITY),
-          to: this.#value(TokenType.VELOCITY),
-          next: this.#node(),
-        };
-      }
-      case Operation.DYN: {
+      case "dyn": {
         return {
           type: NodeType.DYN,
           value: this.#value(TokenType.VELOCITY),
           next: this.#node(),
         };
       }
-      case Operation.REPEAT:
-        // todo: change node structure
+      case "key": {
+        return {
+          type: NodeType.KEY,
+          value: this.#value(TokenType.INT),
+          next: this.#node(),
+        };
+      }
+      case "repeat":
         return {
           type: NodeType.INSERT,
           index: this.#resolve(this.#mark()),
         };
-      case Operation.PROGRAM: {
+      case "program": {
         return {
           type: NodeType.PROGRAM,
-          value: this.#value(TokenType.DEC),
+          value: this.#value(TokenType.INT),
           next: this.#node(),
         };
       }
-      case Operation.MARK: {
+      case "mark": {
         const mark = this.#mark();
         const index = this.#sections.push({ mark, node: this.#node() }) - 1;
         this.#bindings.push({ mark, index });
-        // todo: change node structure
         return {
           type: NodeType.INSERT,
           index,
         };
       }
-      case Operation.TEMPO: {
+      case "tempo": {
         return {
           type: NodeType.TEMPO,
-          value: this.#value(TokenType.DEC),
+          value: this.#value(TokenType.INT),
           next: this.#node(),
         };
       }
       default:
         throw this.#error(`Unknown operator ${name}`);
+    }
+  }
+
+  #accident(): -2 | -1 | 0 | 1 | 2 {
+    switch (this.#current.type) {
+      case TokenType.DOUBLE_MINUS:
+        this.#advance();
+        return -2;
+      case TokenType.DOUBLE_PLUS:
+        this.#advance();
+        return 2;
+      case TokenType.MINUS:
+        this.#advance();
+        return -1;
+      case TokenType.PLUS:
+        this.#advance();
+        return 1;
+      default:
+        return 0;
     }
   }
 
@@ -221,15 +222,20 @@ export class Parser {
       }
       case TokenType.OPERATOR:
         return this.#operation();
-      case TokenType.PITCH: {
-        const pitch = this.#current.value;
-        if (pitch === undefined) {
-          throw this.#error(`missing pitch value`);
-        }
+      case TokenType.MINUS: {
         this.#advance();
         return {
           type: NodeType.NOTE,
-          pitch,
+          degree: -this.#value(TokenType.INT),
+          accident: this.#accident(),
+          duration: this.#value(TokenType.HEX),
+        };
+      }
+      case TokenType.INT: {
+        return {
+          type: NodeType.NOTE,
+          degree: this.#value(TokenType.INT),
+          accident: this.#accident(),
           duration: this.#value(TokenType.HEX),
         };
       }

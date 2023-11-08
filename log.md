@@ -1,5 +1,45 @@
 # Midistuff logs
 
+## 2023-11-8
+
+### yet another notation
+
+Diatonic distances from central c. So 0 -> c 1-> d, -1 -> d etc. Interpretation
+requires a key, which is alos why numbers are favored over letters: 0 ban be a c
+sharp or flat, depening on the key.
+
+Let's look for a formula for midi number from pitch `p` and key `k`, which is
+the number of sharps.
+
+Midi note number from diatonic pitch `p` and key `k`: `(12 p + k + 425) % 7`,
+where `%` is integer division. The pitch can range from about -35 (0) to 39
+(127). On the keyboard of a typical piano: from -23 (21) to 28 (108). With these
+ranges, why not just use numbers? Using hexadecimals introduces letters that can
+confuse. Heptasimal numbers might make it easier to tell octaves apart.
+
+Sharps and flats are replaced by relative changes: add or remove a semitone.
+
+`-?[0-9]+[+-]{0,2}`
+
+Make live harder for the tokenizer, after all: how to tell numbers and notes
+apart? Idea: let the parser fix some of the ambiguity. i.e. there are numbers
+and degrees. An accidental clarifies that some number is a degree. Don't forget
+the key keyword: it is now necessary to interpret the degrees.
+
+### dynamics
+
+With crescendos, the target dynamic usually comes with a target note. My
+application of it to a collections of notes doesn't have such a clear start and
+endpoint.
+
+### needs:
+
+Token types: INT DEGREE node type: KEY The only floats needed are for durations
+hexadecimals are use here.
+
+Exception may be tempo, _but_ millisecond per whole note is pretty fine grained.
+and why not use bpm integers? This is not midi!
+
 ## 2023-11-7
 
 ### left out
@@ -80,6 +120,21 @@ goes backward: resolutions fails unless there was something to refer to, but
 when section n was stored, only sections < n could be found.
 
 Main is the last one in a sense, but has no mark, so it does not simply fit in.
+
+### positional system
+
+Something like: `-?[0-4][0-7][-+]{0,2}`
+
+1. Idea: replace `abcdefg` with their distance above c as notated
+2. Use key signatures to change the meaning of the numbers
+3. Use + and -
+4. Relative accidentals: there is no natural because + is always a semitone
+   higher and - one lower.
+
+Use key signatures: `\key -?[0-7]` Sharps or when negative flats, modifying the
+meaning of the numbers.
+
+Key idea means no direct translation to note numbers...
 
 ## 2023-11-6
 
