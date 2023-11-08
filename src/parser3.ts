@@ -51,6 +51,14 @@ KEYWORDS.put("program", "program");
 KEYWORDS.put("repeat", "repeat");
 KEYWORDS.put("tempo", "tempo");
 
+export type AST = {
+  main: Node;
+  sections: {
+    mark: string;
+    node: Node;
+  }[];
+};
+
 export class Parser {
   #scanner;
   #current;
@@ -74,7 +82,7 @@ export class Parser {
     return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
   }
 
-  parse(): { main: Node; sections: { mark: string; node: Node }[] } {
+  parse(): AST {
     try {
       const main = this.#node();
       if (!this.#done()) throw this.#error("input left over");

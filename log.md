@@ -40,6 +40,25 @@ hexadecimals are use here.
 Exception may be tempo, _but_ millisecond per whole note is pretty fine grained.
 and why not use bpm integers? This is not midi!
 
+### interpreter
+
+Basic setup done. Immediate ideas on optimisations, Mainly: doing something
+about setting parameters.
+
+It could be more convenient to just have a 'settings region.' for: dyn, key,
+program and tempo
+
+Remaining: mark and repeat.
+
+### idea
+
+The operands are functions retruning collections and most of the operators
+affect one of the parameters fed to the functions.
+
+### result
+
+This now works! `.\play.ps1 .\samples\jacob.txt`
+
 ## 2023-11-7
 
 ### left out
