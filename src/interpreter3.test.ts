@@ -14,9 +14,24 @@ Deno.test(function simpleMelodie() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
+Deno.test(function durations() {
+  assertEquals(
+    new Interpreter(
+      new Parser(textEncoder.encode("[ r ];.d")).parse(),
+    ).time,
+    1625,
+  );
+  assertEquals(
+    new Interpreter(
+      new Parser(textEncoder.encode("[ r ;.d ]")).parse(),
+    ).time,
+    1625,
+  );
+});
+
 Deno.test(function simpleChord() {
   const messages = new Interpreter(
-    new Parser(textEncoder.encode("[ 0 ;.8, 2- ;.8, 4 ;.4 ]")).parse(),
+    new Parser(textEncoder.encode("[ 0, 2-, 4 ];.8")).parse(),
   ).messages;
   assertEquals(messages.length, 6);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 3);

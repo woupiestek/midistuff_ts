@@ -10,7 +10,13 @@ const textEncoder = new TextEncoder();
 Deno.test(function parseRest() {
   const { main: node } = new Parser(textEncoder.encode("r;.4")).parse();
   if (node.type !== NodeType.REST) fail("wrong type");
-  assertEquals(node.duration, 0.25);
+  assertEquals(node.operations?.duration, 0.25);
+});
+
+Deno.test(function parseSimpleRest() {
+  const { main: node } = new Parser(textEncoder.encode("r")).parse();
+  if (node.type !== NodeType.REST) fail("wrong type");
+  assertEquals(node.operations?.duration, undefined);
 });
 
 Deno.test(function parseNote() {
@@ -18,10 +24,18 @@ Deno.test(function parseNote() {
   if (node.type !== NodeType.NOTE) fail("wrong type");
   assertEquals(node.degree, -7);
   assertEquals(node.accident, 1);
-  assertEquals(node.duration, 0.75);
+  assertEquals(node.operations?.duration, 0.75);
 });
 
-Deno.test(function parseSequence() {
+Deno.test(function parseSimpleNote() {
+  const { main: node } = new Parser(textEncoder.encode("-7+;.c")).parse();
+  if (node.type !== NodeType.NOTE) fail("wrong type");
+  assertEquals(node.degree, -7);
+  assertEquals(node.accident, 1);
+  assertEquals(node.operations?.duration, 0.75);
+});
+
+Deno.test(function parseSet() {
   const { main: node } = new Parser(
     textEncoder.encode("[ 0;.2 1;.4 2;.4 0;.4 r;.2 ]"),
   ).parse();
@@ -30,6 +44,18 @@ Deno.test(function parseSequence() {
   const child = node.children[0];
   if (child.type !== NodeType.SEQUENCE) fail("wrong child type");
   assertEquals(child.children.length, 5);
+});
+
+Deno.test(function parsePitchSet() {
+  const { main: node } = new Parser(
+    textEncoder.encode("[ 0;.2 1 2 0 r;.2 ];.4"),
+  ).parse();
+  if (node.type !== NodeType.JOIN) fail("wrong type");
+  assertEquals(node.children.length, 1);
+  const child = node.children[0];
+  if (child.type !== NodeType.SEQUENCE) fail("wrong child type");
+  assertEquals(child.children.length, 5);
+  assertEquals(node.operations?.duration, 0.25);
 });
 
 Deno.test(function parseJoin() {
@@ -85,14 +111,14 @@ Deno.test(function parseRepeat() {
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
     textEncoder.encode(
-      "\\program 64 \\tempo 1667 \\key 3 \\dyn fff [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]",
+      "\\program 64 \\tempo 1667 \\key -3 \\dyn fff [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]",
     ),
   ).parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
-  assertEquals(node.operations?.get("program"), 64);
-  assertEquals(node.operations?.get("tempo"), 1667);
-  assertEquals(node.operations?.get("key"), 3);
-  assertEquals(node.operations?.get("dyn"), Dynamic.FFF);
+  assertEquals(node.operations?.program, 64);
+  assertEquals(node.operations?.tempo, 1667);
+  assertEquals(node.operations?.key, -3);
+  assertEquals(node.operations?.dyn, Dynamic.FFF);
 });
 
 Deno.test(function parseDuplicateOperations() {
@@ -122,17 +148,17 @@ Deno.test(function parseUnknownOperations() {
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(textEncoder.encode(
     "\\tempo 1500 \\dyn f [\n" +
-      "$A = [0;.2 1;.4 2;.4 0;.4 r;.2] $A\n" +
-      "$B = [2;.2 3;.4 4;.8 r;.2] $B\n" +
+      "$A = [0;.2 1 2 0 r;.2] $A\n" +
+      "$B = [2;.2 3 4;.8 r;.2] $B\n" +
       "% this was a puzzle to get right!\n" +
-      "$C = [4;.2 5;.1 4;.2 3;.1 2;.4 0;.4 r;.2] $C\n" +
-      "$D = [0;.2 -3;.4 0;.8 r;.2] $D\n]",
+      "$C = [4;.2 5;.1 4;.2 3;.1 2 0 r;.2] $C\n" +
+      "$D = [0;.2 -3 0;.8 r;.2] $D\n]",
   )).parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(sections.length, 4);
-  assertEquals(node.operations?.get("tempo"), 1500);
-  assertEquals(node.operations?.get("key"), undefined);
-  assertEquals(node.operations?.get("dyn"), Dynamic.F);
+  assertEquals(node.operations?.tempo, 1500);
+  assertEquals(node.operations?.key, undefined);
+  assertEquals(node.operations?.dyn, Dynamic.F);
 });
 
 Deno.test(function parseError() {
@@ -146,6 +172,6 @@ Deno.test(function parseError() {
   assertEquals(child.token.type, TokenType.ERROR);
   assertEquals(
     child.error.message,
-    "Error at line 1 (ERROR 'h'): Expected a HEX",
+    "Error at line 1 (ERROR 'h'): expected a mark '$...' collection '[...]', an operation '...', a rest 'r...' or a note '3c...'",
   );
 });

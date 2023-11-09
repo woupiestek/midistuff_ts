@@ -5,6 +5,7 @@ import { Token } from "./scanner3.ts";
 class Params {
   constructor(
     readonly channel: number = 0,
+    readonly duration: number = .25,
     readonly key: number = 0,
     readonly tempo: number = 2000,
     readonly velocity: number = 64,
@@ -14,8 +15,8 @@ class Params {
     return Math.floor((425 + 12 * degree + this.key) / 7);
   }
 
-  diffTime(wholeNotes: number): number {
-    return this.tempo * wholeNotes;
+  diffTime(): number {
+    return this.tempo * this.duration;
   }
 
   status(type: MessageType, channel = this.channel) {
@@ -66,14 +67,15 @@ export class Interpreter {
     });
   }
 
-  #combine(params: Params, parameters?: Operations): Params {
-    if (parameters === undefined || parameters.size === 0) return params;
-    const program = parameters.get("program");
-    const dynamic = parameters.get("dyn");
+  #combine(params: Params, operations?: Operations): Params {
+    if (operations === undefined) return params;
+    const program = operations.program;
+    const dynamic = operations.dyn;
     return new Params(
       program ? this.#getChannel(program) : params.channel,
-      parameters.get("key") || params.key,
-      parameters.get("tempo") || params.tempo,
+      operations.duration || params.duration,
+      operations.key || params.key,
+      operations.tempo || params.tempo,
       dynamic ? 1 + 14 * dynamic : params.velocity,
     );
   }
@@ -107,22 +109,25 @@ export class Interpreter {
         return;
       }
       case NodeType.NOTE: {
-        const pitch = params.pitch(node.degree) + node.accident;
+        const _params = this.#combine(params, node.operations);
+        const pitch = _params.pitch(node.degree) + node.accident;
         this.#emit(
-          params.status(MessageType.noteOn),
+          _params.status(MessageType.noteOn),
           pitch,
-          params.velocity,
+          _params.velocity,
         );
-        this.#time += params.diffTime(node.duration);
+        this.#time += _params.diffTime();
         this.#emit(
-          params.status(MessageType.noteOff),
+          _params.status(MessageType.noteOff),
           pitch,
-          params.velocity,
+          _params.velocity,
         );
         return;
       }
       case NodeType.REST:
-        this.#time += params.diffTime(node.duration);
+        (node.operations?.tempo || params.tempo) *
+          (node.operations?.duration || params.duration);
+        this.#time += this.#combine(params, node.operations).diffTime();
         return;
       case NodeType.SEQUENCE: {
         const _params = this.#combine(params, node.operations);

@@ -1,5 +1,4 @@
 import { Scanner, Token, TokenType } from "./scanner3.ts";
-import { TrieMap } from "./trieMap.ts";
 
 export enum NodeType {
   ERROR,
@@ -10,41 +9,39 @@ export enum NodeType {
   SEQUENCE,
 }
 
-export type Operations = Map<string, number>;
+export type Operations = Record<string, number> & {
+  duration?: number;
+  dyn?: number;
+  key?: number;
+  program?: number;
+  tempo?: number;
+};
 
 export type Node =
   | {
-    type: NodeType.JOIN | NodeType.SEQUENCE;
-    children: Node[];
-    operations?: Operations;
-  }
+      type: NodeType.JOIN | NodeType.SEQUENCE;
+      children: Node[];
+      operations?: Operations;
+    }
   | {
-    type: NodeType.INSERT;
-    index: number;
-  }
+      type: NodeType.INSERT;
+      index: number;
+    }
   | {
-    type: NodeType.REST;
-    duration: number;
-    operations?: Operations;
-  }
+      type: NodeType.REST;
+      operations?: Operations;
+    }
   | {
-    type: NodeType.NOTE;
-    degree: number;
-    accident: -2 | -1 | 0 | 1 | 2;
-    duration: number;
-    operations?: Operations;
-  }
+      type: NodeType.NOTE;
+      degree: number;
+      accident: -2 | -1 | 0 | 1 | 2;
+      operations?: Operations;
+    }
   | {
-    type: NodeType.ERROR;
-    token: Token;
-    error: Error;
-  };
-
-const KEYWORDS: TrieMap<TokenType> = new TrieMap();
-KEYWORDS.put("dyn", TokenType.DYNAMIC);
-KEYWORDS.put("key", TokenType.INT);
-KEYWORDS.put("program", TokenType.INT);
-KEYWORDS.put("tempo", TokenType.INT);
+      type: NodeType.ERROR;
+      token: Token;
+      error: Error;
+    };
 
 export type AST = {
   main: Node;
@@ -72,7 +69,7 @@ export class Parser {
     const type = TokenType[this.#current.type];
     const line = this.#current.line;
     const lexeme = Parser.#decoder.decode(
-      this.source.slice(this.#current.from, this.#current.to),
+      this.source.slice(this.#current.from, this.#current.to)
     );
     return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
   }
@@ -140,22 +137,40 @@ export class Parser {
     throw this.#error(`Could not resolve ${mark}`);
   }
 
+  // todo: check the ranges of the values.
   #operations(): Operations | undefined {
     if (this.#current.type !== TokenType.OPERATOR) {
       return undefined;
     }
-    const operations: Operations = new Map();
+    const operations: Operations = {};
     do {
       const slice = this.source.slice(this.#current.from + 1, this.#current.to);
       const name = Parser.#decoder.decode(slice);
-      const type = KEYWORDS.getByArray(slice);
-      if (type === null) {
-        throw this.#error(`Unknown operator \\${name}`);
-      } else if (operations.has(name)) {
+      if (operations[name] !== undefined) {
         throw this.#error(`Duplicate operator \\${name}`);
       }
-      this.#advance();
-      operations.set(name, this.#value(type));
+      switch (name) {
+        case "dyn":
+          this.#advance();
+          operations[name] = this.#value(TokenType.DYNAMIC);
+          break;
+        case "key":
+          this.#advance();
+          operations[name] = this.#match(TokenType.MINUS)
+            ? -this.#value(TokenType.INT)
+            : this.#value(TokenType.INT);
+          break;
+        case "program":
+          this.#advance();
+          operations[name] = this.#value(TokenType.INT);
+          break;
+        case "tempo":
+          this.#advance();
+          operations[name] = this.#value(TokenType.INT);
+          break;
+        default:
+          throw this.#error(`Unknown operator \\${name}`);
+      }
     } while (this.#current.type === TokenType.OPERATOR);
     return operations;
   }
@@ -179,7 +194,25 @@ export class Parser {
     }
   }
 
+  #addDuration(node: Node): Node {
+    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) {
+      return node;
+    }
+    if (this.#current.type === TokenType.HEX && this.#current.value) {
+      if (!node.operations) {
+        node.operations = { duration: this.#current.value };
+      } else {
+        node.operations.duration = this.#current.value;
+      }
+      this.#advance();
+    }
+    return node;
+  }
+
   #node(): Node {
+    if (this.#current.type === TokenType.MARK) {
+      return this.#insert();
+    }
     const operations: Operations | undefined = this.#operations();
     switch (this.#current.type) {
       case TokenType.LEFT_BRACKET: {
@@ -187,53 +220,49 @@ export class Parser {
         const scope = this.#bindings.length;
         const children = this.#set();
         this.#bindings.length = scope; // bindings go out of scope
-        return { type: NodeType.JOIN, children, operations };
+        return this.#addDuration({
+          type: NodeType.JOIN,
+          children,
+          operations,
+        });
       }
       case TokenType.MINUS: {
         this.#advance();
-        return {
+        return this.#addDuration({
           type: NodeType.NOTE,
           degree: -this.#value(TokenType.INT),
           accident: this.#accident(),
-          duration: this.#value(TokenType.HEX),
           operations,
-        };
+        });
       }
       case TokenType.INT: {
-        return {
+        return this.#addDuration({
           type: NodeType.NOTE,
           degree: this.#value(TokenType.INT),
           accident: this.#accident(),
-          duration: this.#value(TokenType.HEX),
           operations,
-        };
+        });
       }
       case TokenType.REST:
         if (operations) {
-          if (operations.has("dyn")) {
+          if (operations.dyn !== undefined) {
             throw this.#error("\\dyn is not allowed on a rest");
           }
-          if (operations.has("key")) {
+          if (operations.key !== undefined) {
             throw this.#error("\\key is not allowed on a rest");
           }
-          if (operations.has("program")) {
+          if (operations.program !== undefined) {
             throw this.#error("\\program is not allowed on a rest");
           }
         }
         this.#advance();
-        return {
+        return this.#addDuration({
           type: NodeType.REST,
-          duration: this.#value(TokenType.HEX),
           operations,
-        };
-      case TokenType.MARK: // operations should not be allowed here!
-        if (operations === undefined) {
-          return this.#insert();
-        }
-        throw this.#error("No operations on marks allowed");
+        });
       default:
         throw this.#error(
-          "expected a collection '[...]', an operation '...', a rest 'r...' or a note '3c...'",
+          "expected a mark '$...' collection '[...]', an operation '...', a rest 'r...' or a note '3c...'"
         );
     }
   }
@@ -256,7 +285,7 @@ export class Parser {
 
   #sequencEnd() {
     return [TokenType.END, TokenType.COMMA, TokenType.RIGHT_BRACKET].includes(
-      this.#current.type,
+      this.#current.type
     );
   }
 

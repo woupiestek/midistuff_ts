@@ -11,8 +11,11 @@ Further changes to the system:
 - ~~dynamic enum, translated by interpreter.~~
 - ~~break up parsing and validating? downside: no info on error location~~
 - ~~params as params~~
-- pitch sets: [0 2 4];.4
-- ; -> d? r -> .?
+- ~~pitch sets: [0 2 4];.4~~
+- ~~; -> d? r -> .?~~
+- remove operations
+- move durations
+- use `_` as duration symbol
 
 ### pitch sets
 
@@ -26,7 +29,25 @@ Let's keep it a post fix operator for now.
 
 ### parsing & validation
 
-Keep the combination, but make it configurable somehow.
+Keep the combination to attach locations to errors
+
+### program issue
+
+No program does weird things, as well as program 0, which is technically out of
+range
+
+### remaining issues
+
+- Should we not now put the durations in front?
+- Will we stick with this notation for dynamics?
+
+Options: `_.4` `!ppp` `|ppp`.
+
+- At the moment, there is no ambiguity to forces dynamics to use the \dyn keyword.
+Of course, the following big step is translations back and forth between
+formats.
+
+Might as well use special token for each of them, now.
 
 ## 2023-11-8
 
