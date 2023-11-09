@@ -1,5 +1,33 @@
 # Midistuff logs
 
+## 2023-11-9
+
+Further changes to the system:
+
+- ~~simplify mark & repeat notation~~
+- ~~improve interpretation: go for literal repeat~~
+- ~~change how parameters are attached to sets.~~
+- ~~different symbols~~
+- ~~dynamic enum, translated by interpreter.~~
+- ~~break up parsing and validating? downside: no info on error location~~
+- ~~params as params~~
+- pitch sets: [0 2 4];.4
+- ; -> d? r -> .?
+
+### pitch sets
+
+The pitch group fulfils some need, but again in a novel way. How far does this
+go? It could work similar to all the parameters, actually! So, 0 is a complete
+note, ;.4 modifies its value, but only as far as its goes, so in:
+`;.4[;.2 0 1 2 0 ;.2r]` everthing is a quarter note, except for the note that
+are explicitly marked a eigths.
+
+Let's keep it a post fix operator for now.
+
+### parsing & validation
+
+Keep the combination, but make it configurable somehow.
+
 ## 2023-11-8
 
 ### yet another notation
@@ -58,6 +86,14 @@ affect one of the parameters fed to the functions.
 ### result
 
 This now works! `.\play.ps1 .\samples\jacob.txt`
+
+### conflict resolution
+
+This `\dyn p { 0;.4 1;.4 \dyn f 3;.4 4;.4 }` would be my argument for the inner
+settings overriding the outer one. How else do you say: piano overall, but one
+note forte? Perhaps the other way around is actually better, but I dont see it.
+
+Dynamics and durations as post fix operators?
 
 ## 2023-11-7
 

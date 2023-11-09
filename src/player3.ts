@@ -8,7 +8,7 @@ if (Deno.args.length < 1) {
 }
 
 const data = await Deno.readFile(Deno.args[0]);
-const messages = new Interpreter(new Parser(data).parse()).messages;
+const { messages, time } = new Interpreter(new Parser(data).parse());
 const midi_out = new midi.Output();
 midi_out.openPort(0);
 for (const { realTime, message } of messages) {
@@ -17,3 +17,7 @@ for (const { realTime, message } of messages) {
     Math.floor(realTime),
   );
 }
+setTimeout(
+  () => console.log("done"),
+  Math.floor(time) + 250,
+);

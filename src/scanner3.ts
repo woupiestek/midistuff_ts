@@ -9,15 +9,30 @@ export enum TokenType {
   ERROR,
   HEX,
   INT,
-  LBRACE,
+  IS,
+  LEFT_BRACKET,
   MARK,
   MINUS,
   OPERATOR,
   PLUS,
-  RBRACE,
   REST,
-  VELOCITY,
+  RIGHT_BRACKET,
+  DYNAMIC,
 }
+
+export enum Dynamic {
+  PPPP,
+  PPP,
+  PP,
+  P,
+  MP,
+  MF,
+  F,
+  FF,
+  FFF,
+  FFFF,
+}
+
 export type Token = {
   type: TokenType;
   from: number;
@@ -37,17 +52,17 @@ const CODES: Record<string, number> = Object.fromEntries(
 );
 
 const OPERANDS: TrieMap<[TokenType, ...number[]]> = new TrieMap();
+OPERANDS.put("f", [TokenType.DYNAMIC, Dynamic.F]);
+OPERANDS.put("ff", [TokenType.DYNAMIC, Dynamic.FF]);
+OPERANDS.put("fff", [TokenType.DYNAMIC, Dynamic.FFF]);
+OPERANDS.put("ffff", [TokenType.DYNAMIC, Dynamic.FFFF]);
+OPERANDS.put("mf", [TokenType.DYNAMIC, Dynamic.MF]);
+OPERANDS.put("mp", [TokenType.DYNAMIC, Dynamic.MP]);
+OPERANDS.put("p", [TokenType.DYNAMIC, Dynamic.P]);
+OPERANDS.put("pp", [TokenType.DYNAMIC, Dynamic.PP]);
+OPERANDS.put("ppp", [TokenType.DYNAMIC, Dynamic.PPP]);
+OPERANDS.put("pppp", [TokenType.DYNAMIC, Dynamic.PPPP]);
 OPERANDS.put("r", [TokenType.REST]);
-OPERANDS.put("pppp", [TokenType.VELOCITY, 1]);
-OPERANDS.put("ppp", [TokenType.VELOCITY, 15]);
-OPERANDS.put("pp", [TokenType.VELOCITY, 29]);
-OPERANDS.put("p", [TokenType.VELOCITY, 43]);
-OPERANDS.put("mp", [TokenType.VELOCITY, 57]);
-OPERANDS.put("mf", [TokenType.VELOCITY, 71]);
-OPERANDS.put("f", [TokenType.VELOCITY, 85]);
-OPERANDS.put("ff", [TokenType.VELOCITY, 99]);
-OPERANDS.put("fff", [TokenType.VELOCITY, 113]);
-OPERANDS.put("ffff", [TokenType.VELOCITY, 127]);
 
 export class Scanner {
   #current = 0;
@@ -196,10 +211,12 @@ export class Scanner {
         );
       case CODES[","]:
         return this.#token(TokenType.COMMA);
-      case CODES["{"]:
-        return this.#token(TokenType.LBRACE);
-      case CODES["}"]:
-        return this.#token(TokenType.RBRACE);
+      case CODES["["]:
+        return this.#token(TokenType.LEFT_BRACKET);
+      case CODES["]"]:
+        return this.#token(TokenType.RIGHT_BRACKET);
+      case CODES["="]:
+        return this.#token(TokenType.IS);
       case CODES["\\"]:
         this.#identifier();
         return this.#token(TokenType.OPERATOR);

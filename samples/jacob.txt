@@ -1,7 +1,7 @@
-\tempo 1500 \dyn f {
-  \mark $A {0;.2 1;.4 2;.4 0;.4 r;.2} \repeat $A
-  \mark $B {2;.2 3;.4 4;.8 r;.2} \repeat $B
+\tempo 1500 \dyn f [
+  $A = [0;.2 1;.4 2;.4 0;.4 r;.2] $A
+  $B = [2;.2 3;.4 4;.8 r;.2] $B
   % this was a puzzle to get right!
-  \mark $C {4;.2 5;.1 4;.2 3;.1 2;.4 0;.4 r;.2} \repeat $C
-  \mark $D {0;.2 -3;.4 0;.8 r;.2} \repeat $D 
-}
+  $C = [4;.2 5;.1 4;.2 3;.1 2;.4 0;.4 r;.2] $C
+  $D = [0;.2 -3;.4 0;.8 r;.2] $D
+]

@@ -2,26 +2,21 @@ import { Scanner, Token, TokenType } from "./scanner3.ts";
 import { TrieMap } from "./trieMap.ts";
 
 export enum NodeType {
-  DYN,
   ERROR,
   INSERT,
   JOIN,
-  KEY,
   NOTE,
-  PROGRAM,
   REST,
   SEQUENCE,
-  TEMPO,
 }
+
+export type Operations = Map<string, number>;
+
 export type Node =
   | {
     type: NodeType.JOIN | NodeType.SEQUENCE;
     children: Node[];
-  }
-  | {
-    type: NodeType.DYN | NodeType.KEY | NodeType.PROGRAM | NodeType.TEMPO;
-    value: number;
-    next: Node;
+    operations?: Operations;
   }
   | {
     type: NodeType.INSERT;
@@ -30,12 +25,14 @@ export type Node =
   | {
     type: NodeType.REST;
     duration: number;
+    operations?: Operations;
   }
   | {
     type: NodeType.NOTE;
     degree: number;
     accident: -2 | -1 | 0 | 1 | 2;
     duration: number;
+    operations?: Operations;
   }
   | {
     type: NodeType.ERROR;
@@ -43,13 +40,11 @@ export type Node =
     error: Error;
   };
 
-const KEYWORDS: TrieMap<string> = new TrieMap();
-KEYWORDS.put("dyn", "dyn");
-KEYWORDS.put("key", "key");
-KEYWORDS.put("mark", "mark");
-KEYWORDS.put("program", "program");
-KEYWORDS.put("repeat", "repeat");
-KEYWORDS.put("tempo", "tempo");
+const KEYWORDS: TrieMap<TokenType> = new TrieMap();
+KEYWORDS.put("dyn", TokenType.DYNAMIC);
+KEYWORDS.put("key", TokenType.INT);
+KEYWORDS.put("program", TokenType.INT);
+KEYWORDS.put("tempo", TokenType.INT);
 
 export type AST = {
   main: Node;
@@ -145,59 +140,24 @@ export class Parser {
     throw this.#error(`Could not resolve ${mark}`);
   }
 
-  // use triemap and test the whole thing
-  #operation(): Node {
-    const type = KEYWORDS.getByArray(
-      this.source.slice(this.#current.from + 1, this.#current.to),
-    );
-    if (type === undefined) throw this.#error(`Bad keyword`);
-    this.#advance();
-    switch (type) {
-      case "dyn": {
-        return {
-          type: NodeType.DYN,
-          value: this.#value(TokenType.VELOCITY),
-          next: this.#node(),
-        };
-      }
-      case "key": {
-        return {
-          type: NodeType.KEY,
-          value: this.#value(TokenType.INT),
-          next: this.#node(),
-        };
-      }
-      case "repeat":
-        return {
-          type: NodeType.INSERT,
-          index: this.#resolve(this.#mark()),
-        };
-      case "program": {
-        return {
-          type: NodeType.PROGRAM,
-          value: this.#value(TokenType.INT),
-          next: this.#node(),
-        };
-      }
-      case "mark": {
-        const mark = this.#mark();
-        const index = this.#sections.push({ mark, node: this.#node() }) - 1;
-        this.#bindings.push({ mark, index });
-        return {
-          type: NodeType.INSERT,
-          index,
-        };
-      }
-      case "tempo": {
-        return {
-          type: NodeType.TEMPO,
-          value: this.#value(TokenType.INT),
-          next: this.#node(),
-        };
-      }
-      default:
-        throw this.#error(`Unknown operator ${name}`);
+  #operations(): Operations | undefined {
+    if (this.#current.type !== TokenType.OPERATOR) {
+      return undefined;
     }
+    const operations: Operations = new Map();
+    do {
+      const slice = this.source.slice(this.#current.from + 1, this.#current.to);
+      const name = Parser.#decoder.decode(slice);
+      const type = KEYWORDS.getByArray(slice);
+      if (type === null) {
+        throw this.#error(`Unknown operator \\${name}`);
+      } else if (operations.has(name)) {
+        throw this.#error(`Duplicate operator \\${name}`);
+      }
+      this.#advance();
+      operations.set(name, this.#value(type));
+    } while (this.#current.type === TokenType.OPERATOR);
+    return operations;
   }
 
   #accident(): -2 | -1 | 0 | 1 | 2 {
@@ -220,16 +180,15 @@ export class Parser {
   }
 
   #node(): Node {
+    const operations: Operations | undefined = this.#operations();
     switch (this.#current.type) {
-      case TokenType.LBRACE: {
+      case TokenType.LEFT_BRACKET: {
         this.#advance();
         const scope = this.#bindings.length;
-        const children = this.#collection();
+        const children = this.#set();
         this.#bindings.length = scope; // bindings go out of scope
-        return { type: NodeType.JOIN, children };
+        return { type: NodeType.JOIN, children, operations };
       }
-      case TokenType.OPERATOR:
-        return this.#operation();
       case TokenType.MINUS: {
         this.#advance();
         return {
@@ -237,6 +196,7 @@ export class Parser {
           degree: -this.#value(TokenType.INT),
           accident: this.#accident(),
           duration: this.#value(TokenType.HEX),
+          operations,
         };
       }
       case TokenType.INT: {
@@ -245,23 +205,57 @@ export class Parser {
           degree: this.#value(TokenType.INT),
           accident: this.#accident(),
           duration: this.#value(TokenType.HEX),
+          operations,
         };
       }
       case TokenType.REST:
+        if (operations) {
+          if (operations.has("dyn")) {
+            throw this.#error("\\dyn is not allowed on a rest");
+          }
+          if (operations.has("key")) {
+            throw this.#error("\\key is not allowed on a rest");
+          }
+          if (operations.has("program")) {
+            throw this.#error("\\program is not allowed on a rest");
+          }
+        }
         this.#advance();
         return {
           type: NodeType.REST,
           duration: this.#value(TokenType.HEX),
+          operations,
         };
+      case TokenType.MARK: // operations should not be allowed here!
+        if (operations === undefined) {
+          return this.#insert();
+        }
+        throw this.#error("No operations on marks allowed");
       default:
         throw this.#error(
-          "expected a collection '{', an operation '...', a rest 'r...' or a note '3c...'",
+          "expected a collection '[...]', an operation '...', a rest 'r...' or a note '3c...'",
         );
     }
   }
 
+  #insert(): Node {
+    const mark = this.#mark();
+    if (!this.#match(TokenType.IS)) {
+      return {
+        type: NodeType.INSERT,
+        index: this.#resolve(mark),
+      };
+    }
+    const index = this.#sections.push({ mark, node: this.#node() }) - 1;
+    this.#bindings.push({ mark, index });
+    return {
+      type: NodeType.INSERT,
+      index,
+    };
+  }
+
   #sequencEnd() {
-    return [TokenType.END, TokenType.COMMA, TokenType.RBRACE].includes(
+    return [TokenType.END, TokenType.COMMA, TokenType.RIGHT_BRACKET].includes(
       this.#current.type,
     );
   }
@@ -282,13 +276,13 @@ export class Parser {
 
   #panic() {
     while (!this.#sequencEnd()) {
-      if (this.#current.type === TokenType.LBRACE) {
+      if (this.#current.type === TokenType.LEFT_BRACKET) {
         let depth = 1;
         while (depth > 0 && !this.#done()) {
           this.#advance();
-          if (this.#current.type === TokenType.LBRACE) {
+          if (this.#current.type === TokenType.LEFT_BRACKET) {
             depth++;
-          } else if (this.#current.type === TokenType.RBRACE) {
+          } else if (this.#current.type === TokenType.RIGHT_BRACKET) {
             depth--;
           }
         }
@@ -297,14 +291,14 @@ export class Parser {
     }
   }
 
-  #collection(): Node[] {
-    if (this.#match(TokenType.RBRACE)) return [];
+  #set(): Node[] {
+    if (this.#match(TokenType.RIGHT_BRACKET)) return [];
     const children: Node[] = [];
     for (;;) {
       children.push(this.#sequence());
       if (!this.#match(TokenType.COMMA)) break;
     }
-    this.#consume(TokenType.RBRACE);
+    this.#consume(TokenType.RIGHT_BRACKET);
     return children;
   }
 }

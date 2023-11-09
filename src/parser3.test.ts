@@ -3,7 +3,7 @@ import {
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { NodeType, Parser } from "./parser3.ts";
-import { TokenType } from "./scanner3.ts";
+import { Dynamic, TokenType } from "./scanner3.ts";
 
 const textEncoder = new TextEncoder();
 
@@ -23,7 +23,7 @@ Deno.test(function parseNote() {
 
 Deno.test(function parseSequence() {
   const { main: node } = new Parser(
-    textEncoder.encode("{ 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
+    textEncoder.encode("[ 0;.2 1;.4 2;.4 0;.4 r;.2 ]"),
   ).parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(node.children.length, 1);
@@ -34,7 +34,7 @@ Deno.test(function parseSequence() {
 
 Deno.test(function parseJoin() {
   const { main: node } = new Parser(
-    textEncoder.encode("{ 0 ;.8, 2- ;.8, 4 ;.4 }"),
+    textEncoder.encode("[ 0 ;.8, 2- ;.8, 4 ;.4 ]"),
   ).parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(node.children.length, 3);
@@ -45,7 +45,7 @@ Deno.test(function parseJoin() {
 
 Deno.test(function parseMark() {
   const { main: node, sections } = new Parser(
-    textEncoder.encode("\\mark $line_1 { 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
+    textEncoder.encode("$line_1 = [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]"),
   ).parse();
   if (node.type !== NodeType.INSERT) fail("wrong type");
   assertEquals(node.index, 0);
@@ -57,7 +57,7 @@ Deno.test(function parseMark() {
 
 Deno.test(function parseResolvedRepeat() {
   const { main: node, sections } = new Parser(
-    textEncoder.encode("{\\mark $C 0;.4 \\repeat $C}"),
+    textEncoder.encode("[ $C = 0;.4 $C ]"),
   ).parse();
   assertEquals(sections.length, 1);
   assertEquals(sections[0].mark, "C");
@@ -73,7 +73,7 @@ Deno.test(function parseResolvedRepeat() {
 
 Deno.test(function parseRepeat() {
   const { main: node } = new Parser(
-    textEncoder.encode("\\repeat $line_1"),
+    textEncoder.encode("$line_1"),
   ).parse();
   if (node.type !== NodeType.ERROR) fail("wrong type");
   assertEquals(
@@ -82,64 +82,62 @@ Deno.test(function parseRepeat() {
   );
 });
 
-Deno.test(function parseProgram() {
+Deno.test(function parseOperations() {
   const { main: node } = new Parser(
-    textEncoder.encode("\\program 64 { 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
+    textEncoder.encode(
+      "\\program 64 \\tempo 1667 \\key 3 \\dyn fff [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]",
+    ),
   ).parse();
-  if (node.type !== NodeType.PROGRAM) fail("wrong type");
-  assertEquals(node.value, 64);
-  const child = node.next;
-  if (child.type !== NodeType.JOIN) fail("wrong child type");
+  if (node.type !== NodeType.JOIN) fail("wrong type");
+  assertEquals(node.operations?.get("program"), 64);
+  assertEquals(node.operations?.get("tempo"), 1667);
+  assertEquals(node.operations?.get("key"), 3);
+  assertEquals(node.operations?.get("dyn"), Dynamic.FFF);
 });
 
-Deno.test(function parseTempo() {
+Deno.test(function parseDuplicateOperations() {
   const { main: node } = new Parser(
-    textEncoder.encode("\\tempo 1667 { 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
+    textEncoder.encode("\\dyn f \\dyn fff [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]"),
   ).parse();
-  if (node.type !== NodeType.TEMPO) fail("wrong type");
-  assertEquals(node.value, 1667);
-  const child = node.next;
-  if (child.type !== NodeType.JOIN) fail("wrong child type");
+  if (node.type !== NodeType.ERROR) fail("wrong type");
+  assertEquals(node.token.type, TokenType.OPERATOR);
+  assertEquals(
+    node.error.message,
+    "Error at line 1 (OPERATOR '\\dyn'): Duplicate operator \\dyn",
+  );
 });
 
-Deno.test(function parseKey() {
+Deno.test(function parseUnknownOperations() {
   const { main: node } = new Parser(
-    textEncoder.encode("\\key 3 { 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
+    textEncoder.encode("\\dir 30 [ 0;.2 1;.4 2;.4 0;.4 r;.2 ]"),
   ).parse();
-  if (node.type !== NodeType.KEY) fail("wrong type");
-  assertEquals(node.value, 3);
-  const child = node.next;
-  if (child.type !== NodeType.JOIN) fail("wrong child type");
+  if (node.type !== NodeType.ERROR) fail("wrong type");
+  assertEquals(node.token.type, TokenType.OPERATOR);
+  assertEquals(
+    node.error.message,
+    "Error at line 1 (OPERATOR '\\dir'): Unknown operator \\dir",
+  );
 });
-
-Deno.test(function parseDynamic() {
-  const { main: node } = new Parser(
-    textEncoder.encode("\\dyn fff { 0;.2 1;.4 2;.4 0;.4 r;.2 }"),
-  ).parse();
-  if (node.type !== NodeType.DYN) fail("wrong type");
-  assertEquals(node.value, 113);
-  const child = node.next;
-  if (child.type !== NodeType.JOIN) fail("wrong child type");
-});
-
-const SCORE = textEncoder.encode(
-  "\\tempo 1500 \\dyn f {\n" +
-    "\\mark $A {0;.2 1;.4 2;.4 0;.4 r;.2} \\repeat $A\n" +
-    "\\mark $B {2;.2 3;.4 4;.8 r;.2} \\repeat $B\n" +
-    "% this was a puzzle to get right!\n" +
-    "\\mark $C {4;.2 5;.1 4;.2 3;.1 2;.4 0;.4 r;.2} \\repeat $C\n" +
-    "\\mark $D {0;.2 -3;.4 0;.8 r;.2} \\repeat $D\n}",
-);
 
 Deno.test(function parseCombination() {
-  const { main: node, sections } = new Parser(SCORE).parse();
-  if (node.type !== NodeType.TEMPO) fail("wrong type");
+  const { main: node, sections } = new Parser(textEncoder.encode(
+    "\\tempo 1500 \\dyn f [\n" +
+      "$A = [0;.2 1;.4 2;.4 0;.4 r;.2] $A\n" +
+      "$B = [2;.2 3;.4 4;.8 r;.2] $B\n" +
+      "% this was a puzzle to get right!\n" +
+      "$C = [4;.2 5;.1 4;.2 3;.1 2;.4 0;.4 r;.2] $C\n" +
+      "$D = [0;.2 -3;.4 0;.8 r;.2] $D\n]",
+  )).parse();
+  if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(sections.length, 4);
+  assertEquals(node.operations?.get("tempo"), 1500);
+  assertEquals(node.operations?.get("key"), undefined);
+  assertEquals(node.operations?.get("dyn"), Dynamic.F);
 });
 
 Deno.test(function parseError() {
   const { main: node } = new Parser(
-    textEncoder.encode("{ 3h ;.8, 2 ;.8, 4 ;.4 }"),
+    textEncoder.encode("[ 3h ;.8, 2 ;.8, 4 ;.4 ]"),
   ).parse();
   if (node.type !== NodeType.JOIN) fail("wrong type");
   assertEquals(node.children.length, 3);
