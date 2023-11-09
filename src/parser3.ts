@@ -8,10 +8,9 @@ export enum NodeType {
   REST,
   SEQUENCE,
 }
-
-export type Operations = Record<string, number> & {
+export type Options = Record<string, number> & {
   duration?: number;
-  dyn?: number;
+  dynamic?: number;
   key?: number;
   program?: number;
   tempo?: number;
@@ -19,29 +18,29 @@ export type Operations = Record<string, number> & {
 
 export type Node =
   | {
-      type: NodeType.JOIN | NodeType.SEQUENCE;
-      children: Node[];
-      operations?: Operations;
-    }
+    type: NodeType.JOIN | NodeType.SEQUENCE;
+    children: Node[];
+    options?: Options;
+  }
   | {
-      type: NodeType.INSERT;
-      index: number;
-    }
+    type: NodeType.INSERT;
+    index: number;
+  }
   | {
-      type: NodeType.REST;
-      operations?: Operations;
-    }
+    type: NodeType.REST;
+    options?: Options;
+  }
   | {
-      type: NodeType.NOTE;
-      degree: number;
-      accident: -2 | -1 | 0 | 1 | 2;
-      operations?: Operations;
-    }
+    type: NodeType.NOTE;
+    degree: number;
+    accident: -2 | -1 | 0 | 1 | 2;
+    options?: Options;
+  }
   | {
-      type: NodeType.ERROR;
-      token: Token;
-      error: Error;
-    };
+    type: NodeType.ERROR;
+    token: Token;
+    error: Error;
+  };
 
 export type AST = {
   main: Node;
@@ -69,7 +68,7 @@ export class Parser {
     const type = TokenType[this.#current.type];
     const line = this.#current.line;
     const lexeme = Parser.#decoder.decode(
-      this.source.slice(this.#current.from, this.#current.to)
+      this.source.slice(this.#current.from, this.#current.to),
     );
     return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
   }
@@ -116,13 +115,17 @@ export class Parser {
     return Parser.#decoder.decode(value);
   }
 
-  #value(type: TokenType): number {
-    if (this.#current.type !== type) {
-      throw this.#error(`Expected a ${TokenType[type]}`);
+  #integer(min: number, max: number): number {
+    if (this.#current.type !== TokenType.INTEGER) {
+      throw this.#error(`Expected an integer`);
     }
     const value = this.#current.value;
     if (value === undefined) {
-      throw this.#error(`Expected ${TokenType[type]} to have a value`);
+      // should not be reachable
+      throw this.#error(`Expected integer to have a value`);
+    }
+    if (value < min || max < value) {
+      throw this.#error(`Value ${value} is out of range [${min}, ${max}]`);
     }
     this.#current = this.#scanner.next();
     return value;
@@ -137,132 +140,120 @@ export class Parser {
     throw this.#error(`Could not resolve ${mark}`);
   }
 
-  // todo: check the ranges of the values.
-  #operations(): Operations | undefined {
-    if (this.#current.type !== TokenType.OPERATOR) {
+  #options(): Options | undefined {
+    const options: Options = {};
+    a: for (;;) {
+      switch (this.#current.type) {
+        case TokenType.DYNAMIC:
+          if (options.dynamic !== undefined) {
+            throw this.#error("Double dynamic");
+          }
+          options.dynamic = this.#current.value;
+          this.#advance();
+          continue;
+        case TokenType.HEX:
+          if (options.duration !== undefined) {
+            throw this.#error("Double duration");
+          }
+          options.duration = this.#current.value;
+          this.#advance();
+          continue;
+        case TokenType.KEY:
+          if (options.key !== undefined) {
+            throw this.#error("Double key");
+          }
+          this.#advance();
+          options.key = this.#integer(-7, 7);
+          continue;
+        case TokenType.PROGRAM:
+          if (options.program !== undefined) {
+            throw this.#error("Double program");
+          }
+          this.#advance();
+          options.program = this.#integer(0, 127);
+          continue;
+        case TokenType.TEMPO:
+          if (options.tempo !== undefined) {
+            throw this.#error("Double tempo");
+          }
+          this.#advance();
+          options.tempo = this.#integer(0, Number.MAX_SAFE_INTEGER);
+          continue;
+        default:
+          break a;
+      }
+    }
+    if (Object.values(options).every((it) => it === undefined)) {
       return undefined;
     }
-    const operations: Operations = {};
-    do {
-      const slice = this.source.slice(this.#current.from + 1, this.#current.to);
-      const name = Parser.#decoder.decode(slice);
-      if (operations[name] !== undefined) {
-        throw this.#error(`Duplicate operator \\${name}`);
-      }
-      switch (name) {
-        case "dyn":
-          this.#advance();
-          operations[name] = this.#value(TokenType.DYNAMIC);
-          break;
-        case "key":
-          this.#advance();
-          operations[name] = this.#match(TokenType.MINUS)
-            ? -this.#value(TokenType.INT)
-            : this.#value(TokenType.INT);
-          break;
-        case "program":
-          this.#advance();
-          operations[name] = this.#value(TokenType.INT);
-          break;
-        case "tempo":
-          this.#advance();
-          operations[name] = this.#value(TokenType.INT);
-          break;
-        default:
-          throw this.#error(`Unknown operator \\${name}`);
-      }
-    } while (this.#current.type === TokenType.OPERATOR);
-    return operations;
+    return options;
   }
 
-  #accident(): -2 | -1 | 0 | 1 | 2 {
-    switch (this.#current.type) {
-      case TokenType.DOUBLE_MINUS:
-        this.#advance();
-        return -2;
-      case TokenType.DOUBLE_PLUS:
-        this.#advance();
-        return 2;
-      case TokenType.MINUS:
-        this.#advance();
-        return -1;
-      case TokenType.PLUS:
-        this.#advance();
-        return 1;
-      default:
-        return 0;
+  #note(accident: -2 | -1 | 0 | 1 | 2, options?: Options): Node {
+    const degree = this.#current.value;
+    if (degree === undefined) {
+      // should not be reachable
+      throw this.#error(`Expected integer to have a value`);
     }
-  }
-
-  #addDuration(node: Node): Node {
-    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) {
-      return node;
+    if (degree < -34 || 38 < degree) {
+      throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
-    if (this.#current.type === TokenType.HEX && this.#current.value) {
-      if (!node.operations) {
-        node.operations = { duration: this.#current.value };
-      } else {
-        node.operations.duration = this.#current.value;
-      }
-      this.#advance();
-    }
-    return node;
+    this.#current = this.#scanner.next();
+    return {
+      type: NodeType.NOTE,
+      degree,
+      accident,
+      options,
+    };
   }
 
   #node(): Node {
     if (this.#current.type === TokenType.MARK) {
       return this.#insert();
     }
-    const operations: Operations | undefined = this.#operations();
+    const options: Options | undefined = this.#options();
     switch (this.#current.type) {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
         const scope = this.#bindings.length;
         const children = this.#set();
         this.#bindings.length = scope; // bindings go out of scope
-        return this.#addDuration({
+        return {
           type: NodeType.JOIN,
           children,
-          operations,
-        });
+          options,
+        };
       }
-      case TokenType.MINUS: {
-        this.#advance();
-        return this.#addDuration({
-          type: NodeType.NOTE,
-          degree: -this.#value(TokenType.INT),
-          accident: this.#accident(),
-          operations,
-        });
-      }
-      case TokenType.INT: {
-        return this.#addDuration({
-          type: NodeType.NOTE,
-          degree: this.#value(TokenType.INT),
-          accident: this.#accident(),
-          operations,
-        });
-      }
+      case TokenType.INTEGER_MINUS:
+        return this.#note(-1, options);
+      case TokenType.INTEGER_MINUS_MINUS:
+        return this.#note(-2, options);
+      case TokenType.INTEGER_PLUS:
+        return this.#note(1, options);
+      case TokenType.INTEGER_PLUS_PLUS:
+        return this.#note(2, options);
+      case TokenType.INTEGER:
+        return this.#note(0, options);
       case TokenType.REST:
-        if (operations) {
-          if (operations.dyn !== undefined) {
-            throw this.#error("\\dyn is not allowed on a rest");
+        if (options) {
+          if (options.dynamic !== undefined) {
+            throw this.#error("Dynamics are not allowed on rests");
           }
-          if (operations.key !== undefined) {
-            throw this.#error("\\key is not allowed on a rest");
+          if (options.key !== undefined) {
+            throw this.#error("Key signatures are not allowed rests");
           }
-          if (operations.program !== undefined) {
-            throw this.#error("\\program is not allowed on a rest");
+          if (options.program !== undefined) {
+            throw this.#error("Program changes are not allowed on rests");
           }
         }
         this.#advance();
-        return this.#addDuration({
+        return {
           type: NodeType.REST,
-          operations,
-        });
+          options,
+        };
       default:
         throw this.#error(
-          "expected a mark '$...' collection '[...]', an operation '...', a rest 'r...' or a note '3c...'"
+          `Unexpected type of token ${TokenType[this.#current.type]}`,
         );
     }
   }
@@ -285,7 +276,7 @@ export class Parser {
 
   #sequencEnd() {
     return [TokenType.END, TokenType.COMMA, TokenType.RIGHT_BRACKET].includes(
-      this.#current.type
+      this.#current.type,
     );
   }
 

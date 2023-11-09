@@ -3,21 +3,23 @@ import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
   COMMA,
-  DOUBLE_MINUS,
-  DOUBLE_PLUS,
+  DYNAMIC,
   END,
   ERROR,
   HEX,
-  INT,
+  INTEGER_MINUS_MINUS,
+  INTEGER_MINUS,
+  INTEGER_PLUS_PLUS,
+  INTEGER_PLUS,
+  INTEGER,
   IS,
+  KEY,
   LEFT_BRACKET,
   MARK,
-  MINUS,
-  OPERATOR,
-  PLUS,
+  PROGRAM,
   REST,
   RIGHT_BRACKET,
-  DYNAMIC,
+  TEMPO,
 }
 
 export enum Dynamic {
@@ -51,18 +53,22 @@ const CODES: Record<string, number> = Object.fromEntries(
   Array.from(Array(0x7e)).map((_, i) => [String.fromCharCode(i), i]),
 );
 
-const OPERANDS: TrieMap<[TokenType, ...number[]]> = new TrieMap();
-OPERANDS.put("f", [TokenType.DYNAMIC, Dynamic.F]);
-OPERANDS.put("ff", [TokenType.DYNAMIC, Dynamic.FF]);
-OPERANDS.put("fff", [TokenType.DYNAMIC, Dynamic.FFF]);
-OPERANDS.put("ffff", [TokenType.DYNAMIC, Dynamic.FFFF]);
-OPERANDS.put("mf", [TokenType.DYNAMIC, Dynamic.MF]);
-OPERANDS.put("mp", [TokenType.DYNAMIC, Dynamic.MP]);
-OPERANDS.put("p", [TokenType.DYNAMIC, Dynamic.P]);
-OPERANDS.put("pp", [TokenType.DYNAMIC, Dynamic.PP]);
-OPERANDS.put("ppp", [TokenType.DYNAMIC, Dynamic.PPP]);
-OPERANDS.put("pppp", [TokenType.DYNAMIC, Dynamic.PPPP]);
-OPERANDS.put("r", [TokenType.REST]);
+const KEYWORDS: TrieMap<[TokenType, ...number[]]> = new TrieMap();
+KEYWORDS.put("f", [TokenType.DYNAMIC, Dynamic.F]);
+KEYWORDS.put("ff", [TokenType.DYNAMIC, Dynamic.FF]);
+KEYWORDS.put("fff", [TokenType.DYNAMIC, Dynamic.FFF]);
+KEYWORDS.put("ffff", [TokenType.DYNAMIC, Dynamic.FFFF]);
+KEYWORDS.put("key", [TokenType.KEY]);
+KEYWORDS.put("mf", [TokenType.DYNAMIC, Dynamic.MF]);
+KEYWORDS.put("mp", [TokenType.DYNAMIC, Dynamic.MP]);
+KEYWORDS.put("p", [TokenType.DYNAMIC, Dynamic.P]);
+KEYWORDS.put("pp", [TokenType.DYNAMIC, Dynamic.PP]);
+KEYWORDS.put("ppp", [TokenType.DYNAMIC, Dynamic.PPP]);
+KEYWORDS.put("pppp", [TokenType.DYNAMIC, Dynamic.PPPP]);
+KEYWORDS.put("program", [TokenType.PROGRAM]);
+KEYWORDS.put("r", [TokenType.REST]);
+KEYWORDS.put("r", [TokenType.REST]);
+KEYWORDS.put("tempo", [TokenType.TEMPO]);
 
 export class Scanner {
   #current = 0;
@@ -185,11 +191,21 @@ export class Scanner {
     return value;
   }
 
-  #integer(value: number): number {
+  #integer(value: number, positive: boolean): Token {
     while (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
       value = 10 * value + (this.source[this.#current++] - 48);
     }
-    return value;
+    let type = TokenType.INTEGER;
+    if (this.#match("+")) {
+      type = this.#match("+")
+        ? TokenType.INTEGER_PLUS_PLUS
+        : TokenType.INTEGER_PLUS;
+    } else if (this.#match("-")) {
+      type = this.#match("-")
+        ? TokenType.INTEGER_MINUS_MINUS
+        : TokenType.INTEGER_MINUS;
+    }
+    return this.#token(type, positive ? value : -value);
   }
 
   next(): Token {
@@ -198,17 +214,15 @@ export class Scanner {
     if (this.done()) return this.#token(TokenType.END);
     const code = this.#pop();
     if (Scanner.#isDigit(code)) {
-      return this.#token(TokenType.INT, this.#integer(code - 48));
+      return this.#integer(code - 48, true);
     }
     switch (code) {
-      case CODES["-"]:
-        return this.#token(
-          this.#match("-") ? TokenType.DOUBLE_MINUS : TokenType.MINUS,
-        );
-      case CODES["+"]:
-        return this.#token(
-          this.#match("+") ? TokenType.DOUBLE_PLUS : TokenType.PLUS,
-        );
+      case CODES["-"]: {
+        if (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
+          return this.#integer(this.#pop() - 48, false);
+        }
+        return this.#token(TokenType.ERROR);
+      }
       case CODES[","]:
         return this.#token(TokenType.COMMA);
       case CODES["["]:
@@ -217,10 +231,7 @@ export class Scanner {
         return this.#token(TokenType.RIGHT_BRACKET);
       case CODES["="]:
         return this.#token(TokenType.IS);
-      case CODES["\\"]:
-        this.#identifier();
-        return this.#token(TokenType.OPERATOR);
-      case CODES[";"]:
+      case CODES["_"]:
         return this.#token(TokenType.HEX, this.#hex());
       case CODES["$"]:
         this.#identifier();
@@ -230,7 +241,7 @@ export class Scanner {
     }
     if (Scanner.#ic(code)) {
       this.#identifier();
-      const specific = OPERANDS.getByArray(
+      const specific = KEYWORDS.getByArray(
         this.source.slice(this.#from, this.#current),
       );
       if (specific !== null) {

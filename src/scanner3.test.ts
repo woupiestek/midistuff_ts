@@ -16,22 +16,28 @@ function scanAndMatch(input: string, type: TokenType) {
 
 scanAndMatch("", TokenType.END);
 scanAndMatch(",", TokenType.COMMA);
-scanAndMatch("--", TokenType.DOUBLE_MINUS);
-scanAndMatch("++", TokenType.DOUBLE_PLUS);
 scanAndMatch("[", TokenType.LEFT_BRACKET);
-scanAndMatch("-", TokenType.MINUS);
-scanAndMatch("+", TokenType.PLUS);
 scanAndMatch("]", TokenType.RIGHT_BRACKET);
 scanAndMatch("r", TokenType.REST);
 scanAndMatch("=", TokenType.IS);
 
-Deno.test(function scanInt() {
+Deno.test(function scanInteger() {
   const scanner = new Scanner(textEncoder.encode("1739"));
   const { type, from, to, line, value } = scanner.next();
-  assertEquals(type, TokenType.INT);
+  assertEquals(type, TokenType.INTEGER);
   assertEquals(value, 1739);
   assertEquals(from, 0);
   assertEquals(to, 4);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanIntegerMinusMinus() {
+  const scanner = new Scanner(textEncoder.encode("-17--"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.INTEGER_MINUS_MINUS);
+  assertEquals(value, -17);
+  assertEquals(from, 0);
+  assertEquals(to, 5);
   assertEquals(line, 1);
 });
 
@@ -56,7 +62,7 @@ Deno.test(function scanLines() {
 });
 
 Deno.test(function scanHex() {
-  const scanner = new Scanner(textEncoder.encode(";1a.f9"));
+  const scanner = new Scanner(textEncoder.encode("_1a.f9"));
   const { type, from, to, line, value } = scanner.next();
   assertEquals(type, TokenType.HEX);
   assertEquals(value, 26.97265625);
@@ -74,16 +80,7 @@ Deno.test(function scanError() {
   assertEquals(line, 1);
 });
 
-Deno.test(function scanOperator() {
-  const scanner = new Scanner(textEncoder.encode("\\1234567890asdfghjkl"));
-  const { type, from, to, line } = scanner.next();
-  assertEquals(type, TokenType.OPERATOR);
-  assertEquals(from, 0);
-  assertEquals(to, 20);
-  assertEquals(line, 1);
-});
-
-Deno.test(function scanVelocity() {
+Deno.test(function scanKeyword() {
   const scanner = new Scanner(textEncoder.encode("mp"));
   const { type, from, to, line, value } = scanner.next();
   assertEquals(type, TokenType.DYNAMIC);

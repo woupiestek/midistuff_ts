@@ -13,9 +13,9 @@ Further changes to the system:
 - ~~params as params~~
 - ~~pitch sets: [0 2 4];.4~~
 - ~~; -> d? r -> .?~~
-- remove operations
-- move durations
-- use `_` as duration symbol
+- ~~remove operations~~
+- ~~move durations~~
+- ~~use `_` as duration symbol~~
 
 ### pitch sets
 
@@ -43,11 +43,16 @@ range
 
 Options: `_.4` `!ppp` `|ppp`.
 
-- At the moment, there is no ambiguity to forces dynamics to use the \dyn keyword.
-Of course, the following big step is translations back and forth between
-formats.
+- At the moment, there is no ambiguity to forces dynamics to use the \dyn
+  keyword. Of course, the following big step is translations back and forth
+  between formats.
 
 Might as well use special token for each of them, now.
+
+How about this: durations are mostly fractional, and other numbers are not, So
+we may replace the `;.` with a single indicator for fractional hexadecimals.
+
+Accidental problem: `0- 3` and `0 -3` cannot be told apart now.
 
 ## 2023-11-8
 

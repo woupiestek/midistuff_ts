@@ -1,5 +1,5 @@
 import { MessageType } from "./midiTypes.ts";
-import { AST, Node, NodeType, Operations } from "./parser3.ts";
+import { AST, Node, NodeType, Options } from "./parser3.ts";
 import { Token } from "./scanner3.ts";
 
 class Params {
@@ -8,7 +8,7 @@ class Params {
     readonly duration: number = .25,
     readonly key: number = 0,
     readonly tempo: number = 2000,
-    readonly velocity: number = 64,
+    readonly velocity: number = 71,
   ) {}
 
   pitch(degree: number): number {
@@ -67,15 +67,15 @@ export class Interpreter {
     });
   }
 
-  #combine(params: Params, operations?: Operations): Params {
-    if (operations === undefined) return params;
-    const program = operations.program;
-    const dynamic = operations.dyn;
+  #combine(params: Params, options?: Options): Params {
+    if (options === undefined) return params;
+    const program = options.program;
+    const dynamic = options.dynamic;
     return new Params(
       program ? this.#getChannel(program) : params.channel,
-      operations.duration || params.duration,
-      operations.key || params.key,
-      operations.tempo || params.tempo,
+      options.duration || params.duration,
+      options.key || params.key,
+      options.tempo || params.tempo,
       dynamic ? 1 + 14 * dynamic : params.velocity,
     );
   }
@@ -95,7 +95,7 @@ export class Interpreter {
         }
         return;
       case NodeType.JOIN: {
-        const _params = this.#combine(params, node.operations);
+        const _params = this.#combine(params, node.options);
         const start = this.#time;
         let end = start;
         for (const child of node.children) {
@@ -109,7 +109,7 @@ export class Interpreter {
         return;
       }
       case NodeType.NOTE: {
-        const _params = this.#combine(params, node.operations);
+        const _params = this.#combine(params, node.options);
         const pitch = _params.pitch(node.degree) + node.accident;
         this.#emit(
           _params.status(MessageType.noteOn),
@@ -125,12 +125,12 @@ export class Interpreter {
         return;
       }
       case NodeType.REST:
-        (node.operations?.tempo || params.tempo) *
-          (node.operations?.duration || params.duration);
-        this.#time += this.#combine(params, node.operations).diffTime();
+        (node.options?.tempo || params.tempo) *
+          (node.options?.duration || params.duration);
+        this.#time += this.#combine(params, node.options).diffTime();
         return;
       case NodeType.SEQUENCE: {
-        const _params = this.#combine(params, node.operations);
+        const _params = this.#combine(params, node.options);
         for (const child of node.children) {
           this.#interpret(child, _params);
         }
