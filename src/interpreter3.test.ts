@@ -17,14 +17,14 @@ Deno.test(function simpleMelody() {
 Deno.test(function durations() {
   assertEquals(
     new Interpreter(
-      new Parser(textEncoder.encode("_.d[r]")).parse(),
-    ).time,
+      new Parser(textEncoder.encode("_.d[0]")).parse(),
+    ).realTime,
     1625,
   );
   assertEquals(
     new Interpreter(
-      new Parser(textEncoder.encode("[_.d r]")).parse(),
-    ).time,
+      new Parser(textEncoder.encode("[_.d 0]")).parse(),
+    ).realTime,
     1625,
   );
 });

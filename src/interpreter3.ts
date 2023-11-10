@@ -1,177 +1,52 @@
-import { MessageType } from "./midiTypes.ts";
-import { AST, Node, NodeType, Options } from "./parser3.ts";
-import { Token } from "./scanner3.ts";
+import { MidiPlanner } from "./midi3.ts";
+import { MessageType, MetaType } from "./midiTypes.ts";
+import { AST } from "./parser3.ts";
 
-enum Op {
-  PROGRAM,
-  TEMPO,
-  VELOCITY,
-}
-
-const CLASSES = new Map();
-for (let i = 0; i < 128; i++) {
-  CLASSES.set(`program_${i}`, [Op.PROGRAM, i]);
-}
-const LONGA = 2.4e5;
-CLASSES.set("grave", [Op.TEMPO, LONGA / 32]);
-CLASSES.set("largo", [Op.TEMPO, LONGA / 53]);
-CLASSES.set("adagio", [Op.TEMPO, LONGA / 56]);
-CLASSES.set("lento", [Op.TEMPO, LONGA / 80]);
-CLASSES.set("andante", [Op.TEMPO, LONGA / 82]);
-CLASSES.set("moderato", [Op.TEMPO, LONGA / 114]);
-CLASSES.set("allegro", [Op.TEMPO, LONGA / 138]);
-CLASSES.set("vivace", [Op.TEMPO, LONGA / 166]);
-CLASSES.set("presto", [Op.TEMPO, LONGA / 184]);
-["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
-  (k, i) => CLASSES.set(k, [Op.VELOCITY, 1 + 14 * i]),
-);
-
-class Params {
-  constructor(
-    readonly channel: number = 0,
-    readonly duration: number = 0.25,
-    readonly key: number = 0,
-    readonly tempo: number = 2000,
-    readonly velocity: number = 71,
-  ) {}
-
-  pitch(degree: number): number {
-    return Math.floor((425 + 12 * degree + this.key) / 7);
-  }
-
-  diffTime(): number {
-    return this.tempo * this.duration;
-  }
-
-  status(type: MessageType, channel = this.channel) {
-    return (type << 4) | channel;
-  }
-}
-
+const CONVERSION = 250;
 export class Interpreter {
-  #messages: { realTime: number; message: number[] }[] = [];
-  #time = 0;
-  #programs: (number | undefined)[] = Array(16);
-  #sections: { mark: string; node: Node; params?: Params }[];
+  messages: { realTime: number; message: number[] }[] = [];
+  realTime = 0;
   constructor(ast: AST) {
-    this.#sections = ast.sections;
-    this.#interpret(ast.main, new Params());
-    this.#messages.sort((x, y) => x.realTime - y.realTime);
+    this.#process(new MidiPlanner(ast));
   }
 
-  get messages() {
-    return this.#messages;
-  }
-
-  get time() {
-    return this.#time;
-  }
-
-  #getChannel(program: number): number {
-    let free = 16;
-    for (let i = 15; i >= 0; i--) {
-      if (i === 10) continue;
-      if (this.#programs[i] === program) {
-        return i;
-      }
-      if (this.#programs[i] === undefined) {
-        free = i;
-      }
-    }
-    if (free === 16) throw new Error("out of channels");
-    this.#programs[free] = program;
-    this.#emit((MessageType.programChange << 4) | free, program);
-    return free;
-  }
-
-  #emit(...message: number[]) {
-    this.#messages.push({
-      realTime: this.#time | 0,
-      message,
-    });
-  }
-
-  #combine(params: Params, options?: Options): Params {
-    if (options === undefined) return params;
-    let channel = params.channel;
-    let velocity = params.velocity;
-    let tempo = params.tempo;
-    if (options.classes !== undefined) {
-      for (const c of options.classes) {
-        const op = CLASSES.get(c);
-        if (op === undefined) continue;
-        switch (op[0]) {
-          case Op.VELOCITY:
-            velocity = op[1];
-            break;
-          case Op.PROGRAM:
-            channel = this.#getChannel(op[1]);
-            break;
-          case Op.TEMPO:
-            tempo = op[1];
-            break;
+  #process(planner: MidiPlanner) {
+    let tempo = 2000;
+    let lastTime = 0;
+    for (const { time, event } of planner.messages) {
+      this.realTime += tempo * (time - lastTime);
+      lastTime = time;
+      if (event === null) continue;
+      if (event.type === MessageType.meta) {
+        if (event.metaType == MetaType.tempo) {
+          tempo = event.value / CONVERSION;
         }
+        continue;
       }
-    }
-    return new Params(
-      channel,
-      options.duration || params.duration,
-      options.key || params.key,
-      tempo,
-      velocity,
-    );
-  }
-
-  #interpret(node: Node, params: Params) {
-    switch (node.type) {
-      case NodeType.ERROR:
-        console.error(`Error at ${Token.stringify(node.token)}`, node.error);
-        return;
-      case NodeType.INSERT:
-        {
-          const section = this.#sections[node.index];
-          if (!section.params) {
-            section.params = params;
-          }
-          this.#interpret(section.node, section.params);
-        }
-        return;
-      case NodeType.JOIN: {
-        const _params = this.#combine(params, node.options);
-        const start = this.#time;
-        let end = start;
-        for (const child of node.children) {
-          this.#time = start;
-          this.#interpret(child, _params);
-          if (this.#time > end) {
-            end = this.#time;
-          }
-        }
-        this.#time = end;
-        return;
+      const message = [(event.type << 4) | event.channel];
+      switch (event.type) {
+        case MessageType.noteOff:
+        case MessageType.noteOn:
+          message.push(event.note, event.velocity);
+          break;
+        case MessageType.polyphonicPressure:
+          message.push(event.note, event.pressure);
+          break;
+        case MessageType.controller:
+          message.push(event.controller, event.value);
+          break;
+        case MessageType.programChange:
+          message.push(event.program);
+          break;
+        case MessageType.channelPressure:
+          message.push(event.pressure);
+          break;
+        case MessageType.pitchBend:
+          // todo: check!
+          message.push(0x7f & event.value, (event.value >> 7) + 0x40);
+          break;
       }
-      case NodeType.NOTE: {
-        const _params = this.#combine(params, node.options);
-        const pitch = _params.pitch(node.degree) + node.accident;
-        this.#emit(_params.status(MessageType.noteOn), pitch, _params.velocity);
-        this.#time += _params.diffTime();
-        this.#emit(
-          _params.status(MessageType.noteOff),
-          pitch,
-          _params.velocity,
-        );
-        return;
-      }
-      case NodeType.REST:
-        this.#time += this.#combine(params, node.options).diffTime();
-        return;
-      case NodeType.SEQUENCE: {
-        const _params = this.#combine(params, node.options);
-        for (const child of node.children) {
-          this.#interpret(child, _params);
-        }
-        return;
-      }
+      this.messages.push({ realTime: this.realTime, message });
     }
   }
 }
