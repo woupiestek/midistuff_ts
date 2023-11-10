@@ -99,18 +99,92 @@ than others.
 
 So what to do here?
 
-I like the idea of tagging tone sets and then defining the interpretation of
-  the tags elsewhere. As long as they are numbers that don't change to often,
-  that should just work out, right?
+I like the idea of tagging tone sets and then defining the interpretation of the
+tags elsewhere. As long as they are numbers that don't change to often, that
+should just work out, right?
 
 Questions:
-- Should the styles be in the same file?
+
+- Should the styles be in the same file? Look at style html...
 - Is special syntax needed for the tags, or can we just use keywords?
 - How about the key?
 
 Actions:
+
 - I can at least test the identifier and limited keyword approach for dynamics,
-  and add the option to use that generally, but don't do anything about program and tempo.
+  and add the option to use that generally, but don't do anything about program
+  and tempo.
+
+## goal
+
+Translate composition form NWC to this format, compose some more in this format,
+export to musescore. The system cannot handle that yet.
+
+### tempos
+
+Relevant: 240000/bpm
+
+- Grave – (32 bpm) - 7500ms
+- Largo – (53 bpm) - 4528ms
+- Adagio – (56 bpm) - 4286ms
+- Lento – (80 bpm) - 3000ms
+- Andante – (82 bpm) - 2927ms
+- Moderato – (114 bpm) - 2105ms
+- Allegro – (138 bpm) - 1739ms
+- Vivace – (166 bpm) - 1447ms
+- Presto – (184 bpm) - 1304ms
+
+### drums
+
+Can we accomodate? A slight different notation might be better, and looking
+around what exists already is somthing I still need to do.
+
+### status
+
+I think I have it: the core syntax and semantics of my notation. The only thing
+remaining is the way styles and scores can be combined. HTML uses ccs in 3 ways:
+
+- inline, with the styles attributes
+- in the header with css between style tags
+- in a files linked from the header.
+
+I could mimick this system:
+
+- a `style`-like keyword or structure, that accepts key values pairs.
+- a file format that consists of two parts, where one part has the
+  selector/style combinations as in css
+- an option to link the two.
+
+Key values pairs: it will have to be the literal strings, with limitations, so
+`{tempo:1700;program:10}` could work specifically for my interpreter. Then maybe
+`piano = { channel: 0; program: 1; }`, to attach styles to classes. In this
+case, though, not every class needs an associated style. Keep the tokenizer in
+mind! only keys and values that are acceptable s tokens can be used in the
+key-value pairs, and the interpreters have to work with these too...
+
+Modal tokenizer can remember in what mode it was tokenzing, So it can generate
+different tokens in diferrent part of the file. Fine, i think, if it remains a
+finite state machine.
+
+Why do I want that? Because this system controls the values that interpreters
+get out of it. Now everything is numbers, but I imagine some data I want to
+transfer is not.
+
+Maybe is it enough to allow for a number of predefined tokens anyway, Like
+identifiers and integers
+
+`'{' (IDENTIFIER ':' (IDENTIFIER|INTEGER))* '}'`
+
+I don't like the inline definition. inline attributes are better.
+
+Start the file with a specific line. Then an optional header, or you know what:
+put that after the end instead.
+
+Add metadata there too.
+
+### generating midi files
+
+Yeah, let's put that together.
 
 ## 2023-11-9
 

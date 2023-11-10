@@ -3,7 +3,7 @@ import {
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { NodeType, Parser } from "./parser3.ts";
-import { Dynamic, TokenType } from "./scanner3.ts";
+import { TokenType } from "./scanner3.ts";
 
 const textEncoder = new TextEncoder();
 
@@ -114,45 +114,31 @@ Deno.test(function parseRepeat() {
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
     textEncoder.encode(
-      "program 64 tempo 1667 key -3 fff _.5[ _.2 0 1 2 0 _.2 r ]",
+      "program_64 vivace key -3 fff _.5[ _.2 0 1 2 0 _.2 r ]",
     ),
   ).parse();
   if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
-  assertEquals(node.options?.program, 64);
-  assertEquals(node.options?.tempo, 1667);
   assertEquals(node.options?.key, -3);
-  assertEquals(node.options?.dynamic, Dynamic.FFF);
+  assertEquals(node.options?.classes, ["program_64", "vivace", "fff"]);
   assertEquals(node.options?.duration, 5 / 16);
 });
 
 Deno.test(function parseDoubleDynamics() {
   const { main: node } = new Parser(
-    textEncoder.encode("f fff _.4[ _.2 0 1 2 0 _.2 r ]"),
+    textEncoder.encode("f f _.4[ _.2 0 1 2 0 _.2 r ]"),
   ).parse();
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
-  assertEquals(node.token.type, TokenType.DYNAMIC);
+  assertEquals(node.token.type, TokenType.IDENTIFIER);
   assertEquals(
     node.error.message,
-    "Error at line 1 (DYNAMIC 'fff'): Double dynamic",
-  );
-});
-
-Deno.test(function parseProgramOutOfRange() {
-  const { main: node } = new Parser(
-    textEncoder.encode("program 2000 _.4[ _.2 0 1 2 0 _.2 r ]"),
-  ).parse();
-  if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
-  assertEquals(node.token.type, TokenType.INTEGER);
-  assertEquals(
-    node.error.message,
-    "Error at line 1 (INTEGER '2000'): Value 2000 is out of range [0, 127]",
+    "Error at line 1 (IDENTIFIER 'f'): Double 'f'",
   );
 });
 
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(
     textEncoder.encode(
-      "tempo 1500 f [\n" +
+      "allegro f [\n" +
         "$A = [_.2 0 1 2 0 _.2 r] $A\n" +
         "$B = [_.2 2 3 _.8 4 _.2 r] $B\n" +
         "% this was a puzzle to get right!\n" +
@@ -162,9 +148,8 @@ Deno.test(function parseCombination() {
   ).parse();
   if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(sections.length, 4);
-  assertEquals(node.options?.tempo, 1500);
   assertEquals(node.options?.key, undefined);
-  assertEquals(node.options?.dynamic, Dynamic.F);
+  assertEquals(node.options?.classes, ["allegro", "f"]);
 });
 
 Deno.test(function parseError() {
@@ -172,11 +157,13 @@ Deno.test(function parseError() {
   if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 3);
   const child = node.children[0];
-  if (child.type !== NodeType.ERROR) fail("wrong child type");
-  assertEquals(child.token.type, TokenType.ERROR);
+  if (child.type !== NodeType.ERROR) {
+    fail(`wrong child type ${NodeType[child.type]}`);
+  }
+  assertEquals(child.token.type, TokenType.COMMA);
   assertEquals(
     child.error.message,
-    "Error at line 1 (ERROR 'h'): Unexpected type of token ERROR",
+    "Error at line 1 (COMMA ','): Expected note, rest or set here",
   );
 });
 

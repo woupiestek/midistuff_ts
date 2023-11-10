@@ -52,7 +52,7 @@ Deno.test(function simpleRepeat() {
 Deno.test(function simpleProgram() {
   const messages = new Interpreter(
     new Parser(
-      textEncoder.encode("program 64 [ _.2 0 _.4 1 _.4 2 _.4 0 _.2 r ]"),
+      textEncoder.encode("program_64 [ _.2 0 _.4 1 _.4 2 _.4 0 _.2 r ]"),
     ).parse(),
   ).messages;
   assertEquals(messages.length, 9);
@@ -66,7 +66,7 @@ Deno.test(function otherParamsChange() {
   const messages = new Interpreter(
     new Parser(
       textEncoder.encode(
-        "tempo 1667 key 3 fff [ _.2 0 1 2 0 _.2 r ]",
+        "vivace key 3 fff [ _.2 0 1 2 0 _.2 r ]",
       ),
     ).parse(),
   ).messages;
@@ -77,9 +77,9 @@ Deno.test(function otherParamsChange() {
   assertEquals(messages.filter((it) => it.message[2] === 113).length, 8);
 });
 
-Deno.test(function otherParamsChange() {
+Deno.test(function jacob() {
   const messages = new Interpreter(new Parser(textEncoder.encode(
-    "tempo 1500 f [\n" +
+    "allegro f [\n" +
       "$A = [_.2 0 1 2 0 _.2 r] $A\n" +
       "$B = [_.2 2 3 _.8 4 _.2 r] $B\n" +
       "% this was a puzzle to get right!\n" +

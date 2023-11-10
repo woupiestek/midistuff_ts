@@ -8,12 +8,10 @@ export enum NodeType {
   REST,
   SEQUENCE,
 }
-export type Options = Record<string, number> & {
+export type Options = {
   duration?: number;
-  dynamic?: number;
   key?: number;
-  program?: number;
-  tempo?: number;
+  classes?: string[];
 };
 
 export type Node =
@@ -144,13 +142,21 @@ export class Parser {
     const options: Options = {};
     a: for (;;) {
       switch (this.#current.type) {
-        case TokenType.DYNAMIC:
-          if (options.dynamic !== undefined) {
-            throw this.#error("Double dynamic");
+        case TokenType.IDENTIFIER: {
+          const lexeme = Parser.#decoder.decode(
+            this.source.slice(this.#current.from, this.#current.to),
+          );
+          if (options.classes === undefined) {
+            options.classes = [lexeme];
+          } else {
+            if (options.classes.includes(lexeme)) {
+              throw this.#error(`Double '${lexeme}'`);
+            }
+            options.classes.push(lexeme);
           }
-          options.dynamic = this.#current.value;
           this.#advance();
           continue;
+        }
         case TokenType.HEX:
           if (options.duration !== undefined) {
             throw this.#error("Double duration");
@@ -164,20 +170,6 @@ export class Parser {
           }
           this.#advance();
           options.key = this.#integer(-7, 7);
-          continue;
-        case TokenType.PROGRAM:
-          if (options.program !== undefined) {
-            throw this.#error("Double program");
-          }
-          this.#advance();
-          options.program = this.#integer(0, 127);
-          continue;
-        case TokenType.TEMPO:
-          if (options.tempo !== undefined) {
-            throw this.#error("Double tempo");
-          }
-          this.#advance();
-          options.tempo = this.#integer(0, Number.MAX_SAFE_INTEGER);
           continue;
         default:
           break a;
@@ -236,14 +228,8 @@ export class Parser {
         return this.#note(0, options);
       case TokenType.REST:
         if (options) {
-          if (options.dynamic !== undefined) {
-            throw this.#error("Dynamics are not allowed on rests");
-          }
           if (options.key !== undefined) {
             throw this.#error("Key signatures are not allowed rests");
-          }
-          if (options.program !== undefined) {
-            throw this.#error("Program changes are not allowed on rests");
           }
         }
         this.#advance();
@@ -253,7 +239,7 @@ export class Parser {
         };
       default:
         throw this.#error(
-          `Unexpected type of token ${TokenType[this.#current.type]}`,
+          `Expected note, rest or set here`,
         );
     }
   }

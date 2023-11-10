@@ -3,10 +3,10 @@ import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
   COMMA,
-  DYNAMIC,
   END,
   ERROR,
   HEX,
+  IDENTIFIER,
   INTEGER_MINUS_MINUS,
   INTEGER_MINUS,
   INTEGER_PLUS_PLUS,
@@ -16,23 +16,8 @@ export enum TokenType {
   KEY,
   LEFT_BRACKET,
   MARK,
-  PROGRAM,
   REST,
   RIGHT_BRACKET,
-  TEMPO,
-}
-
-export enum Dynamic {
-  PPPP,
-  PPP,
-  PP,
-  P,
-  MP,
-  MF,
-  F,
-  FF,
-  FFF,
-  FFFF,
 }
 
 export type Token = {
@@ -53,21 +38,9 @@ const CODES: Record<string, number> = Object.fromEntries(
   Array.from(Array(0x7e)).map((_, i) => [String.fromCharCode(i), i]),
 );
 
-const KEYWORDS: TrieMap<[TokenType, ...number[]]> = new TrieMap();
-KEYWORDS.put("f", [TokenType.DYNAMIC, Dynamic.F]);
-KEYWORDS.put("ff", [TokenType.DYNAMIC, Dynamic.FF]);
-KEYWORDS.put("fff", [TokenType.DYNAMIC, Dynamic.FFF]);
-KEYWORDS.put("ffff", [TokenType.DYNAMIC, Dynamic.FFFF]);
-KEYWORDS.put("key", [TokenType.KEY]);
-KEYWORDS.put("mf", [TokenType.DYNAMIC, Dynamic.MF]);
-KEYWORDS.put("mp", [TokenType.DYNAMIC, Dynamic.MP]);
-KEYWORDS.put("p", [TokenType.DYNAMIC, Dynamic.P]);
-KEYWORDS.put("pp", [TokenType.DYNAMIC, Dynamic.PP]);
-KEYWORDS.put("ppp", [TokenType.DYNAMIC, Dynamic.PPP]);
-KEYWORDS.put("pppp", [TokenType.DYNAMIC, Dynamic.PPPP]);
-KEYWORDS.put("program", [TokenType.PROGRAM]);
-KEYWORDS.put("r", [TokenType.REST]);
-KEYWORDS.put("tempo", [TokenType.TEMPO]);
+const KEYWORDS: TrieMap<TokenType> = new TrieMap();
+KEYWORDS.put("key", TokenType.KEY);
+KEYWORDS.put("r", TokenType.REST);
 
 export class Scanner {
   #current = 0;
@@ -238,14 +211,12 @@ export class Scanner {
       default:
         break;
     }
-    if (Scanner.#ic(code)) {
+    if (Scanner.#isLetter(code)) {
       this.#identifier();
-      const specific = KEYWORDS.getByArray(
-        this.source.slice(this.#from, this.#current),
+      return this.#token(
+        KEYWORDS.getByArray(this.source.slice(this.#from, this.#current)) ||
+          TokenType.IDENTIFIER,
       );
-      if (specific !== null) {
-        return this.#token(...specific);
-      }
     }
     return this.#token(TokenType.ERROR);
   }

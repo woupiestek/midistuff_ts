@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Dynamic, Scanner, TokenType } from "./scanner3.ts";
+import { Scanner, TokenType } from "./scanner3.ts";
 
 const textEncoder = new TextEncoder();
 
@@ -72,21 +72,31 @@ Deno.test(function scanHex() {
 });
 
 Deno.test(function scanError() {
-  const scanner = new Scanner(textEncoder.encode("asdfghjklz1234567890"));
+  const scanner = new Scanner(textEncoder.encode("\\asdfghjklz1234567890"));
   const { type, from, to, line } = scanner.next();
   assertEquals(type, TokenType.ERROR);
   assertEquals(from, 0);
-  assertEquals(to, 20);
+  assertEquals(to, 1);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanIdentifier() {
+  const scanner = new Scanner(textEncoder.encode("mp"));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.IDENTIFIER);
+  assertEquals(value, undefined);
+  assertEquals(from, 0);
+  assertEquals(to, 2);
   assertEquals(line, 1);
 });
 
 Deno.test(function scanKeyword() {
-  const scanner = new Scanner(textEncoder.encode("mp"));
+  const scanner = new Scanner(textEncoder.encode("key"));
   const { type, from, to, line, value } = scanner.next();
-  assertEquals(type, TokenType.DYNAMIC);
-  assertEquals(value, Dynamic.MP);
+  assertEquals(type, TokenType.KEY);
+  assertEquals(value, undefined);
   assertEquals(from, 0);
-  assertEquals(to, 2);
+  assertEquals(to, 3);
   assertEquals(line, 1);
 });
 

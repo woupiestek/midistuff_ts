@@ -2,10 +2,33 @@ import { MessageType } from "./midiTypes.ts";
 import { AST, Node, NodeType, Options } from "./parser3.ts";
 import { Token } from "./scanner3.ts";
 
+enum Op {
+  PROGRAM,
+  TEMPO,
+  VELOCITY,
+}
+
+const CLASSES = new Map();
+for (let i = 0; i < 128; i++) {
+  CLASSES.set(`program_${i}`, [Op.PROGRAM, i]);
+}
+CLASSES.set("grave", [Op.TEMPO, 7500]);
+CLASSES.set("largo", [Op.TEMPO, 4528]);
+CLASSES.set("adagio", [Op.TEMPO, 4286]);
+CLASSES.set("lento", [Op.TEMPO, 3000]);
+CLASSES.set("andante", [Op.TEMPO, 2927]);
+CLASSES.set("moderato", [Op.TEMPO, 2105]);
+CLASSES.set("allegro", [Op.TEMPO, 1739]);
+CLASSES.set("vivace", [Op.TEMPO, 1447]);
+CLASSES.set("grave", [Op.TEMPO, 1304]);
+["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
+  (k, i) => CLASSES.set(k, [Op.VELOCITY, 1 + 14 * i]),
+);
+
 class Params {
   constructor(
     readonly channel: number = 0,
-    readonly duration: number = .25,
+    readonly duration: number = 0.25,
     readonly key: number = 0,
     readonly tempo: number = 2000,
     readonly velocity: number = 71,
@@ -69,14 +92,32 @@ export class Interpreter {
 
   #combine(params: Params, options?: Options): Params {
     if (options === undefined) return params;
-    const program = options.program;
-    const dynamic = options.dynamic;
+    let channel = params.channel;
+    let velocity = params.velocity;
+    let tempo = params.tempo;
+    if (options.classes !== undefined) {
+      for (const c of options.classes) {
+        const op = CLASSES.get(c);
+        if (op === undefined) continue;
+        switch (op[0]) {
+          case Op.VELOCITY:
+            velocity = op[1];
+            break;
+          case Op.PROGRAM:
+            channel = this.#getChannel(op[1]);
+            break;
+          case Op.TEMPO:
+            tempo = op[1];
+            break;
+        }
+      }
+    }
     return new Params(
-      program ? this.#getChannel(program) : params.channel,
+      channel,
       options.duration || params.duration,
       options.key || params.key,
-      options.tempo || params.tempo,
-      dynamic ? 1 + 14 * dynamic : params.velocity,
+      tempo,
+      velocity,
     );
   }
 
@@ -111,11 +152,7 @@ export class Interpreter {
       case NodeType.NOTE: {
         const _params = this.#combine(params, node.options);
         const pitch = _params.pitch(node.degree) + node.accident;
-        this.#emit(
-          _params.status(MessageType.noteOn),
-          pitch,
-          _params.velocity,
-        );
+        this.#emit(_params.status(MessageType.noteOn), pitch, _params.velocity);
         this.#time += _params.diffTime();
         this.#emit(
           _params.status(MessageType.noteOff),
@@ -125,8 +162,6 @@ export class Interpreter {
         return;
       }
       case NodeType.REST:
-        (node.options?.tempo || params.tempo) *
-          (node.options?.duration || params.duration);
         this.#time += this.#combine(params, node.options).diffTime();
         return;
       case NodeType.SEQUENCE: {
