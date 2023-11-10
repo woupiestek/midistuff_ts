@@ -21,9 +21,6 @@ Deno.test(function parseSimpleRest() {
 
 Deno.test(function parseNote() {
   const { main: node } = new Parser(textEncoder.encode("_.c -7++")).parse();
-  if (node.type === NodeType.ERROR) {
-    console.error(node.error);
-  }
   if (node.type !== NodeType.NOTE) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.degree, -7);
   assertEquals(node.accident, 2);
@@ -194,6 +191,5 @@ Deno.test(function noFalseDurations() {
       ? it.options?.duration
       : undefined
   );
-  console.log(...node.children);
   assertEquals(durations, [0.125, undefined, 0.5, 0.125]);
 });

@@ -25,7 +25,7 @@ export function transform1({ timing, tracks }: MidiFile) {
   }
 
   const { ppqn } = timing;
-  let tempo = 5e5;
+  let tempo = 5e5; // 120 bpm = 5e5 microsecond per beat.
   let realTime = 0;
   let pulse = 0;
 

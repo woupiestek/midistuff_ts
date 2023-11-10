@@ -186,6 +186,22 @@ Add metadata there too.
 
 Yeah, let's put that together.
 
+### tuplets
+
+Could be an exception to the free interpretation rule: fit more notes into less
+time.
+
+Technically, this would work: `_.2 tuplet [_.4 [0 1 2]]` Compress the set into
+the duration before the tuplet.
+
+idea: `tuplet` INTEGER implies scaling by `n / (n + 1)`, all integers except
+`-3, -2, -1, 0, 1` though.
+
+Something like, 'shorthen node by this duration' could be good.
+
+Technically, only odd denominators matter, so letting the numerator
+automatically be the 'greatest power of two less than' works.
+
 ## 2023-11-9
 
 Further changes to the system:

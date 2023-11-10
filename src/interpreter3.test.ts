@@ -4,7 +4,7 @@ import { Parser } from "./parser3.ts";
 
 const textEncoder = new TextEncoder();
 
-Deno.test(function simpleMelodie() {
+Deno.test(function simpleMelody() {
   const messages = new Interpreter(
     new Parser(textEncoder.encode("[ _.2 0 _.4 1 _.4 2 _.4 0 _.2 r ]")).parse(),
   ).messages;
