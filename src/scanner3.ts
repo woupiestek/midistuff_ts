@@ -67,7 +67,6 @@ KEYWORDS.put("ppp", [TokenType.DYNAMIC, Dynamic.PPP]);
 KEYWORDS.put("pppp", [TokenType.DYNAMIC, Dynamic.PPPP]);
 KEYWORDS.put("program", [TokenType.PROGRAM]);
 KEYWORDS.put("r", [TokenType.REST]);
-KEYWORDS.put("r", [TokenType.REST]);
 KEYWORDS.put("tempo", [TokenType.TEMPO]);
 
 export class Scanner {

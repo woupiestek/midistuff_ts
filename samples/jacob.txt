@@ -1,4 +1,4 @@
-program 10 tempo 1500 f [
+program 53 tempo 1750 f [
   $A = [
     $A = [_.2 0 1 2 0 _.2 r] $A
     $B = [_.2 2 3 _.8 4 _.2 r] $B

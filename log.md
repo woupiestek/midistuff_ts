@@ -2,6 +2,118 @@
 
 ## 2023-11-9
 
+Directions to head into:
+
+- generate notation
+- generate midi files
+- more midi controls
+
+Idea: this is a data format to help compose music within certain traditional
+limits, but it should allow much data to be attached to the scores, both for
+producing notation and for midi.
+
+The score is a series of numbers (with modifiers) indicating tones and a symbol
+for a rest, which can be grouped and set to run in parallel. Some key attributes
+that can be attached to both individual tones and to goruping of them are:
+
+- duration: this is the floating point hexadecimal thing, which indicates how
+  low a tone is supposed to last relative to the temp
+- tempo: currently milliseconds for a whole note. BPM has a legacy, but requires
+  explicitly mentioning the duration like so: `bpm _.4 135`. This is
+  `60000/(duration * bpm)` ms per whole note.
+- key: since the scale is diatonic, this is requires to understand the scale
+  degrees
+- dynamic: pretty relevant to music as well.
+
+The midi interpreter I have now keeps track of time, programs and channels, and
+uses a set of parameters to take care of the rest. `Program` feels like
+something only relevant to midi interpreters, however.
+
+Operationally, duration, key and dynamic set pattern that can be applied to
+generic attributes: key values pairs. `{ channel: x program: x pedal }[]`
+`{ pedal }[...]`
+
+There is no truly objective way to seperate text from interpretation, of course.
+So my system should as expressive as sheet music and midi files combined, while
+being convenient for composing the kind of music I want.
+
+Pedal is a good example: is it really up to the interpreter, or it it part of
+the composition? Arguably, it is somewhere in the middle. Same for tempo.
+
+I like only having one kind of collection, so no xml, and no s-expression, where
+everything needs a tag.
+
+Layers:
+
+1. tones, rests
+2. duration, key, dynamic
+3. tempo
+4. program
+
+- define new keywords with parameters
+- let those definition carry meta data
+
+Hypothetically it could say: def f { velocity = 85 } Somewhere, so dynamics are
+not given, though this invites questions about specifying imports...
+
+Back to this: `let \piano { channel: 0, program: 1 }`
+
+Attach tags to nodes, and add parameters to tags.
+
+`\pedal = {} [... \pedal [...] ...]` That seems like a clean solution, doesn't
+it?
+
+This is verbose, then: `\music_box = { program: 10 } \music_box [...]`
+
+- a fairly free system to attach attributes to a node. What values can an
+  attribute take?
+- a way to group those attributes together
+
+Could be more like this:
+
+- Attribute attachment `=program 10 []`
+- This starts looking like a macro system: `\music_box [=program 10 ...]`
+  `\music_box [...]`
+
+The ontology has five parts now:
+
+- sets of tones and rests, the core data of music.
+- durations, dynamics, key and tempo: the core attributes.
+- general attributes: key value pairs for the benefit of interpreters.
+- tags: sets of attributes to apply to sets of tones.
+- marks: tone sets can be marked to be repeated later.
+
+Utimately, we could do something like: `\# = [transpose 1]`,
+`\b = [transpose -1]` and so on.
+
+### ongoing thoughts
+
+The keys, tones and durations need to stay. Dynamic and tempo have me wondering:
+to what extend are they part of the composition, and to what extend are they up
+to the interpreter? Only the bpm number is exact, there rest is much less clear.
+Then the program number: this is strictly for midi of course.
+
+Some things that I don't support yet: pedal, crescendo, ralentando, accents on
+notes... There are endless numbers of these some of which are less ambiguous
+than others.
+
+So what to do here?
+
+I like the idea of tagging tone sets and then defining the interpretation of
+  the tags elsewhere. As long as they are numbers that don't change to often,
+  that should just work out, right?
+
+Questions:
+- Should the styles be in the same file?
+- Is special syntax needed for the tags, or can we just use keywords?
+- How about the key?
+
+Actions:
+- I can at least test the identifier and limited keyword approach for dynamics,
+  and add the option to use that generally, but don't do anything about program and tempo.
+
+## 2023-11-9
+
 Further changes to the system:
 
 - ~~simplify mark & repeat notation~~
