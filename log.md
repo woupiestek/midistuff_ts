@@ -1,6 +1,42 @@
 # Midistuff logs
 
-## 2023-11-9
+## 2023-11-11
+
+### todo list
+
+- ~~add tuplet code~~
+- fix parallel tempo support in midi
+- add attributes, file structure
+- generate music xml
+- generate from nwctxt
+
+### tuplets
+
+For the tuplets: treat it as modified duration? i.e. `_.4 / _1.8`. Why not use
+fractions all the time then, though? `_/4` `_3/4` `_/256` `_ 1 / 4`. Three token
+types: UNDERSCORE, SLASH, INTEGER, Rule: `UNDERSCORE INTEGER? (SLASH INTEGER)?`.
+Default to 1 if either integer is missing, so `_ [...]` is a tone set of whole
+note duration. Forbid `0` as a value on either side.
+
+### midi tempo
+
+Midi has its own interpretation of tempo, which may be unexpected. I.e. I could
+write `[allegro [0 1 2], vivace [3 4 6]]` for some experiment in modernism. This
+indicates two melodies played in parallel with different tempos. Use the tempo
+midi meta message, however, and both will be play with only on of these tempos.
+
+Maybe that is the problem: we should not use the midi meta messages for the
+tempo.
+
+1. All meta messages are optional
+2. There are alternative timing options, and all that matters is ticks.
+
+I.e. we could try a timecode, and tie each event to a frame.
+
+Here the option of attaching attributes a file, a tone set or a 'class' becomes
+useful again.
+
+## 2023-11-10
 
 Directions to head into:
 
@@ -201,6 +237,27 @@ Something like, 'shorthen node by this duration' could be good.
 
 Technically, only odd denominators matter, so letting the numerator
 automatically be the 'greatest power of two less than' works.
+
+### todo list
+
+- add tuplet code
+- add attributes
+- generate music xml
+- generate from nwctxt
+
+Attributes can be attached to both classes and sets, But the attachment to
+classes needs to happen somewhere else.
+
+Maybe there won't be an inline solution at all.
+
+File structure:
+
+- header: likely the file type and version followed by a description
+- tone set: a tone set
+- classes: stuff like midi settings and notation parameters
+- properties: stuff that applies to all of the file, like title, author, etc.
+
+Maybe come up with better names... e.g. 'modes' for classes.
 
 ## 2023-11-9
 

@@ -5,7 +5,6 @@ export enum TokenType {
   COMMA,
   END,
   ERROR,
-  HEX,
   IDENTIFIER,
   INTEGER_MINUS_MINUS,
   INTEGER_MINUS,
@@ -18,6 +17,8 @@ export enum TokenType {
   MARK,
   REST,
   RIGHT_BRACKET,
+  SLASH,
+  UNDERSCORE,
 }
 
 export type Token = {
@@ -134,35 +135,6 @@ export class Scanner {
     }
   }
 
-  #hexDigit(): number | null {
-    if (this.done()) return null;
-    const code = this.source[this.#current++];
-    const c15 = code & 15;
-    if ((code & 240) === 48 && c15 <= 9) return c15;
-    if ((code & 216) === 64 && c15 !== 0 && c15 !== 7) return c15 + 9;
-    this.#current--;
-    return null;
-  }
-
-  #hex() {
-    let value = 0;
-    for (;;) {
-      const digit = this.#hexDigit();
-      if (digit === null) break;
-      value = 16 * value + digit;
-    }
-    if (this.#match(".")) {
-      let f = 1 / 16;
-      for (;;) {
-        const digit = this.#hexDigit();
-        if (digit === null) break;
-        value += f * digit;
-        f /= 16;
-      }
-    }
-    return value;
-  }
-
   #integer(value: number, positive: boolean): Token {
     while (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
       value = 10 * value + (this.source[this.#current++] - 48);
@@ -203,8 +175,10 @@ export class Scanner {
         return this.#token(TokenType.RIGHT_BRACKET);
       case CODES["="]:
         return this.#token(TokenType.IS);
+      case CODES["/"]:
+        return this.#token(TokenType.SLASH);
       case CODES["_"]:
-        return this.#token(TokenType.HEX, this.#hex());
+        return this.#token(TokenType.UNDERSCORE);
       case CODES["$"]:
         this.#identifier();
         return this.#token(TokenType.MARK);

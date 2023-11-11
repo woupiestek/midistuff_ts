@@ -113,10 +113,16 @@ export class MidiPlanner {
     }
     return new Params(
       channel,
-      options.duration || params.duration,
+      MidiPlanner.#duration(options, params.duration),
       options.key || params.key,
       velocity,
     );
+  }
+
+  static #duration(options: Options, duration: number): number {
+    return options.durationNumerator && options.durationDenominator
+      ? options.durationNumerator / options.durationDenominator
+      : duration;
   }
 
   #interpret(node: Node, params: Params) {
@@ -166,7 +172,9 @@ export class MidiPlanner {
         return;
       }
       case NodeType.REST:
-        this.#time += node.options?.duration || params.duration;
+        this.#time += node.options
+          ? MidiPlanner.#duration(node.options, params.duration)
+          : params.duration;
         return;
       case NodeType.SEQUENCE: {
         const _params = this.#combine(params, node.options);

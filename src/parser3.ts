@@ -9,7 +9,8 @@ export enum NodeType {
   SEQUENCE,
 }
 export type Options = {
-  duration?: number;
+  durationNumerator?: number;
+  durationDenominator?: number;
   key?: number;
   classes?: string[];
 };
@@ -138,6 +139,19 @@ export class Parser {
     throw this.#error(`Could not resolve ${mark}`);
   }
 
+  #duration(options: Options) {
+    if (this.#current.type === TokenType.INTEGER) {
+      options.durationNumerator = this.#integer(1, Number.MAX_SAFE_INTEGER);
+    } else {
+      options.durationNumerator = 1;
+    }
+    if (this.#match(TokenType.SLASH)) {
+      options.durationDenominator = this.#integer(1, Number.MAX_SAFE_INTEGER);
+    } else {
+      options.durationDenominator = 1;
+    }
+  }
+
   #options(): Options | undefined {
     const options: Options = {};
     a: for (;;) {
@@ -157,12 +171,12 @@ export class Parser {
           this.#advance();
           continue;
         }
-        case TokenType.HEX:
-          if (options.duration !== undefined) {
+        case TokenType.UNDERSCORE:
+          if (options.durationNumerator !== undefined) {
             throw this.#error("Double duration");
           }
-          options.duration = this.#current.value;
           this.#advance();
+          this.#duration(options);
           continue;
         case TokenType.KEY:
           if (options.key !== undefined) {
@@ -238,9 +252,7 @@ export class Parser {
           options,
         };
       default:
-        throw this.#error(
-          `Expected note, rest or set here`,
-        );
+        throw this.#error(`Expected note, rest or set here`);
     }
   }
 

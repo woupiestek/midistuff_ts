@@ -20,6 +20,8 @@ scanAndMatch("[", TokenType.LEFT_BRACKET);
 scanAndMatch("]", TokenType.RIGHT_BRACKET);
 scanAndMatch("r", TokenType.REST);
 scanAndMatch("=", TokenType.IS);
+scanAndMatch("_", TokenType.UNDERSCORE);
+scanAndMatch("/", TokenType.SLASH);
 
 Deno.test(function scanInteger() {
   const scanner = new Scanner(textEncoder.encode("1739"));
@@ -59,16 +61,6 @@ Deno.test(function scanLines() {
   assertEquals(from, 5);
   assertEquals(to, 5);
   assertEquals(line, 6);
-});
-
-Deno.test(function scanHex() {
-  const scanner = new Scanner(textEncoder.encode("_1a.f9"));
-  const { type, from, to, line, value } = scanner.next();
-  assertEquals(type, TokenType.HEX);
-  assertEquals(value, 26.97265625);
-  assertEquals(from, 0);
-  assertEquals(to, 6);
-  assertEquals(line, 1);
 });
 
 Deno.test(function scanError() {
