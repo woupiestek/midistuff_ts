@@ -1,10 +1,9 @@
-import { MessageType, MetaType, MidiEvent } from "./midiTypes.ts";
+import { MessageType, MidiEvent } from "./midiTypes.ts";
 import { AST, Node, NodeType, Options } from "./parser3.ts";
 import { Token } from "./scanner3.ts";
 
 enum Op {
   PROGRAM,
-  TEMPO,
   VELOCITY,
 }
 
@@ -12,20 +11,6 @@ const CLASSES = new Map();
 for (let i = 0; i < 128; i++) {
   CLASSES.set(`program_${i}`, [Op.PROGRAM, i]);
 }
-const TEMPO: [string, number][] = [
-  ["grave", 32],
-  ["largo", 53],
-  ["adagio", 56],
-  ["lento", 80],
-  ["andante", 82],
-  ["moderato", 114],
-  ["allegro", 138],
-  ["vivace", 166],
-  ["presto", 184],
-];
-// beats per minute, but midi expect the tempo to be in milliseconds per quarter note
-// so as long as the quarter note has the beat (not yet configurable) this is alright
-TEMPO.forEach(([key, bpm]) => CLASSES.set(key, [Op.TEMPO, (6e7 / bpm) | 0]));
 ["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
   (k, i) => CLASSES.set(k, [Op.VELOCITY, 1 + 14 * i]),
 );
@@ -48,7 +33,13 @@ export class MidiPlanner {
   #time = 0;
   #programs: (number | undefined)[] = Array(16);
   #sections: { mark: string; node: Node; params?: Params }[];
+  bpm = 120;
   constructor(ast: AST) {
+    for (const { key, value } of ast.metadata) {
+      if (key === "bpm" && typeof value === "number") {
+        this.bpm = value;
+      }
+    }
     this.#sections = ast.sections;
     this.#interpret(ast.main, new Params());
     this.#messages.sort((x, y) => x.time - y.time);
@@ -65,7 +56,7 @@ export class MidiPlanner {
   #getChannel(program: number): number {
     let free = 16;
     for (let i = 15; i >= 0; i--) {
-      if (i === 10) continue;
+      if (i === 10 || i === 11) continue;
       if (this.#programs[i] === program) {
         return i;
       }
@@ -90,8 +81,8 @@ export class MidiPlanner {
     if (options === undefined) return params;
     let channel = params.channel;
     let velocity = params.velocity;
-    if (options.classes !== undefined) {
-      for (const c of options.classes) {
+    if (options.labels !== undefined) {
+      for (const c of options.labels) {
         const op = CLASSES.get(c);
         if (op === undefined) continue;
         switch (op[0]) {
@@ -100,13 +91,6 @@ export class MidiPlanner {
             break;
           case Op.PROGRAM:
             channel = this.#getChannel(op[1]);
-            break;
-          case Op.TEMPO:
-            this.#emit({
-              type: MessageType.meta,
-              metaType: MetaType.tempo,
-              value: op[1],
-            });
             break;
         }
       }

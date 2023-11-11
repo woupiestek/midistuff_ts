@@ -22,6 +22,10 @@ scanAndMatch("r", TokenType.REST);
 scanAndMatch("=", TokenType.IS);
 scanAndMatch("_", TokenType.UNDERSCORE);
 scanAndMatch("/", TokenType.SLASH);
+scanAndMatch("{", TokenType.LEFT_BRACE);
+scanAndMatch("}", TokenType.RIGHT_BRACE);
+scanAndMatch(":", TokenType.COLON);
+scanAndMatch(";", TokenType.SEMICOLON);
 
 Deno.test(function scanInteger() {
   const scanner = new Scanner(textEncoder.encode("1739"));
@@ -79,6 +83,16 @@ Deno.test(function scanIdentifier() {
   assertEquals(value, undefined);
   assertEquals(from, 0);
   assertEquals(to, 2);
+  assertEquals(line, 1);
+});
+
+Deno.test(function scanText() {
+  const scanner = new Scanner(textEncoder.encode('"make "" it 😉 hard\n"'));
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.TEXT);
+  assertEquals(value, undefined);
+  assertEquals(from, 0);
+  assertEquals(to, 23);
   assertEquals(line, 1);
 });
 

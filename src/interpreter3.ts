@@ -1,8 +1,7 @@
 import { MidiPlanner } from "./midi3.ts";
-import { MessageType, MetaType } from "./midiTypes.ts";
+import { MessageType } from "./midiTypes.ts";
 import { AST } from "./parser3.ts";
 
-const CONVERSION = 250;
 export class Interpreter {
   messages: { realTime: number; message: number[] }[] = [];
   realTime = 0;
@@ -11,18 +10,12 @@ export class Interpreter {
   }
 
   #process(planner: MidiPlanner) {
-    let tempo = 2000;
+    const tempo = 2.4e5 / planner.bpm;
     let lastTime = 0;
     for (const { time, event } of planner.messages) {
       this.realTime += tempo * (time - lastTime);
       lastTime = time;
-      if (event === null) continue;
-      if (event.type === MessageType.meta) {
-        if (event.metaType == MetaType.tempo) {
-          tempo = event.value / CONVERSION;
-        }
-        continue;
-      }
+      if (event === null || event.type === MessageType.meta) continue;
       const message = [(event.type << 4) | event.channel];
       switch (event.type) {
         case MessageType.noteOff:

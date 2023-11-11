@@ -5,8 +5,10 @@
 ### todo list
 
 - ~~add tuplet code~~
-- fix parallel tempo support in midi
-- add attributes, file structure
+- ~~fix parallel tempo support in midi~~
+- ~~unicode?~~
+- (pretty) printer
+- ~~add attributes, file structure~~
 - generate music xml
 - generate from nwctxt
 
@@ -35,6 +37,64 @@ I.e. we could try a timecode, and tie each event to a frame.
 
 Here the option of attaching attributes a file, a tone set or a 'class' becomes
 useful again.
+
+### midi timing
+
+Midi has a global notion of tempo which determine the length of a tick... IDK
+how much influence the time signature meta data has, but ordinarily, one tick
+has a length of `tempo / PPQN`, where `tempo = 6e7 microseconds / BPM`. With a
+metadata event the tempo number can be changing in the course of the file. The
+issue now, is that parallel tracks with different tempo's are interpreted
+incorrectly now: the tempo indication influence each other.
+
+Possible solutions:
+
+- use a header/footer with metadata to specify the midi tempo instead, tempo
+  indications in the score are for other interpreters
+- change the interpreter to ignore midi tempo, and compute independent values.
+
+The former has more uses.
+
+### lilypond/latex example:
+
+I turned `\keyword {}` into `keyword []`, and that can continue. The identifiers
+are labels now, freely added to the score for the benefit of the interpreter. I
+should add strings for the same purpose. To indicate sections of the file that
+contain different data...
+
+```
+\let [ velocity [ 100 ] ] _/2 [0, 2, 4]
+
+\define [
+  f [ velocity [ 85 ] ]
+  p [ velocity [ 43 ] ]
+]
+```
+
+Perhaps the score should have a marker A header is needed to indicate file type
+and version
+
+Attach attributes to a node, possible at any place, so why not on top?
+
+The list is:
+
+- adding key value pairs to any node
+- adding key value pairs to a file
+- adding key value pairs to a label
+
+The first one is dubious: what are we really trying to do there?
+
+o/c we don't need two syntaxes for key value pairs, but... I guess I still don't
+know what I really need.
+
+### keep it simple
+
+- add utf8 strings and hashes
+- allow an optional header add the start of a file
+- don't pick a universal way to associate key value pairs to labels in the file.
+
+Assume drastically simplified json, as in: key-value pairs, integers, labels and
+strings, that is it.
 
 ## 2023-11-10
 

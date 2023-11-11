@@ -2,6 +2,7 @@ import {} from "https://deno.land/std@0.184.0/path/_constants.ts";
 import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
+  COLON,
   COMMA,
   END,
   ERROR,
@@ -13,11 +14,15 @@ export enum TokenType {
   INTEGER,
   IS,
   KEY,
+  LEFT_BRACE,
   LEFT_BRACKET,
   MARK,
   REST,
+  RIGHT_BRACE,
   RIGHT_BRACKET,
+  SEMICOLON,
   SLASH,
+  TEXT,
   UNDERSCORE,
 }
 
@@ -72,6 +77,17 @@ export class Scanner {
   #pop(): number {
     if (this.done()) throw new Error(`Out of input`);
     return this.source[this.#current++];
+  }
+
+  #text(): Token {
+    for (;;) {
+      if (this.done()) return this.#token(TokenType.ERROR);
+      if (this.source[this.#current++] === CODES['"']) {
+        if (this.source[this.#current] === CODES['"']) {
+          this.#current++;
+        } else return this.#token(TokenType.TEXT);
+      }
+    }
   }
 
   #whitespace() {
@@ -167,18 +183,28 @@ export class Scanner {
         }
         return this.#token(TokenType.ERROR);
       }
+      case CODES[":"]:
+        return this.#token(TokenType.COLON);
+      case CODES[";"]:
+        return this.#token(TokenType.SEMICOLON);
       case CODES[","]:
         return this.#token(TokenType.COMMA);
       case CODES["["]:
         return this.#token(TokenType.LEFT_BRACKET);
       case CODES["]"]:
         return this.#token(TokenType.RIGHT_BRACKET);
+      case CODES["{"]:
+        return this.#token(TokenType.LEFT_BRACE);
+      case CODES["}"]:
+        return this.#token(TokenType.RIGHT_BRACE);
       case CODES["="]:
         return this.#token(TokenType.IS);
       case CODES["/"]:
         return this.#token(TokenType.SLASH);
       case CODES["_"]:
         return this.#token(TokenType.UNDERSCORE);
+      case CODES['"']:
+        return this.#text();
       case CODES["$"]:
         this.#identifier();
         return this.#token(TokenType.MARK);

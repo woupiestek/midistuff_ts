@@ -12,8 +12,13 @@ export type Options = {
   durationNumerator?: number;
   durationDenominator?: number;
   key?: number;
-  classes?: string[];
+  labels?: string[];
 };
+
+export type KeyValuePairs = {
+  key: string;
+  value: KeyValuePairs | number | string;
+}[];
 
 export type Node =
   | {
@@ -42,6 +47,7 @@ export type Node =
   };
 
 export type AST = {
+  metadata: KeyValuePairs;
   main: Node;
   sections: {
     mark: string;
@@ -73,12 +79,17 @@ export class Parser {
   }
 
   parse(): AST {
+    let metadata: KeyValuePairs = [];
+    if (this.#match(TokenType.LEFT_BRACE)) {
+      metadata = this.#keyValuePairs();
+    }
     try {
       const main = this.#node();
       if (!this.#done()) throw this.#error("input left over");
-      return { main, sections: this.#sections };
+      return { metadata, main, sections: this.#sections };
     } catch (error) {
       return {
+        metadata,
         main: { type: NodeType.ERROR, token: this.#current, error },
         sections: this.#sections,
       };
@@ -160,24 +171,17 @@ export class Parser {
           const lexeme = Parser.#decoder.decode(
             this.source.slice(this.#current.from, this.#current.to),
           );
-          if (options.classes === undefined) {
-            options.classes = [lexeme];
+          if (options.labels === undefined) {
+            options.labels = [lexeme];
           } else {
-            if (options.classes.includes(lexeme)) {
+            if (options.labels.includes(lexeme)) {
               throw this.#error(`Double '${lexeme}'`);
             }
-            options.classes.push(lexeme);
+            options.labels.push(lexeme);
           }
           this.#advance();
           continue;
         }
-        case TokenType.UNDERSCORE:
-          if (options.durationNumerator !== undefined) {
-            throw this.#error("Double duration");
-          }
-          this.#advance();
-          this.#duration(options);
-          continue;
         case TokenType.KEY:
           if (options.key !== undefined) {
             throw this.#error("Double key");
@@ -185,6 +189,30 @@ export class Parser {
           this.#advance();
           options.key = this.#integer(-7, 7);
           continue;
+        case TokenType.UNDERSCORE:
+          if (options.durationNumerator !== undefined) {
+            throw this.#error("Double duration");
+          }
+          this.#advance();
+          this.#duration(options);
+          continue;
+        case TokenType.TEXT: {
+          const lexeme = Parser.#decoder
+            .decode(
+              this.source.slice(this.#current.from + 1, this.#current.to - 1),
+            )
+            .replace('""', '"');
+          if (options.labels === undefined) {
+            options.labels = [lexeme];
+          } else {
+            if (options.labels.includes(lexeme)) {
+              throw this.#error(`Double '${lexeme}'`);
+            }
+            options.labels.push(lexeme);
+          }
+          this.#advance();
+          continue;
+        }
         default:
           break a;
       }
@@ -318,5 +346,63 @@ export class Parser {
     }
     this.#consume(TokenType.RIGHT_BRACKET);
     return children;
+  }
+
+  #pop(): Token {
+    if (this.#done()) throw this.#error("Expected more input");
+    const current = this.#current;
+    this.#current = this.#scanner.next();
+    return current;
+  }
+
+  #keyValuePairs(): KeyValuePairs {
+    const result: KeyValuePairs = [];
+    for (;;) {
+      const token1 = this.#pop();
+      let key: string;
+      switch (token1.type) {
+        case TokenType.RIGHT_BRACE:
+          return result;
+        case TokenType.IDENTIFIER:
+          key = Parser.#decoder.decode(
+            this.source.slice(token1.from, token1.to),
+          );
+          break;
+        case TokenType.TEXT:
+          key = Parser.#decoder
+            .decode(this.source.slice(token1.from + 1, token1.to - 1))
+            .replace('""', '"');
+          break;
+        default:
+          throw this.#error(`Expected label or string`);
+      }
+      this.#consume(TokenType.COLON);
+      let value: KeyValuePairs | number | string;
+      const token2 = this.#pop();
+      switch (token2.type) {
+        case TokenType.LEFT_BRACE:
+          value = this.#keyValuePairs();
+          break;
+        case TokenType.IDENTIFIER:
+          value = Parser.#decoder.decode(
+            this.source.slice(token2.from, token2.to),
+          );
+          break;
+        case TokenType.INTEGER:
+          value = token2.value || 0;
+          break;
+        case TokenType.TEXT:
+          value = Parser.#decoder
+            .decode(this.source.slice(token2.from + 1, token2.to - 1))
+            .replace('""', '"');
+          break;
+        default:
+          throw this.#error(
+            "Expected integer, label, string or key-value pairs",
+          );
+      }
+      this.#consume(TokenType.SEMICOLON);
+      result.push({ key, value });
+    }
   }
 }

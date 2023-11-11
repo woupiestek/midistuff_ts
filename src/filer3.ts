@@ -29,16 +29,6 @@ export class Filer {
   }
 
   static #process(planner: MidiPlanner): MidiFile {
-    const track0: { time: number; event: MidiEvent }[] = [];
-    const track1: { time: number; event: MidiEvent }[] = [];
-    for (const message of planner.messages) {
-      if (message.event === null) continue;
-      if (message.event.type === MessageType.meta) {
-        track0.push(message);
-      } else {
-        track1.push(message);
-      }
-    }
     const EOT: { time: number; event: MidiEvent } = {
       time: planner.time,
       event: {
@@ -46,7 +36,21 @@ export class Filer {
         metaType: MetaType.endOfTrack,
       },
     };
-    track0.push(EOT);
+    const track0: { time: number; event: MidiEvent }[] = [
+      {
+        time: 0,
+        event: {
+          type: MessageType.meta,
+          metaType: MetaType.tempo,
+          value: 6e7 / planner.bpm,
+        },
+      },
+      EOT,
+    ];
+    const track1: { time: number; event: MidiEvent }[] = [];
+    for (const message of planner.messages) {
+      track1.push(message);
+    }
     track1.push(EOT);
     return {
       format: 1,
