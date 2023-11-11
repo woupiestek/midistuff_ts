@@ -3,10 +3,10 @@ import { Scanner, Token, TokenType } from "./scanner3.ts";
 export enum NodeType {
   ERROR,
   INSERT,
-  JOIN,
   NOTE,
   REST,
   SEQUENCE,
+  SET,
 }
 export type Options = {
   durationNumerator?: number;
@@ -22,7 +22,7 @@ export type KeyValuePairs = {
 
 export type Node =
   | {
-    type: NodeType.JOIN | NodeType.SEQUENCE;
+    type: NodeType.SET | NodeType.SEQUENCE;
     children: Node[];
     options?: Options;
   }
@@ -253,7 +253,7 @@ export class Parser {
         const children = this.#set();
         this.#bindings.length = scope; // bindings go out of scope
         return {
-          type: NodeType.JOIN,
+          type: NodeType.SET,
           children,
           options,
         };

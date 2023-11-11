@@ -7,7 +7,7 @@
 - ~~add tuplet code~~
 - ~~fix parallel tempo support in midi~~
 - ~~unicode?~~
-- (pretty) printer
+- ~~(pretty) printer~~
 - ~~add attributes, file structure~~
 - generate music xml
 - generate from nwctxt

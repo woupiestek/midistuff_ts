@@ -123,7 +123,7 @@ export class MidiPlanner {
           this.#interpret(section.node, section.params);
         }
         return;
-      case NodeType.JOIN: {
+      case NodeType.SET: {
         const _params = this.#combine(params, node.options);
         const start = this.#time;
         let end = start;

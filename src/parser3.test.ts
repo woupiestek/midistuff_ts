@@ -43,7 +43,7 @@ Deno.test(function parseSet() {
   const { main: node } = new Parser(
     textEncoder.encode("_/4[ _/8 0 1 2 0 _/8 r ]"),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 1);
   const child = node.children[0];
   if (child.type !== NodeType.SEQUENCE) fail("wrong child type");
@@ -54,7 +54,7 @@ Deno.test(function parsePitchSet() {
   const { main: node } = new Parser(
     textEncoder.encode("_5/16[ 0 2 4 ]"),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 1);
   const child = node.children[0];
   if (child.type !== NodeType.SEQUENCE) fail("wrong child type");
@@ -67,7 +67,7 @@ Deno.test(function parseJoin() {
   const { main: node } = new Parser(
     textEncoder.encode("_/2[ 0 , 2- , 4 ]"),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 3);
   const child = node.children[0];
   if (child.type !== NodeType.SEQUENCE) fail("wrong child type");
@@ -83,7 +83,7 @@ Deno.test(function parseMark() {
   assertEquals(sections.length, 1);
   assertEquals(sections[0].mark, "line_1");
   const child = sections[0].node;
-  if (child.type !== NodeType.JOIN) fail("wrong child type");
+  if (child.type !== NodeType.SET) fail("wrong child type");
 });
 
 Deno.test(function parseResolvedRepeat() {
@@ -92,7 +92,7 @@ Deno.test(function parseResolvedRepeat() {
   ).parse();
   assertEquals(sections.length, 1);
   assertEquals(sections[0].mark, "C");
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 1);
   if (node.children[0].type !== NodeType.SEQUENCE) {
     fail(`wrong type ${NodeType[node.type]}`);
@@ -121,7 +121,7 @@ Deno.test(function parseOperations() {
       "program_64 vivace key -3 fff _5/16[ _/8 0 1 2 0 _/8 r ]",
     ),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.key, -3);
   assertEquals(node.options?.labels, ["program_64", "vivace", "fff"]);
   assertEquals(node.options?.durationNumerator, 5);
@@ -151,7 +151,7 @@ Deno.test(function parseCombination() {
         "$D = [_/8 0 -3 _/2 0 _/8r] $D\n]",
     ),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(sections.length, 4);
   assertEquals(node.options?.key, undefined);
   assertEquals(node.options?.labels, ["allegro", "f"]);
@@ -159,7 +159,7 @@ Deno.test(function parseCombination() {
 
 Deno.test(function parseError() {
   const { main: node } = new Parser(textEncoder.encode("[ 3h, 2, 4 ]")).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 3);
   const child = node.children[0];
   if (child.type !== NodeType.ERROR) {
@@ -176,7 +176,7 @@ Deno.test(function noFalseAccidentals() {
   const { main: node } = new Parser(
     textEncoder.encode("[_/8 0 -3 _/2 0 _/8 r]"),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   if (node.children[0].type !== NodeType.SEQUENCE) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -190,7 +190,7 @@ Deno.test(function noFalseDurations() {
   const { main: node } = new Parser(
     textEncoder.encode("[_/8 2 3 _/2 4 _/8 r]"),
   ).parse();
-  if (node.type !== NodeType.JOIN) fail(`wrong type ${NodeType[node.type]}`);
+  if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   if (node.children[0].type !== NodeType.SEQUENCE) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
