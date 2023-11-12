@@ -1,5 +1,16 @@
 # Midistuff logs
 
+## 2023-11-13
+
+- arrays
+- generate music xml
+- generate from nwctxt
+
+### arrays
+
+Arrays of data may be useful for specifying e.g. multiple midi configs, like
+different channels and programs.
+
 ## 2023-11-11
 
 ### todo list

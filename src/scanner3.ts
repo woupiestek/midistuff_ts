@@ -2,7 +2,6 @@ import {} from "https://deno.land/std@0.184.0/path/_constants.ts";
 import { TrieMap } from "./trieMap.ts";
 
 export enum TokenType {
-  COLON,
   COMMA,
   END,
   ERROR,
@@ -20,7 +19,6 @@ export enum TokenType {
   REST,
   RIGHT_BRACE,
   RIGHT_BRACKET,
-  SEMICOLON,
   SLASH,
   TEXT,
   UNDERSCORE,
@@ -183,10 +181,6 @@ export class Scanner {
         }
         return this.#token(TokenType.ERROR);
       }
-      case CODES[":"]:
-        return this.#token(TokenType.COLON);
-      case CODES[";"]:
-        return this.#token(TokenType.SEMICOLON);
       case CODES[","]:
         return this.#token(TokenType.COMMA);
       case CODES["["]:

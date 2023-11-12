@@ -24,8 +24,6 @@ scanAndMatch("_", TokenType.UNDERSCORE);
 scanAndMatch("/", TokenType.SLASH);
 scanAndMatch("{", TokenType.LEFT_BRACE);
 scanAndMatch("}", TokenType.RIGHT_BRACE);
-scanAndMatch(":", TokenType.COLON);
-scanAndMatch(";", TokenType.SEMICOLON);
 
 Deno.test(function scanInteger() {
   const scanner = new Scanner(textEncoder.encode("1739"));

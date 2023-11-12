@@ -35,10 +35,9 @@ export class MidiPlanner {
   #sections: { mark: string; node: Node; params?: Params }[];
   bpm = 120;
   constructor(ast: AST) {
-    for (const { key, value } of ast.metadata) {
-      if (key === "bpm" && typeof value === "number") {
-        this.bpm = value;
-      }
+    const bpm = ast.metadata.get("bpm");
+    if (typeof bpm === "number") {
+      this.bpm = bpm;
     }
     this.#sections = ast.sections;
     this.#interpret(ast.main, new Params());

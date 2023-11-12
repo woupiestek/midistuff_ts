@@ -15,11 +15,7 @@ export type Options = {
   labels?: string[];
 };
 
-export type KeyValuePairs = {
-  key: string;
-  value: KeyValuePairs | number | string;
-}[];
-
+export type Value = Map<string, Value> | number | string | Value[];
 export type Node =
   | {
     type: NodeType.SET | NodeType.SEQUENCE;
@@ -47,7 +43,7 @@ export type Node =
   };
 
 export type AST = {
-  metadata: KeyValuePairs;
+  metadata: Map<string, Value>;
   main: Node;
   sections: {
     mark: string;
@@ -79,9 +75,9 @@ export class Parser {
   }
 
   parse(): AST {
-    let metadata: KeyValuePairs = [];
+    let metadata: Map<string, Value> = new Map();
     if (this.#match(TokenType.LEFT_BRACE)) {
-      metadata = this.#keyValuePairs();
+      metadata = this.#pairs();
     }
     try {
       const main = this.#node();
@@ -355,8 +351,40 @@ export class Parser {
     return current;
   }
 
-  #keyValuePairs(): KeyValuePairs {
-    const result: KeyValuePairs = [];
+  #array(): Value[] {
+    const array = [];
+    for (;;) {
+      if (this.#match(TokenType.RIGHT_BRACKET)) return array;
+      array.push(this.#value());
+    }
+  }
+
+  #value(): Value {
+    const token2 = this.#pop();
+    switch (token2.type) {
+      case TokenType.LEFT_BRACE:
+        return this.#pairs();
+      case TokenType.LEFT_BRACKET:
+        return this.#array();
+      case TokenType.IDENTIFIER:
+        return Parser.#decoder.decode(
+          this.source.slice(token2.from, token2.to),
+        );
+      case TokenType.INTEGER:
+        return token2.value || 0;
+      case TokenType.TEXT:
+        return Parser.#decoder
+          .decode(this.source.slice(token2.from + 1, token2.to - 1))
+          .replace('""', '"');
+      default:
+        throw this.#error(
+          "Expected integer, label, string, array or key-value pairs",
+        );
+    }
+  }
+
+  #pairs(): Map<string, Value> {
+    const result: Map<string, Value> = new Map();
     for (;;) {
       const token1 = this.#pop();
       let key: string;
@@ -374,35 +402,11 @@ export class Parser {
             .replace('""', '"');
           break;
         default:
-          throw this.#error(`Expected label or string`);
+          throw this.#error("Expected label or string");
       }
-      this.#consume(TokenType.COLON);
-      let value: KeyValuePairs | number | string;
-      const token2 = this.#pop();
-      switch (token2.type) {
-        case TokenType.LEFT_BRACE:
-          value = this.#keyValuePairs();
-          break;
-        case TokenType.IDENTIFIER:
-          value = Parser.#decoder.decode(
-            this.source.slice(token2.from, token2.to),
-          );
-          break;
-        case TokenType.INTEGER:
-          value = token2.value || 0;
-          break;
-        case TokenType.TEXT:
-          value = Parser.#decoder
-            .decode(this.source.slice(token2.from + 1, token2.to - 1))
-            .replace('""', '"');
-          break;
-        default:
-          throw this.#error(
-            "Expected integer, label, string or key-value pairs",
-          );
-      }
-      this.#consume(TokenType.SEMICOLON);
-      result.push({ key, value });
+      if (result.has(key)) throw this.#error(`Double key ${key}`);
+      this.#consume(TokenType.IS);
+      result.set(key, this.#value());
     }
   }
 }

@@ -208,16 +208,16 @@ Deno.test(function noFalseDurations() {
 Deno.test(function addMetaData() {
   const { metadata } = new Parser(
     textEncoder.encode(
-      '{ tempo: 500000; title:"one note"; "cresc poco a poco":{from:43;to:85;};}0',
+      '{ tempo= 500000 title="one note" "cresc poco a poco"={from=43to=85} parts=["piano" "viola"]}0',
     ),
   ).parse();
   console.log(metadata);
-  assertEquals(metadata, [
-    { key: "tempo", value: 500000 },
-    { key: "title", value: "one note" },
-    {
-      key: "cresc poco a poco",
-      value: [{ key: "from", value: 43 }, { key: "to", value: 85 }],
-    },
-  ]);
+
+  assertEquals(metadata.get("tempo"), 500000);
+  assertEquals(metadata.get("title"), "one note");
+  const cpap = metadata.get("cresc poco a poco");
+  if (!(cpap instanceof Map)) fail("unexpected type");
+  assertEquals(cpap.get("from"), 43);
+  assertEquals(cpap.get("to"), 85);
+  assertEquals(metadata.get("parts"), ["piano", "viola"]);
 });

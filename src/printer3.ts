@@ -1,4 +1,4 @@
-import { AST, KeyValuePairs, Node, NodeType, Options } from "./parser3.ts";
+import { AST, Node, NodeType, Options, Value } from "./parser3.ts";
 
 export class Printer {
   #strings: string[] = [];
@@ -9,19 +9,19 @@ export class Printer {
   }
 
   file(ast: AST): void {
-    if (ast.metadata.length > 0) {
-      this.#pairs(ast.metadata);
+    if (ast.metadata.size > 0) {
+      this.#map(ast.metadata);
       this.#emit(" ");
     }
     this.#node(ast.main, ast.sections);
   }
 
   #space() {
-      this.#strings.push(" ");
+    this.#strings.push(" ");
   }
 
   #emit(chars: string) {
-      this.#strings.push(chars);
+    this.#strings.push(chars);
   }
 
   #string(value: string) {
@@ -32,22 +32,34 @@ export class Printer {
     this.#emit((value | 0).toString());
   }
 
-  #pairs(metadata: KeyValuePairs) {
+  #map(map: Map<string, Value>) {
     this.#emit("{");
-    const { key, value } = metadata[0];
+    if (map.size === 0) return this.#emit("}");
+    const entries = [...map.entries()];
+    const [key, value] = entries[0];
     this.#pair(key, value);
-    for (let i = 1; i < metadata.length; i++) {
+    for (let i = 1; i < entries.length; i++) {
       this.#space();
-      const { key, value } = metadata[i];
+      const [key, value] = entries[i];
       this.#pair(key, value);
     }
     this.#emit("}");
   }
 
-  #pair(key: string, value: string | number | KeyValuePairs) {
-    this.#string(key);
-    this.#emit(":");
-    this.#space();
+  #array(array: Value[]) {
+    if (array.length === 0) {
+      this.#emit("]");
+      return;
+    }
+    this.#value(array[0]);
+    for (const value of array) {
+      this.#space();
+      this.#value(value);
+    }
+    this.#emit("]");
+  }
+
+  #value(value: Value) {
     switch (typeof value) {
       case "string":
         this.#string(value);
@@ -56,10 +68,21 @@ export class Printer {
         this.#integer(value);
         break;
       default:
-        this.#pairs(value);
+        if (value instanceof Map) {
+          this.#map(value);
+          break;
+        }
+        this.#array(value);
         break;
     }
-    this.#emit(";");
+  }
+
+  #pair(key: string, value: Value) {
+    this.#string(key);
+    this.#space();
+    this.#emit("=");
+    this.#space();
+    this.#value(value);
   }
 
   #options(options: Options) {
