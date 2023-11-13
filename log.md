@@ -135,7 +135,13 @@ importance. Then do a breadth first search.
 Set: have the interpreter, and a run setup that can test the interpreter against
 a string
 
-Split up by parts,
+Split up by parts (not meaningful yet), then by time. Measures, notes, ties.
+
+### tactic
+
+Forget about the verbose musicxml solution, and forcus on the needed structure:
+
+Break up in measures, then break up notes.
 
 ## 2023-11-12
 

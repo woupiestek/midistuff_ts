@@ -12,7 +12,7 @@ export type Options = {
   durationNumerator?: number;
   durationDenominator?: number;
   key?: number;
-  labels?: string[];
+  labels?: Set<string>;
 };
 
 export type Value = Map<string, Value> | number | string | Value[];
@@ -190,12 +190,12 @@ export class Parser {
             this.source.slice(this.#current.from, this.#current.to),
           );
           if (options.labels === undefined) {
-            options.labels = [lexeme];
+            options.labels = new Set([lexeme]);
           } else {
-            if (options.labels.includes(lexeme)) {
+            if (options.labels.has(lexeme)) {
               throw this.#error(`Double '${lexeme}'`);
             }
-            options.labels.push(lexeme);
+            options.labels.add(lexeme);
           }
           this.#advance();
           continue;
@@ -221,12 +221,12 @@ export class Parser {
             )
             .replace('""', '"');
           if (options.labels === undefined) {
-            options.labels = [lexeme];
+            options.labels = new Set([lexeme]);
           } else {
-            if (options.labels.includes(lexeme)) {
+            if (options.labels.has(lexeme)) {
               throw this.#error(`Double '${lexeme}'`);
             }
-            options.labels.push(lexeme);
+            options.labels.add(lexeme);
           }
           this.#advance();
           continue;

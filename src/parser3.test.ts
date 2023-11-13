@@ -123,7 +123,7 @@ Deno.test(function parseOperations() {
   ).parse();
   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.key, -3);
-  assertEquals(node.options?.labels, ["program_64", "vivace", "fff"]);
+  assertEquals(node.options?.labels, new Set(["program_64", "vivace", "fff"]));
   assertEquals(node.options?.durationNumerator, 5);
   assertEquals(node.options?.durationDenominator, 16);
 });
@@ -154,7 +154,7 @@ Deno.test(function parseCombination() {
   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(sections.length, 4);
   assertEquals(node.options?.key, undefined);
-  assertEquals(node.options?.labels, ["allegro", "f"]);
+  assertEquals(node.options?.labels, new Set(["allegro", "f"]));
 });
 
 Deno.test(function parseError() {
@@ -211,8 +211,6 @@ Deno.test(function addMetaData() {
       '0{ tempo= 500000 title="one note" "cresc poco a poco"={from=43to=85} parts=["piano" "viola"]}',
     ),
   ).parse();
-  console.log(metadata);
-
   assertEquals(metadata.get("tempo"), 500000);
   assertEquals(metadata.get("title"), "one note");
   const cpap = metadata.get("cresc poco a poco");
