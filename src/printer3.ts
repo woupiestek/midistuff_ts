@@ -9,23 +9,23 @@ export class Printer {
   }
 
   file(ast: AST): void {
-    if (ast.metadata.size > 0) {
-      this.#map(ast.metadata);
-      this.#emit(" ");
-    }
     this.#node(ast.main, ast.sections);
+    if (ast.metadata.size > 0) {
+      this.#emit(" ");
+      this.#map(ast.metadata);
+    }
   }
 
   #space() {
     this.#strings.push(" ");
   }
 
-  #emit(chars: string) {
-    this.#strings.push(chars);
+  #emit(...chars: string[]) {
+    this.#strings.push(...chars);
   }
 
   #string(value: string) {
-    this.#emit('"' + value.replace('"', '""') + '"');
+    this.#emit('"', value.replace('"', '""'), '"');
   }
 
   #integer(value: number) {

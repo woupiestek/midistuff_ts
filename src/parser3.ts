@@ -75,21 +75,43 @@ export class Parser {
   }
 
   parse(): AST {
+    let main: Node;
+    try {
+      main = this.#node();
+    } catch (error) {
+      main = { type: NodeType.ERROR, token: this.#current, error };
+      return { metadata: new Map(), main, sections: [] };
+    }
+
     let metadata: Map<string, Value> = new Map();
     if (this.#match(TokenType.LEFT_BRACE)) {
-      metadata = this.#pairs();
+      try {
+        metadata = this.#pairs();
+      } catch (error) {
+        main = { type: NodeType.ERROR, token: this.#current, error };
+        return {
+          metadata: new Map(),
+          main: {
+            type: NodeType.ERROR,
+            token: this.#current,
+            error: this.#error("input left over"),
+          },
+          sections: [],
+        };
+      }
     }
-    try {
-      const main = this.#node();
-      if (!this.#done()) throw this.#error("input left over");
-      return { metadata, main, sections: this.#sections };
-    } catch (error) {
+    if (!this.#done()) {
       return {
-        metadata,
-        main: { type: NodeType.ERROR, token: this.#current, error },
-        sections: this.#sections,
+        metadata: new Map(),
+        main: {
+          type: NodeType.ERROR,
+          token: this.#current,
+          error: this.#error("input left over"),
+        },
+        sections: [],
       };
     }
+    return { metadata, main, sections: this.#sections };
   }
 
   #advance() {

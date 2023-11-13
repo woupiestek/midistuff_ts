@@ -208,7 +208,7 @@ Deno.test(function noFalseDurations() {
 Deno.test(function addMetaData() {
   const { metadata } = new Parser(
     textEncoder.encode(
-      '{ tempo= 500000 title="one note" "cresc poco a poco"={from=43to=85} parts=["piano" "viola"]}0',
+      '0{ tempo= 500000 title="one note" "cresc poco a poco"={from=43to=85} parts=["piano" "viola"]}',
     ),
   ).parse();
   console.log(metadata);

@@ -1,4 +1,3 @@
-{ bpm = 135 }
 program_53 [
   $A = [
     $A = [_/8 0 1 2 0 _/8 r] $A
@@ -11,3 +10,4 @@ program_53 [
   % changing the program or octave now is not possible, alas
   [ $A $A, _2r $A,_4r $A, _6r $A ]
 ]
+{ bpm = 135 }

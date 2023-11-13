@@ -2,7 +2,144 @@
 
 ## 2023-11-13
 
-- arrays
+- generate music xml
+- pretty printer
+- review metadata (only at the end) & labels ()
+- generate from nwctxt
+
+### music xml
+
+There is a required subdivision of data into parts with ids. Data is then
+organised in two ways: either a collection of measures, where eich measure is
+devided into parts, or a collection of parts where each part is subdivided into
+measures.
+
+Obviously, lacking any specification, everything is going into one part, and
+subdivided in measures assuming 4/4 time.
+
+### pretty printer
+
+- none to long lines
+- show the unity of collections.
+
+With `{}` and `[]` in that context, hugging if the content is small enough,
+otherwise newlines and indents? Often too much vericality to my taste. it is
+more like: when a newline is necessary, because of reaching a column limit,
+indent appropriately.
+
+Aim for something like this, perhaps:
+
+```
+{"bpm" = 140} key 1 "allegro" "f" _/8 [
+  $A = [
+    4 1 5 6 1 5 4 [0+, 3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5 
+      [2-, 4] [1, 6] _/4 4 _5/8 4 4 1 5 6 1 5 4 2 4 _/4 2 
+      _5/8 2, _ [-3, -1] -2 -6 -1 0 -6 -1 -2 [-3, -6] _ [-4, 0] 
+      -3 -6 -2 -1 -6 -2 -3 [-4, -6] _ [-3, -1] -2 -7 -1 0 -7 -1 
+      -2 [-7+, -3]
+  ]
+  [
+    3 1 4 5 0+ 4 3 [0+, 2] _/2 [0, 1] _/2 [0, 3], -2 -6 -1 0
+      -5 -1 -2 -5+ _/2 [-4, -2] _/2 [-6, -2+]
+  ] 
+  $A
+  [
+    3 1 4 5 1 4 3 1 _ [1, 4], -2 -6 -1 0 -5 -1 -2 -4 _
+      [-3, -1]
+  ]
+]
+```
+
+Rules are:
+
+- Up to 64 column of consecutive elements on one line. Keep it horizontal. (key
+  values pairs switch to vertical much faster.)
+- broken up is ok, but that increases the indent by two spaces
+- collections that are small enough to fit stay on only line.
+- Of course, options stick to their nodes. `_3/4 [\n...]` over `_3/4 \n[...]`
+
+Note 3 renderings of sets:
+
+1. horizontal for small sets `[1, 4]`
+2. vertical-horizontal for large sets of horizontal elements.
+3. horizontal-horizontal, for any set of vertical elements. O/C there is the
+   tension between a set being small enough to fit the presumed 64 character
+   limit, but too large to also fit the indent. In some of these cases, an
+   inline rendering could be more fair.
+
+Kiss: keep track of the indent level, but put newlines where you run out of
+space.
+
+```
+{"bpm" = 140} key 1 "allegro" "f" _/8 [$A = [4 1 5 6 1 5 4 [0+,
+      3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5 [2-, 4] [1, 6] _/4 4 
+    _5/8 4 4 1 5 6 1 5 4 2 4 _/4 2 _5/8 2, _ [-3, -1] -2 -6 -1 0
+    -6 -1 -2 [-3, -6] _ [-4, 0] -3 -6 -2 -1 -6 -2 -3 [-4, -6] _ 
+    [-3, -1] -2 -7 -1 0 -7 -1 -2 [-7+, -3]] [3 1 4 5 0+ 4 3 [0+,
+      2] _/2 [0, 1] _/2 [0, 3], -2 -6 -1 0 -5 -1 -2 -5+ _/2 [-4,
+      -2] _/2 [-6, -2+]] $A [3 1 4 5 1 4 3 1 _ [1, 4], -2 -6 -1 
+    0 -5 -1 -2 -4 _ [-3, -1]]]
+```
+
+Not especially readable, I am afraid. I guess I could look at the algorithms in
+use for this, but keep the non prittey printer for now.
+
+Always newline indent, for each collection make thins too vertical. Rather than
+following a will-it-fit rule, have a max size for individual elements e.g. 32 or
+even 16 chars.
+
+### Outside sources
+
+Consider a pretty printer as something that operates maninly on white space. o/c
+it still needs to parse the document, in order to ignore spaces in strings and
+comments (which must be preserved this time), add spaces between tokens, and to
+understand nestings depths...
+
+Advantage: seen this way, we could just keep the line breaks already present in
+the provided document: just don't make choices for the writer here. Just glue
+together, adjust indents and break up long lines, for the benefit of the end
+user.
+
+- Doc = string | Doc[], where '[', ']','{', '}' are just
+
+O/c want I want is to inspect the result of converting nwctxt files, and other
+sources, not necessarily to format existing documents. These things should be
+kept apart perhaps.
+
+### more thoughts
+
+So maybe I went overboard with adding meta data. If possible, bring it down to:
+key-values pairs of two levels, uppoer layer for label definitions, lower layer
+for configs. Document settings would be added to a tag and then the tag would
+appear in front of the node.
+
+Now we could go back to inline metadata: that is keyvalues pairs of one level,
+vs the two level structure that can only appear at the end of the file.
+
+And maybe let labels always be strings.
+
+### complex formatting
+
+Graph search: the idea is that all methods of adding whitespace are permitted,
+but weighted by cost, this is the number of rule violations needed, weighted by
+importance. Then do a breadth first search.
+
+### to music xml
+
+- sorting by part & measure...
+- split notes over barlines and add ties (more generally, don't let odd
+  durations cross over)
+- notes as step, alteration and octave: alterations always needed!
+- remaining issue: polyfony within a part
+
+Set: have the interpreter, and a run setup that can test the interpreter against
+a string
+
+Split up by parts,
+
+## 2023-11-12
+
+- ~~arrays~~
 - generate music xml
 - generate from nwctxt
 

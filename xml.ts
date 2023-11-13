@@ -1,9 +1,6 @@
-import { parse } from "https://deno.land/x/xml/mod.ts";
+import { stringify } from "https://deno.land/x/xml/mod.ts";
+import { XMLPrinter } from "./src/xmlPrinter.ts";
 
-if (Deno.args.length < 1) {
-  console.error("Usage: main [path]\n");
-  Deno.exit(64);
-}
+const printer = new XMLPrinter();
 
-const x = await Deno.readTextFile(Deno.args[0]);
-console.log(parse(x));
+console.log(stringify(printer.pop()));
