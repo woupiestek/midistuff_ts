@@ -107,7 +107,7 @@ Deno.test(function scanKeyword() {
 Deno.test(function scanMark() {
   const scanner = new Scanner(textEncoder.encode("$line_1"));
   const { type, from, to, line } = scanner.next();
-  assertEquals(type, TokenType.MARK);
+  assertEquals(type, TokenType.IDENTIFIER);
   assertEquals(from, 0);
   assertEquals(to, 7);
   assertEquals(line, 1);

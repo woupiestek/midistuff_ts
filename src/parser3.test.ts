@@ -81,14 +81,14 @@ Deno.test(function parseMark() {
   if (node.type !== NodeType.INSERT) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.index, 0);
   assertEquals(sections.length, 1);
-  assertEquals(sections[0].mark, "line_1");
+  assertEquals(sections[0].mark, "$line_1");
   const child = sections[0].node;
   if (child.type !== NodeType.SET) fail("wrong child type");
 });
 
 Deno.test(function parseResolvedRepeat() {
   const { main: node, sections } = new Parser(
-    textEncoder.encode("[ $C = 0 $C ]"),
+    textEncoder.encode("[ C = 0 C ]"),
   ).parse();
   assertEquals(sections.length, 1);
   assertEquals(sections[0].mark, "C");
@@ -111,14 +111,14 @@ Deno.test(function parseRepeat() {
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(
     node.error.message,
-    "Error at line 1 (END ''): Could not resolve line_1",
+    "Error at line 1 (END ''): Could not resolve '$line_1'",
   );
 });
 
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
     textEncoder.encode(
-      "program_64 vivace key -3 fff _5/16[ _/8 0 1 2 0 _/8 r ]",
+      '"program_64" "vivace" key -3 "fff" _5/16[ _/8 0 1 2 0 _/8 r ]',
     ),
   ).parse();
   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
@@ -130,20 +130,20 @@ Deno.test(function parseOperations() {
 
 Deno.test(function parseDoubleDynamics() {
   const { main: node } = new Parser(
-    textEncoder.encode("f f _/4[ _/8 0 1 2 0 _/8 r ]"),
+    textEncoder.encode('"f" "f" _/4[ _/8 0 1 2 0 _/8 r ]'),
   ).parse();
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
-  assertEquals(node.token.type, TokenType.IDENTIFIER);
+  assertEquals(node.token.type, TokenType.TEXT);
   assertEquals(
     node.error.message,
-    "Error at line 1 (IDENTIFIER 'f'): Double 'f'",
+    "Error at line 1 (TEXT '\"f\"'): Double 'f'",
   );
 });
 
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(
     textEncoder.encode(
-      "allegro f [\n" +
+      '"allegro" "f" [\n' +
         "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
         "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
         "% this was a puzzle to get right!\n" +
@@ -168,7 +168,7 @@ Deno.test(function parseError() {
   assertEquals(child.token.type, TokenType.COMMA);
   assertEquals(
     child.error.message,
-    "Error at line 1 (COMMA ','): Expected note, rest or set here",
+    "Error at line 1 (COMMA ','): Could not resolve 'h'",
   );
 });
 
@@ -208,7 +208,7 @@ Deno.test(function noFalseDurations() {
 Deno.test(function addMetaData() {
   const { metadata } = new Parser(
     textEncoder.encode(
-      '0{ tempo= 500000 title="one note" "cresc poco a poco"={from=43to=85} parts=["piano" "viola"]}',
+      '0{ "tempo"= 500000 "title"="one note" "cresc poco a poco"={"from"=43"to"=85} "parts"=["piano" "viola"]}',
     ),
   ).parse();
   assertEquals(metadata.get("tempo"), 500000);

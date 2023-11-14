@@ -1,5 +1,29 @@
 # Midistuff logs
 
+## 2023-11-14
+
+- generate music xml / lilypond
+- pretty printer
+- generate from nwctxt
+- review metadata (are limited ranges of values okay?)
+
+### duration algorithm
+
+Plenty fraction can occur as durations now.
+
+- Not binary fraction get special treatment: Enter a mode to output tuples,
+  keeping track of the modification of the length. internal an adjusted duration
+  is used (typically rounding down to the highest binary fraction)
+- Note at the start of a measure can ignore beats, others cannot. There are two
+  kind of cut--in other words: a dux at the bar line and a comes at the beat.
+- Proper notes and dots are otherwise preferred over ties.
+
+I hope this is easier than formatting text... Tuple & tie system.
+
+### lilypond
+
+This might be an easier target than musicxml, so maybe try this first?
+
 ## 2023-11-13
 
 - generate music xml

@@ -2,7 +2,7 @@ import { stringify } from "https://deno.land/x/xml/mod.ts";
 import { XMLPrinter } from "./src/xmlPrinter.ts";
 import { Parser } from "./src/parser3.ts";
 
-const sample = `key 1 allegro f _/8[
+const sample = `key 1 "allegro" "f" _/8[
   $A = [
     4 1 5 6 1 5 4 [0+, 3] [0, 5] _/4 3 _5/8 3
     5 1 6 7 2 6 5 [2-, 4] [1, 6] _/4 4 _5/8 4
@@ -21,7 +21,7 @@ const sample = `key 1 allegro f _/8[
     -2 -6 -1 0 -5 -1 -2 -4 _ [-3, -1]
   ]
 ]
-{ bpm = 140 }
+{ "bpm" = 140 }
 `;
 
 const encoder = new TextEncoder();

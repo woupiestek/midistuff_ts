@@ -135,10 +135,10 @@ export class Parser {
   }
 
   #mark(): string {
-    if (this.#current.type !== TokenType.MARK) {
+    if (this.#current.type !== TokenType.IDENTIFIER) {
       throw this.#error(`Mark expected`);
     }
-    const value = this.source.slice(this.#current.from + 1, this.#current.to);
+    const value = this.source.slice(this.#current.from, this.#current.to);
     this.#advance();
     return Parser.#decoder.decode(value);
   }
@@ -165,7 +165,7 @@ export class Parser {
     for (let i = this.#bindings.length - 1; i >= 0; i--) {
       if (this.#bindings[i].mark === mark) return this.#bindings[i].index;
     }
-    throw this.#error(`Could not resolve ${mark}`);
+    throw this.#error(`Could not resolve '${mark}'`);
   }
 
   #duration(options: Options) {
@@ -185,21 +185,21 @@ export class Parser {
     const options: Options = {};
     a: for (;;) {
       switch (this.#current.type) {
-        case TokenType.IDENTIFIER: {
-          const lexeme = Parser.#decoder.decode(
-            this.source.slice(this.#current.from, this.#current.to),
-          );
-          if (options.labels === undefined) {
-            options.labels = new Set([lexeme]);
-          } else {
-            if (options.labels.has(lexeme)) {
-              throw this.#error(`Double '${lexeme}'`);
-            }
-            options.labels.add(lexeme);
-          }
-          this.#advance();
-          continue;
-        }
+        // case TokenType.IDENTIFIER: {
+        //   const lexeme = Parser.#decoder.decode(
+        //     this.source.slice(this.#current.from, this.#current.to),
+        //   );
+        //   if (options.labels === undefined) {
+        //     options.labels = new Set([lexeme]);
+        //   } else {
+        //     if (options.labels.has(lexeme)) {
+        //       throw this.#error(`Double '${lexeme}'`);
+        //     }
+        //     options.labels.add(lexeme);
+        //   }
+        //   this.#advance();
+        //   continue;
+        // }
         case TokenType.KEY:
           if (options.key !== undefined) {
             throw this.#error("Double key");
@@ -260,7 +260,7 @@ export class Parser {
   }
 
   #node(): Node {
-    if (this.#current.type === TokenType.MARK) {
+    if (this.#current.type === TokenType.IDENTIFIER) {
       return this.#insert();
     }
     const options: Options | undefined = this.#options();
@@ -388,10 +388,10 @@ export class Parser {
         return this.#pairs();
       case TokenType.LEFT_BRACKET:
         return this.#array();
-      case TokenType.IDENTIFIER:
-        return Parser.#decoder.decode(
-          this.source.slice(token2.from, token2.to),
-        );
+      // case TokenType.IDENTIFIER:
+      //   return Parser.#decoder.decode(
+      //     this.source.slice(token2.from, token2.to),
+      //   );
       case TokenType.INTEGER:
         return token2.value || 0;
       case TokenType.TEXT:
@@ -413,11 +413,11 @@ export class Parser {
       switch (token1.type) {
         case TokenType.RIGHT_BRACE:
           return result;
-        case TokenType.IDENTIFIER:
-          key = Parser.#decoder.decode(
-            this.source.slice(token1.from, token1.to),
-          );
-          break;
+        // case TokenType.IDENTIFIER:
+        //   key = Parser.#decoder.decode(
+        //     this.source.slice(token1.from, token1.to),
+        //   );
+        //   break;
         case TokenType.TEXT:
           key = Parser.#decoder
             .decode(this.source.slice(token1.from + 1, token1.to - 1))

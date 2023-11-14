@@ -52,7 +52,7 @@ Deno.test(function simpleRepeat() {
 Deno.test(function simpleProgram() {
   const messages = new Interpreter(
     new Parser(
-      textEncoder.encode("program_64 [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]"),
+      textEncoder.encode('"program_64" [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]'),
     ).parse(),
   ).messages;
   assertEquals(messages.length, 9);
@@ -66,7 +66,7 @@ Deno.test(function otherParamsChange() {
   const messages = new Interpreter(
     new Parser(
       textEncoder.encode(
-        "vivace key 3 fff [ _/8 0 1 2 0 _/8 r ]",
+        '"vivace" key 3 "fff" [ _/8 0 1 2 0 _/8 r ]',
       ),
     ).parse(),
   ).messages;
@@ -79,7 +79,7 @@ Deno.test(function otherParamsChange() {
 
 Deno.test(function jacob() {
   const messages = new Interpreter(new Parser(textEncoder.encode(
-    "allegro f [\n" +
+    '"allegro" "f" [\n' +
       "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
       "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
       "% this was a puzzle to get right!\n" +

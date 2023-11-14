@@ -15,7 +15,6 @@ export enum TokenType {
   KEY,
   LEFT_BRACE,
   LEFT_BRACKET,
-  MARK,
   REST,
   RIGHT_BRACE,
   RIGHT_BRACKET,
@@ -174,6 +173,13 @@ export class Scanner {
     if (Scanner.#isDigit(code)) {
       return this.#integer(code - 48, true);
     }
+    if (Scanner.#isLetter(code)) {
+      this.#identifier();
+      return this.#token(
+        KEYWORDS.getByArray(this.source.slice(this.#from, this.#current)) ||
+          TokenType.IDENTIFIER,
+      );
+    }
     switch (code) {
       case CODES["-"]: {
         if (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
@@ -201,17 +207,11 @@ export class Scanner {
         return this.#text();
       case CODES["$"]:
         this.#identifier();
-        return this.#token(TokenType.MARK);
+        return this.#token(TokenType.IDENTIFIER);
       default:
         break;
     }
-    if (Scanner.#isLetter(code)) {
-      this.#identifier();
-      return this.#token(
-        KEYWORDS.getByArray(this.source.slice(this.#from, this.#current)) ||
-          TokenType.IDENTIFIER,
-      );
-    }
+
     return this.#token(TokenType.ERROR);
   }
 }
