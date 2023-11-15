@@ -1,5 +1,51 @@
 # Midistuff logs
 
+## 2023-11-15
+
+- generate music xml / lilypond
+- pretty printer
+- generate from nwctxt
+- review metadata (are limited ranges of values okay?)
+
+### polyfony & duration
+
+Basic deal: somehow bring things down to parallel voices, with sequences of
+potential chords of pitches. But these are render options.
+
+Chords of notes of different durations have to be broken up somehow.
+
+### cascading properties
+
+Think of the accidentals: they all control and override the same property:
+volume. The properties attached to the inner lables override the properties of
+the outer labels, but the labels don't have to each other completely.
+
+The fact that there is a preferred interpretation means that there might be a
+preferred interpreter.
+
+### more complicated duration fractions
+
+One might hope for a dterministic algorithm for splitting up notes. Also
+consider the possibility that some
+
+### basic duration algorithm
+
+Just the correct break up of notes now. Missing:
+
+- tuplets
+- polymorphism
+- breaking at the beat
+
+### universal interpretation
+
+Gravitating toward this: generate a universal interpretation, and let other
+system work off that. That way shared code between interpreters becomes less.
+
+### more practical systems?
+
+For repeats, e.g. `|:`, `|n`, `:|` perhaps `:|n` to indicate 
+playing `n` times somehow. 
+
 ## 2023-11-14
 
 - generate music xml / lilypond
