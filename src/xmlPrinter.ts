@@ -13,8 +13,8 @@ class Params {
   with(options?: Options): Params {
     if (!options) return this;
     let duration = this.duration;
-    if (options.durationDenominator && options.durationNumerator) {
-      duration = options.durationNumerator / options.durationDenominator;
+    if (options.duration) {
+      duration = options.duration.value;
     }
     return new Params(duration, options.key || this.key);
   }

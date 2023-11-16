@@ -1,25 +1,25 @@
 import { AST, Node, NodeType, Options, Value } from "./parser3.ts";
-import { less, mod, plus } from "./util.ts";
+import { mod, Ratio } from "./util.ts";
 
 type Note = {
   pitch: {
     degree: number;
     alter: number;
   };
-  time: [number, number];
-  duration: [number, number];
+  time: Ratio;
+  duration: Ratio;
   attributes: Map<string, Value>;
 };
 
 export class Params {
   __attributes: Map<string, Value>;
-  __duration?: [number, number];
+  __duration?: Ratio;
   __key?: number;
   constructor(
     attributes?: Map<string, Value>,
-    duration?: [number, number],
+    duration?: Ratio,
     key?: number,
-    readonly parent?: Params
+    readonly parent?: Params,
   ) {
     if (parent) {
       if (attributes) {
@@ -43,9 +43,9 @@ export class Params {
     return this.__attributes;
   }
 
-  get duration(): [number, number] {
+  get duration(): Ratio {
     if (!this.__duration) {
-      this.__duration = this.parent ? this.parent.duration : [1, 4];
+      this.__duration = this.parent ? this.parent.duration : new Ratio(1, 4);
     }
     return this.__duration;
   }
@@ -63,18 +63,17 @@ export class Params {
 }
 
 export class Transformer {
-  #sections: { node: Node; mark: string; params?: Params }[] = [];
+  #sections: { node: Node; mark: string; __params?: Params }[] = [];
   #buffer: Note[] = [];
-  #time: [number, number] = [0, 1];
+  #time: Ratio = new Ratio(0, 1);
   constructor(readonly sheet: Map<string, Map<string, Value>>) {}
 
   transform(ast: AST) {
     this.#sections = ast.sections;
     // todo: something with the metadata
     this.#buffer = [];
-    this.#time = [0, 1];
+    this.#time = new Ratio(0, 1);
     this.#node(ast.main, new Params());
-    this.#buffer.sort((a, b) => a.time[0] * b.time[1] - a.time[1] * b.time[0]);
     return this.#buffer;
   }
 
@@ -90,14 +89,7 @@ export class Transformer {
         }
       }
     }
-    return new Params(
-      _attributes,
-      options.durationDenominator && options.durationNumerator
-        ? [options.durationNumerator, options.durationDenominator]
-        : undefined,
-      options.key,
-      params
-    );
+    return new Params(_attributes, options.duration, options.key, params);
   }
 
   #node(node: Node, params: Params) {
@@ -107,10 +99,10 @@ export class Transformer {
       case NodeType.INSERT: {
         const section = this.#sections[node.index];
         if (!section) console.error(`section ${node.index} is missing`);
-        if (!section.params) {
-          section.params = params;
+        if (!section.__params) {
+          section.__params = params;
         }
-        this.#node(section.node, section.params);
+        this.#node(section.node, section.__params);
         return;
       }
       case NodeType.NOTE: {
@@ -124,13 +116,12 @@ export class Transformer {
             alter: node.accident + _params.alter(node.degree),
           },
         });
-        this.#time = plus(this.#time, _params.duration);
+        this.#time = this.#time.plus(_params.duration);
         return;
       }
       case NodeType.REST: {
-        this.#time = plus(
-          this.#time,
-          this.#params(params, node.options).duration
+        this.#time = this.#time.plus(
+          this.#params(params, node.options).duration,
         );
         return;
       }
@@ -148,7 +139,7 @@ export class Transformer {
         for (const child of node.children) {
           this.#time = start;
           this.#node(child, _params);
-          if (less(end, this.#time)) end = this.#time;
+          if (end.less(this.#time)) end = this.#time;
         }
         this.#time = end;
         return;

@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2023-11-16
+
+- generate music xml / lilypond
+- pretty printer
+- generate from nwctxt
+- review metadata (are limited ranges of values okay?)
+
 ## 2023-11-15
 
 - generate music xml / lilypond
@@ -43,8 +50,8 @@ system work off that. That way shared code between interpreters becomes less.
 
 ### more practical systems?
 
-For repeats, e.g. `|:`, `|n`, `:|` perhaps `:|n` to indicate 
-playing `n` times somehow. 
+For repeats, e.g. `|:`, `|n`, `:|` perhaps `:|n` to indicate playing `n` times
+somehow.
 
 ## 2023-11-14
 

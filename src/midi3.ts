@@ -103,9 +103,7 @@ export class MidiPlanner {
   }
 
   static #duration(options: Options, duration: number): number {
-    return options.durationNumerator && options.durationDenominator
-      ? options.durationNumerator / options.durationDenominator
-      : duration;
+    return options.duration?.value || duration;
   }
 
   #interpret(node: Node, params: Params) {

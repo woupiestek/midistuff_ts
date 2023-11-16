@@ -1,4 +1,5 @@
 import { Scanner, Token, TokenType } from "./scanner3.ts";
+import { Ratio } from "./util.ts";
 
 export enum NodeType {
   ERROR,
@@ -9,8 +10,7 @@ export enum NodeType {
   SET,
 }
 export type Options = {
-  durationNumerator?: number;
-  durationDenominator?: number;
+  duration?: Ratio;
   key?: number;
   labels?: Set<string>;
 };
@@ -169,37 +169,21 @@ export class Parser {
   }
 
   #duration(options: Options) {
+    let numerator = 1;
+    let denominator = 1;
     if (this.#current.type === TokenType.INTEGER) {
-      options.durationNumerator = this.#integer(1, Number.MAX_SAFE_INTEGER);
-    } else {
-      options.durationNumerator = 1;
+      numerator = this.#integer(1, Number.MAX_SAFE_INTEGER);
     }
     if (this.#match(TokenType.SLASH)) {
-      options.durationDenominator = this.#integer(1, Number.MAX_SAFE_INTEGER);
-    } else {
-      options.durationDenominator = 1;
+      denominator = this.#integer(1, Number.MAX_SAFE_INTEGER);
     }
+    options.duration = new Ratio(numerator, denominator);
   }
 
   #options(): Options | undefined {
     const options: Options = {};
     a: for (;;) {
       switch (this.#current.type) {
-        // case TokenType.IDENTIFIER: {
-        //   const lexeme = Parser.#decoder.decode(
-        //     this.source.slice(this.#current.from, this.#current.to),
-        //   );
-        //   if (options.labels === undefined) {
-        //     options.labels = new Set([lexeme]);
-        //   } else {
-        //     if (options.labels.has(lexeme)) {
-        //       throw this.#error(`Double '${lexeme}'`);
-        //     }
-        //     options.labels.add(lexeme);
-        //   }
-        //   this.#advance();
-        //   continue;
-        // }
         case TokenType.KEY:
           if (options.key !== undefined) {
             throw this.#error("Double key");
@@ -208,7 +192,7 @@ export class Parser {
           options.key = this.#integer(-7, 7);
           continue;
         case TokenType.UNDERSCORE:
-          if (options.durationNumerator !== undefined) {
+          if (options.duration !== undefined) {
             throw this.#error("Double duration");
           }
           this.#advance();
@@ -268,13 +252,9 @@ export class Parser {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
         const scope = this.#bindings.length;
-        const children = this.#set();
+        const set = this.#set(options);
         this.#bindings.length = scope; // bindings go out of scope
-        return {
-          type: NodeType.SET,
-          children,
-          options,
-        };
+        return set;
       }
       case TokenType.INTEGER_MINUS:
         return this.#note(-1, options);
@@ -330,6 +310,7 @@ export class Parser {
       while (!this.#sequencEnd()) {
         children.push(this.#node());
       }
+      if (children.length === 1) return children[0];
       return { type: NodeType.SEQUENCE, children };
     } catch (error) {
       const token = this.#current;
@@ -355,15 +336,41 @@ export class Parser {
     }
   }
 
-  #set(): Node[] {
-    if (this.#match(TokenType.RIGHT_BRACKET)) return [];
+  #set(options?: Options): Node {
     const children: Node[] = [];
+    if (this.#match(TokenType.RIGHT_BRACKET)) {
+      return {
+        type: NodeType.SET,
+        children,
+        options,
+      };
+    }
     for (;;) {
       children.push(this.#sequence());
       if (!this.#match(TokenType.COMMA)) break;
     }
     this.#consume(TokenType.RIGHT_BRACKET);
-    return children;
+    if (children.length === 1) {
+      const child = children[0];
+      if (!options) return child;
+      switch (child.type) {
+        case NodeType.ERROR:
+        case NodeType.INSERT:
+          break;
+        case NodeType.NOTE:
+        case NodeType.REST:
+        case NodeType.SEQUENCE:
+        case NodeType.SET:
+          if (child.options) break;
+          child.options = options;
+          return child;
+      }
+    }
+    return {
+      type: NodeType.SET,
+      children,
+      options,
+    };
   }
 
   #pop(): Token {
@@ -388,10 +395,6 @@ export class Parser {
         return this.#pairs();
       case TokenType.LEFT_BRACKET:
         return this.#array();
-      // case TokenType.IDENTIFIER:
-      //   return Parser.#decoder.decode(
-      //     this.source.slice(token2.from, token2.to),
-      //   );
       case TokenType.INTEGER:
         return token2.value || 0;
       case TokenType.TEXT:

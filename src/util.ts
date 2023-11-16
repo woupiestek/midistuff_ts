@@ -9,23 +9,6 @@ export function gcd(a: number, b: number): number {
   }
 }
 
-export function plus(
-  x: [number, number],
-  y: [number, number],
-): [number, number] {
-  const a = x[0] * y[1] + x[1] * y[0];
-  const b = x[1] * y[1];
-  const c = gcd(a, b);
-  return [a / c, b / c];
-}
-
-export function less(
-  x: [number, number],
-  y: [number, number],
-): boolean {
-  return x[0] * y[1] < x[1] * y[0];
-}
-
 export function mod(x: number, y: number): number {
   return x < 0 ? y - 1 - ((-1 - x) % y) : x % y;
 }
@@ -37,4 +20,31 @@ export function binaryFloor(x: number): number {
   x |= x >> 8;
   x |= x >> 16;
   return x - (x >>> 1);
+}
+
+export class Ratio {
+  readonly numerator: number;
+  readonly denominator: number;
+  constructor(n: number, d: number) {
+    const c = gcd(n, d);
+    this.numerator = n / c;
+    this.denominator = d / c;
+  }
+  plus(that: Ratio) {
+    return new Ratio(
+      this.numerator * that.denominator + this.denominator * that.numerator,
+      this.denominator * that.denominator,
+    );
+  }
+  compare(that: Ratio) {
+    return (
+      this.numerator * that.denominator - this.denominator * that.numerator
+    );
+  }
+  less(that: Ratio) {
+    return this.compare(that) < 0;
+  }
+  get value() {
+    return this.numerator / this.denominator;
+  }
 }

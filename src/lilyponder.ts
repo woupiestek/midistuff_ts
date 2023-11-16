@@ -1,5 +1,5 @@
 import { AST, Node, NodeType, Options } from "./parser3.ts";
-import { mod } from "./util.ts";
+import { mod, Ratio } from "./util.ts";
 
 export class Params {
   __duration?: string[];
@@ -13,17 +13,26 @@ export class Params {
   }
 
   get duration(): string[] {
-    if (this.__duration) return this.__duration;
-    if (this.options.durationDenominator && this.options.durationNumerator) {
-      return (this.__duration = Lilyponder.duration(
-        this.options.durationNumerator,
-        this.options.durationDenominator,
-      ));
+    if (!this.__duration) {
+      if (this.options.duration) {
+        this.__duration = Lilyponder.duration(
+          this.options.duration.numerator,
+          this.options.duration.denominator,
+        );
+      } else if (this.parent) {
+        this.__duration = this.parent.duration;
+      } else this.__duration = ["4"];
+
+      if (this.__duration instanceof Ratio) {
+        throw new Error("what the fuck happened here!?");
+      }
     }
-    if (this.parent?.__duration) {
-      return (this.__duration = this.parent?.__duration);
-    }
-    return (this.__duration = ["4"]);
+    return this.__duration;
+  }
+
+  with(options?: Options) {
+    if (!options) return this;
+    return new Params(options, this);
   }
 }
 
@@ -77,23 +86,16 @@ export class Lilyponder {
         return this.#node(section.node, section.params);
       }
       case NodeType.NOTE: {
-        const _params = node.options
-          ? new Params(node.options, params)
-          : params;
-
+        const _params = params.with(node.options);
         const pitch = Lilyponder.pitch(_params.key, node.degree, node.accident);
         return _params.duration.map((d) => pitch + d);
       }
       case NodeType.REST: {
-        const _params = node.options
-          ? new Params(node.options, params)
-          : params;
+        const _params = params.with(node.options);
         return _params.duration.map((d) => "r" + d);
       }
       case NodeType.SEQUENCE: {
-        const _params = node.options
-          ? new Params(node.options, params)
-          : params;
+        const _params = params.with(node.options);
         const result = ["{"];
         for (const child of node.children) {
           result.push(...this.#node(child, _params));
@@ -102,9 +104,7 @@ export class Lilyponder {
         return result;
       }
       case NodeType.SET: {
-        const _params = node.options
-          ? new Params(node.options, params)
-          : params;
+        const _params = params.with(node.options);
         const result = ["<<"];
         for (const child of node.children) {
           result.push(...this.#node(child, _params));
