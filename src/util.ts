@@ -26,6 +26,10 @@ export class Ratio {
   readonly numerator: number;
   readonly denominator: number;
   constructor(n: number, d: number) {
+    if (d < 0) {
+      n = -n;
+      d = -d;
+    }
     const c = gcd(n, d);
     this.numerator = n / c;
     this.denominator = d / c;
@@ -36,6 +40,12 @@ export class Ratio {
       this.denominator * that.denominator,
     );
   }
+  minus(that: Ratio) {
+    return new Ratio(
+      this.numerator * that.denominator - this.denominator * that.numerator,
+      this.denominator * that.denominator,
+    );
+  }
   compare(that: Ratio) {
     return (
       this.numerator * that.denominator - this.denominator * that.numerator
@@ -43,6 +53,15 @@ export class Ratio {
   }
   less(that: Ratio) {
     return this.compare(that) < 0;
+  }
+  lessThan(that: number) {
+    return this.numerator < that * this.denominator;
+  }
+  moreThan(that: number) {
+    return this.numerator > that * this.denominator;
+  }
+  static int(n: number) {
+    return new Ratio(n | 0, 1);
   }
   get value() {
     return this.numerator / this.denominator;

@@ -7,6 +7,12 @@
 - generate from nwctxt
 - review metadata (are limited ranges of values okay?)
 
+### rules for durations
+
+So complicated...
+
+Simple test for ditted durations: `i&(i+1)===0`
+
 ## 2023-11-15
 
 - generate music xml / lilypond

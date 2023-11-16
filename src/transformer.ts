@@ -1,9 +1,9 @@
 import { AST, Node, NodeType, Options, Value } from "./parser3.ts";
 import { mod, Ratio } from "./util.ts";
 
-type Note = {
+export type Note = {
   pitch: {
-    degree: number;
+    step: number;
     alter: number;
   };
   time: Ratio;
@@ -112,7 +112,7 @@ export class Transformer {
           time: this.#time,
           duration: _params.duration,
           pitch: {
-            degree: node.degree,
+            step: node.degree,
             alter: node.accident + _params.alter(node.degree),
           },
         });
