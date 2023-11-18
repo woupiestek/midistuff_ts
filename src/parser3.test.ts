@@ -206,11 +206,14 @@ Deno.test(function addMetaData() {
       '0{ "tempo"= 500000 "title"="one note" "cresc poco a poco"={"from"=43"to"=85} "parts"=["piano" "viola"]}',
     ),
   ).parse();
-  assertEquals(metadata.get("tempo"), 500000);
-  assertEquals(metadata.get("title"), "one note");
-  const cpap = metadata.get("cresc poco a poco");
-  if (!(cpap instanceof Map)) fail("unexpected type");
-  assertEquals(cpap.get("from"), 43);
-  assertEquals(cpap.get("to"), 85);
-  assertEquals(metadata.get("parts"), ["piano", "viola"]);
+  assertEquals(metadata.tempo, 500000);
+  assertEquals(metadata.title, "one note");
+  const cpap = metadata["cresc poco a poco"];
+  if (!(cpap instanceof Object) || cpap instanceof Array) {
+    console.log(cpap);
+    fail("unexpected type");
+  }
+  assertEquals(cpap.from, 43);
+  assertEquals(cpap.to, 85);
+  assertEquals(metadata.parts, ["piano", "viola"]);
 });

@@ -67,12 +67,10 @@ Deno.test(function durationsInContext() {
   assertEquals(actual, expected3);
 });
 
-const transformer = new Transformer(
-  new Map([
-    ["treble", new Map([["voice", 1]])],
-    ["bass", new Map([["voice", 2]])],
-  ]),
-);
+const transformer = new Transformer({
+  treble: { voice: 1 },
+  bass: { voice: 2 },
+});
 const lilyponder = new Lilyponder();
 const encoder = new TextEncoder();
 Deno.test(function simpleExample() {

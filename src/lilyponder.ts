@@ -180,7 +180,7 @@ export class Lilyponder {
   #addAll(notes: Note[]) {
     this.#chords.length = 0;
     for (const note of notes) {
-      const voice = note.attributes.get("voice");
+      const voice = note.attributes.voice;
 
       // silently ignore?
       if (voice === undefined) {

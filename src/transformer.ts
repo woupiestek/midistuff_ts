@@ -1,4 +1,4 @@
-import { AST, Node, NodeType, Options, Value } from "./parser3.ts";
+import { AST, Dict, Node, NodeType, Options } from "./parser3.ts";
 import { mod, Ratio } from "./util.ts";
 
 export type Note = {
@@ -8,24 +8,24 @@ export type Note = {
   };
   start: Ratio;
   stop: Ratio;
-  attributes: Map<string, Value>;
+  attributes: Dict;
 };
 
 export class Params {
-  __attributes: Map<string, Value>;
+  __attributes: Dict;
   __duration?: Ratio;
   __key?: number;
   constructor(
-    attributes?: Map<string, Value>,
+    attributes?: Dict,
     duration?: Ratio,
     key?: number,
     readonly parent?: Params,
   ) {
     if (parent) {
       if (attributes) {
-        this.__attributes = new Map(parent.__attributes);
-        for (const [k, v] of attributes) {
-          this.__attributes.set(k, v);
+        this.__attributes = Object.create(parent.__attributes);
+        for (const [k, v] of Object.entries(attributes)) {
+          this.__attributes[k] = v;
         }
       } else {
         this.__attributes = parent.__attributes;
@@ -33,13 +33,13 @@ export class Params {
     } else if (attributes) {
       this.__attributes = attributes;
     } else {
-      this.__attributes = new Map();
+      this.__attributes = {};
     }
     this.__duration = duration;
     this.__key = key;
   }
 
-  get attributes(): Map<string, Value> {
+  get attributes(): Dict {
     return this.__attributes;
   }
 
@@ -62,44 +62,11 @@ export class Params {
   }
 }
 
-export type Value2 = { [_: string]: Value2 } | number | string | Value2[];
-
 export class Transformer {
   #sections: { node: Node; mark: string; __params?: Params }[] = [];
   #buffer: Note[] = [];
   #time: Ratio = new Ratio(0, 1);
-  constructor(readonly sheet: Map<string, Map<string, Value>>) {}
-
-  static #value(value: Value2): Value {
-    switch (typeof value) {
-      case "number":
-        return value;
-      case "string":
-        return value;
-      case "object": {
-        if (value === null) break;
-        if (value instanceof Array) {
-          return value.map((it) => Transformer.#value(it));
-        }
-        return Transformer.#map(value);
-      }
-    }
-    throw new Error(`Illegal config value ${value}`);
-  }
-
-  static #map(value: object): Map<string, Value> {
-    const map = new Map();
-    for (const [k, v] of Object.entries(value)) {
-      map.set(k, Transformer.#value(v));
-    }
-    return map;
-  }
-
-  static create(config: object) {
-    return new Transformer(
-      new Map(Object.entries(config).map(([k, v]) => [k, Transformer.#map(v)])),
-    );
-  }
+  constructor(readonly sheet: Record<string, Dict>) {}
 
   transform(ast: AST) {
     this.#sections = ast.sections;
@@ -112,13 +79,13 @@ export class Transformer {
 
   #params(params: Params, options?: Options): Params {
     if (!options) return params;
-    const _attributes: Map<string, Value> = new Map();
+    const _attributes: Dict = {};
     if (options.labels) {
       for (const label of options.labels) {
-        const attributes = this.sheet.get(label);
+        const attributes = this.sheet[label];
         if (!attributes) continue;
-        for (const [k, v] of attributes.entries()) {
-          _attributes.set(k, v);
+        for (const [k, v] of Object.entries(attributes)) {
+          _attributes[k] = v;
         }
       }
     }

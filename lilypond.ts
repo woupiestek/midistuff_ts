@@ -27,7 +27,7 @@ const sample = `key 1 "allegro" "f" _/8[
 const encoder = new TextEncoder();
 const ast = new Parser(encoder.encode(sample)).parse();
 
-const transformer = Transformer.create({
+const transformer = new Transformer({
   treble: { voice: 1 },
   bass: { voice: 2 },
 });

@@ -25,6 +25,21 @@ Watch out: `c~8` is interpreted as a two notes `<c~>8` as one!
 After this much puzzling the lilyponder is done. I can now produce notation form
 the script. It was a lot more work than generating midi.
 
+### looking forward
+
+MusicXML has more applications, and many of the problems in generating that have
+now been solved. We could try that again.
+
+Using altenative bracketing for parallelism is interesting. It takes two symbols
+instead of one, but the added visibility doesn't hurt.
+
+I have the symbols. It is just matter of how to make the split between body and
+metadata. Just add a metadata keyword?
+
+Some things about midi and notation did really fit into the scores. Things that
+affect all voices at the same time, or details about scores. Let's not give up
+too easily.
+
 ## 2023-11-17
 
 - generate music xml / lilypond

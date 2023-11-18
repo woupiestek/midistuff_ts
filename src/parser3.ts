@@ -15,7 +15,8 @@ export type Options = {
   labels?: Set<string>;
 };
 
-export type Value = Map<string, Value> | number | string | Value[];
+export type Dict = { [_: string]: Value };
+export type Value = Dict | number | string | Value[];
 export type Node =
   | {
     type: NodeType.SET | NodeType.SEQUENCE;
@@ -43,7 +44,7 @@ export type Node =
   };
 
 export type AST = {
-  metadata: Map<string, Value>;
+  metadata: Dict;
   main: Node;
   sections: {
     mark: string;
@@ -80,17 +81,17 @@ export class Parser {
       main = this.#node();
     } catch (error) {
       main = { type: NodeType.ERROR, token: this.#current, error };
-      return { metadata: new Map(), main, sections: [] };
+      return { metadata: {}, main, sections: [] };
     }
 
-    let metadata: Map<string, Value> = new Map();
+    let metadata: Dict = {};
     if (this.#match(TokenType.LEFT_BRACE)) {
       try {
-        metadata = this.#pairs();
+        metadata = this.dict();
       } catch (error) {
         main = { type: NodeType.ERROR, token: this.#current, error };
         return {
-          metadata: new Map(),
+          metadata: {},
           main: {
             type: NodeType.ERROR,
             token: this.#current,
@@ -102,7 +103,7 @@ export class Parser {
     }
     if (!this.#done()) {
       return {
-        metadata: new Map(),
+        metadata: {},
         main: {
           type: NodeType.ERROR,
           token: this.#current,
@@ -392,7 +393,7 @@ export class Parser {
     const token2 = this.#pop();
     switch (token2.type) {
       case TokenType.LEFT_BRACE:
-        return this.#pairs();
+        return this.dict();
       case TokenType.LEFT_BRACKET:
         return this.#array();
       case TokenType.INTEGER:
@@ -408,8 +409,8 @@ export class Parser {
     }
   }
 
-  #pairs(): Map<string, Value> {
-    const result: Map<string, Value> = new Map();
+  dict(): Dict {
+    const result: Dict = {};
     for (;;) {
       const token1 = this.#pop();
       let key: string;
@@ -429,9 +430,9 @@ export class Parser {
         default:
           throw this.#error("Expected label or string");
       }
-      if (result.has(key)) throw this.#error(`Double key ${key}`);
+      if (result[key] !== undefined) throw this.#error(`Double key ${key}`);
       this.#consume(TokenType.IS);
-      result.set(key, this.#value());
+      result[key] = this.#value();
     }
   }
 }

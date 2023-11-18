@@ -1,13 +1,13 @@
 import { MessageType, MidiEvent } from "./midiTypes.ts";
-import { AST } from "./parser3.ts";
+import { AST, Dict } from "./parser3.ts";
 import { Note, Transformer } from "./transformer.ts";
 
-const config = new Map();
+const config: Record<string, Dict> = {};
 for (let i = 0; i < 128; i++) {
-  config.set(`program_${i}`, new Map([["program", i]]));
+  config[`program_${i}`] = { program: i };
 }
 ["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
-  (k, i) => config.set(k, new Map([["velocity", 1 + 14 * i]])),
+  (k, i) => (config[k] = { velocity: 1 + 14 * i }),
 );
 
 export class MidiPlanner {
@@ -19,7 +19,7 @@ export class MidiPlanner {
   bpm = 120;
   time = 0;
   constructor(ast: AST) {
-    const bpm = ast.metadata.get("bpm");
+    const bpm = ast.metadata.bpm;
     if (typeof bpm === "number") {
       this.bpm = bpm;
     }
@@ -30,14 +30,14 @@ export class MidiPlanner {
   }
 
   #note(_note: Note) {
-    let velocity = _note.attributes.get("velocity"); //||71;
+    let velocity = _note.attributes.velocity; //||71;
     if (typeof velocity !== "number") {
       velocity = 71;
     }
     const note = Math.floor((425 + 12 * _note.pitch.step) / 7) +
       _note.pitch.alter;
-    const program = _note.attributes.get("program");
-    const channel = this.#getChannel(typeof program === "number" ? program : 0);
+    const program = _note.attributes.program;
+    const channel = typeof program === "number" ? this.#getChannel(program) : 0;
     this.#messages.push({
       time: _note.start.value,
       event: { type: MessageType.noteOn, channel, note, velocity },
