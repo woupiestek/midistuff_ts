@@ -10,7 +10,7 @@ Deno.test(function simpleMelody() {
     new Parser(textEncoder.encode("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]")).parse(),
   );
 
-  assertEquals(file.tracks[1].length, 9);
+  assertEquals(file.tracks[1].length, 10);
   assertEquals(
     file.tracks[1].filter(({ event }) => event?.type === MessageType.noteOff)
       .length,
@@ -31,11 +31,11 @@ Deno.test(function simpleMelody() {
 
 Deno.test(function durations() {
   assertEquals(
-    new Filer(new Parser(textEncoder.encode("_13/16[r]")).parse()).time,
+    new Filer(new Parser(textEncoder.encode("_13/16[0]")).parse()).time,
     312,
   );
   assertEquals(
-    new Filer(new Parser(textEncoder.encode("[_13/16 r]")).parse()).time,
+    new Filer(new Parser(textEncoder.encode("[_13/16 0]")).parse()).time,
     312,
   );
 });
@@ -44,7 +44,7 @@ Deno.test(function simpleChord() {
   const { file } = new Filer(
     new Parser(textEncoder.encode("_/2[ 0, 2-, 4 ]")).parse(),
   );
-  assertEquals(file.tracks[1].length, 7);
+  assertEquals(file.tracks[1].length, 8);
   assertEquals(
     file.tracks[1].filter(({ event }) => event?.type === MessageType.noteOff)
       .length,
@@ -67,7 +67,7 @@ Deno.test(function simpleRepeat() {
   const { file } = new Filer(
     new Parser(textEncoder.encode("[$C = _/4 0 $C]")).parse(),
   );
-  assertEquals(file.tracks[1].length, 5);
+  assertEquals(file.tracks[1].length, 6);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 2);
   // assertEquals(messages.filter((it) => it.message[0] === 144).length, 2);
   // assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
@@ -92,7 +92,7 @@ Deno.test(function otherParamsChange() {
       textEncoder.encode('"vivace" key 3 "fff" [ _/8 0 1 2 0 _/8 r ]'),
     ).parse(),
   );
-  assertEquals(file.tracks[1].length, 9);
+  assertEquals(file.tracks[1].length, 10);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
   // assertEquals(messages.filter((it) => it.message[0] === 144).length, 4);
   // assertEquals(messages.filter((it) => it.message[1] === 61).length, 4);
@@ -112,7 +112,7 @@ Deno.test(function jacob() {
       ),
     ).parse(),
   );
-  assertEquals(file.tracks[1].length, 65);
+  assertEquals(file.tracks[1].length, 66);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 32);
   // assertEquals(messages.filter((it) => it.message[0] === 144).length, 32);
   // assertEquals(messages.filter((it) => it.message[1] === 60).length, 20);

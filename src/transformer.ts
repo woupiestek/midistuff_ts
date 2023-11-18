@@ -62,11 +62,44 @@ export class Params {
   }
 }
 
+export type Value2 = { [_: string]: Value2 } | number | string | Value2[];
+
 export class Transformer {
   #sections: { node: Node; mark: string; __params?: Params }[] = [];
   #buffer: Note[] = [];
   #time: Ratio = new Ratio(0, 1);
   constructor(readonly sheet: Map<string, Map<string, Value>>) {}
+
+  static #value(value: Value2): Value {
+    switch (typeof value) {
+      case "number":
+        return value;
+      case "string":
+        return value;
+      case "object": {
+        if (value === null) break;
+        if (value instanceof Array) {
+          return value.map((it) => Transformer.#value(it));
+        }
+        return Transformer.#map(value);
+      }
+    }
+    throw new Error(`Illegal config value ${value}`);
+  }
+
+  static #map(value: object): Map<string, Value> {
+    const map = new Map();
+    for (const [k, v] of Object.entries(value)) {
+      map.set(k, Transformer.#value(v));
+    }
+    return map;
+  }
+
+  static create(config: object) {
+    return new Transformer(
+      new Map(Object.entries(config).map(([k, v]) => [k, Transformer.#map(v)])),
+    );
+  }
 
   transform(ast: AST) {
     this.#sections = ast.sections;

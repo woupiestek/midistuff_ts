@@ -1,55 +1,59 @@
 import { MessageType, MidiEvent } from "./midiTypes.ts";
-import { AST, Node, NodeType, Options } from "./parser3.ts";
-import { Token } from "./scanner3.ts";
+import { AST } from "./parser3.ts";
+import { Note, Transformer } from "./transformer.ts";
 
-enum Op {
-  PROGRAM,
-  VELOCITY,
-}
-
-const CLASSES = new Map();
+const config = new Map();
 for (let i = 0; i < 128; i++) {
-  CLASSES.set(`program_${i}`, [Op.PROGRAM, i]);
+  config.set(`program_${i}`, new Map([["program", i]]));
 }
 ["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
-  (k, i) => CLASSES.set(k, [Op.VELOCITY, 1 + 14 * i]),
+  (k, i) => config.set(k, new Map([["velocity", 1 + 14 * i]])),
 );
 
-class Params {
-  constructor(
-    readonly channel: number = 0,
-    readonly duration: number = 0.25,
-    readonly key: number = 0,
-    readonly velocity: number = 71,
-  ) {}
-
-  pitch(degree: number): number {
-    return Math.floor((425 + 12 * degree + this.key) / 7);
-  }
-}
-
 export class MidiPlanner {
+  #transformer = new Transformer(config);
   #messages: { time: number; event: MidiEvent }[] = [];
-  #time = 0;
+  // #time = 0;
   #programs: (number | undefined)[] = Array(16);
-  #sections: { mark: string; node: Node; params?: Params }[];
+  // #sections: { mark: string; node: Node; params?: Params }[];
   bpm = 120;
+  time = 0;
   constructor(ast: AST) {
     const bpm = ast.metadata.get("bpm");
     if (typeof bpm === "number") {
       this.bpm = bpm;
     }
-    this.#sections = ast.sections;
-    this.#interpret(ast.main, new Params());
+    for (const note of this.#transformer.transform(ast)) {
+      this.#note(note);
+    }
     this.#messages.sort((x, y) => x.time - y.time);
+  }
+
+  #note(_note: Note) {
+    let velocity = _note.attributes.get("velocity"); //||71;
+    if (typeof velocity !== "number") {
+      velocity = 71;
+    }
+    const note = Math.floor((425 + 12 * _note.pitch.step) / 7) +
+      _note.pitch.alter;
+    const program = _note.attributes.get("program");
+    const channel = this.#getChannel(typeof program === "number" ? program : 0);
+    this.#messages.push({
+      time: _note.start.value,
+      event: { type: MessageType.noteOn, channel, note, velocity },
+    });
+    const time = _note.stop.value;
+    this.#messages.push({
+      time,
+      event: { type: MessageType.noteOff, channel, note, velocity },
+    });
+    if (time > this.time) {
+      this.time = time;
+    }
   }
 
   get messages() {
     return this.#messages;
-  }
-
-  get time() {
-    return this.#time;
   }
 
   #getChannel(program: number): number {
@@ -65,105 +69,10 @@ export class MidiPlanner {
     }
     if (free === 16) throw new Error("out of channels");
     this.#programs[free] = program;
-    this.#emit({ type: MessageType.programChange, channel: free, program });
-    return free;
-  }
-
-  #emit(event: MidiEvent) {
     this.#messages.push({
-      time: this.#time,
-      event,
+      time: 0,
+      event: { type: MessageType.programChange, channel: free, program },
     });
-  }
-
-  #combine(params: Params, options?: Options): Params {
-    if (options === undefined) return params;
-    let channel = params.channel;
-    let velocity = params.velocity;
-    if (options.labels !== undefined) {
-      for (const c of options.labels) {
-        const op = CLASSES.get(c);
-        if (op === undefined) continue;
-        switch (op[0]) {
-          case Op.VELOCITY:
-            velocity = op[1];
-            break;
-          case Op.PROGRAM:
-            channel = this.#getChannel(op[1]);
-            break;
-        }
-      }
-    }
-    return new Params(
-      channel,
-      MidiPlanner.#duration(options, params.duration),
-      options.key || params.key,
-      velocity,
-    );
-  }
-
-  static #duration(options: Options, duration: number): number {
-    return options.duration?.value || duration;
-  }
-
-  #interpret(node: Node, params: Params) {
-    switch (node.type) {
-      case NodeType.ERROR:
-        console.error(`Error at ${Token.stringify(node.token)}`, node.error);
-        return;
-      case NodeType.INSERT:
-        {
-          const section = this.#sections[node.index];
-          if (!section.params) {
-            section.params = params;
-          }
-          this.#interpret(section.node, section.params);
-        }
-        return;
-      case NodeType.SET: {
-        const _params = this.#combine(params, node.options);
-        const start = this.#time;
-        let end = start;
-        for (const child of node.children) {
-          this.#time = start;
-          this.#interpret(child, _params);
-          if (this.#time > end) {
-            end = this.#time;
-          }
-        }
-        this.#time = end;
-        return;
-      }
-      case NodeType.NOTE: {
-        const _params = this.#combine(params, node.options);
-        const pitch = _params.pitch(node.degree) + node.accident;
-        this.#emit({
-          type: MessageType.noteOn,
-          channel: _params.channel,
-          note: pitch,
-          velocity: _params.velocity,
-        });
-        this.#time += _params.duration;
-        this.#emit({
-          type: MessageType.noteOff,
-          channel: _params.channel,
-          note: pitch,
-          velocity: _params.velocity,
-        });
-        return;
-      }
-      case NodeType.REST:
-        this.#time += node.options
-          ? MidiPlanner.#duration(node.options, params.duration)
-          : params.duration;
-        return;
-      case NodeType.SEQUENCE: {
-        const _params = this.#combine(params, node.options);
-        for (const child of node.children) {
-          this.#interpret(child, _params);
-        }
-        return;
-      }
-    }
+    return free;
   }
 }

@@ -1,34 +1,8 @@
-import { FourFourSplitter, Lilyponder, Lilyponder2 } from "./lilyponder.ts";
+import { FourFourSplitter, Lilyponder } from "./lilyponder.ts";
 import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Ratio } from "./util.ts";
 import { Transformer } from "./transformer.ts";
 import { Parser } from "./parser3.ts";
-
-Deno.test(function durations() {
-  const expected = [
-    ["16"],
-    ["8"],
-    ["8."],
-    ["4"],
-    ["4~", "16"],
-    ["4."],
-    ["4.."],
-    ["2"],
-    ["2~", "16"],
-    ["2~", "8"],
-    ["2~", "8."],
-    ["2."],
-    ["2.~", "16"],
-    ["2.."],
-    ["2..."],
-    ["1"],
-  ];
-  const actual = [];
-  for (let i = 1; i <= 16; i++) {
-    actual.push(Lilyponder.duration(i, 16));
-  }
-  assertEquals(actual, expected);
-});
 
 Deno.test(function durationsInContext() {
   const expected = [
@@ -99,7 +73,7 @@ const transformer = new Transformer(
     ["bass", new Map([["voice", 2]])],
   ]),
 );
-const lilyponder = new Lilyponder2();
+const lilyponder = new Lilyponder();
 const encoder = new TextEncoder();
 Deno.test(function simpleExample() {
   assertEquals(Ratio.int(0).compare(Ratio.int(1)), -1);

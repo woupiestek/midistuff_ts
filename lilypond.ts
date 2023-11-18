@@ -1,4 +1,4 @@
-import { Lilyponder2 } from "./src/lilyponder.ts";
+import { Lilyponder } from "./src/lilyponder.ts";
 import { Parser } from "./src/parser3.ts";
 import { Transformer } from "./src/transformer.ts";
 
@@ -27,14 +27,12 @@ const sample = `key 1 "allegro" "f" _/8[
 const encoder = new TextEncoder();
 const ast = new Parser(encoder.encode(sample)).parse();
 
-const transformer = new Transformer(
-  new Map([
-    ["treble", new Map([["voice", 1]])],
-    ["bass", new Map([["voice", 2]])],
-  ]),
-);
+const transformer = Transformer.create({
+  treble: { voice: 1 },
+  bass: { voice: 2 },
+});
 const notes = transformer.transform(ast);
 
 // where are my note lengths!?
-const printer = new Lilyponder2();
+const printer = new Lilyponder();
 console.log(printer.process(notes));

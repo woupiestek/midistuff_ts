@@ -1,13 +1,13 @@
-program_53 [
-  $A = [
-    $A = [_/8 0 1 2 0 _/8 r] $A
-    $B = [_/8 2 3 _/2 4 _/8 r] $B
+"program_53" [
+  A = [
+    A = [_/8 0 1 2 0 _/8 r] A
+    B = [_/8 2 3 _/2 4 _/8 r] B
     % this was a puzzle to get right!
-    $C = _/8 [4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C
-    $D = [_/8 0 -3 _/2 0 _/8 r] $D
+    C = _/8 [4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] C
+    D = [_/8 0 -3 _/2 0 _/8 r] D
   ]
 
   % changing the program or octave now is not possible, alas
-  [ $A $A, _2r $A,_4r $A, _6r $A ]
+  [ A A, _2r A,_4r A, _6r A ]
 ]
-{ bpm = 135 }
+{ "bpm" = 135 }
