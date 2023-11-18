@@ -154,6 +154,18 @@ export class FourFourSplitter {
       this.#start(from, t);
       return;
     }
+
+    // undotted syncopation (special case)
+    if (
+      from.value === 0.25 * f + 0.75 * t &&
+      to.value === 0.25 * f + 0.75 * t
+    ) {
+      this.#start(from, 0.25 * f + 0.75 * t);
+      this.#chunks.push((2 / (t - f)).toString());
+      this.#end(0.75 * f + 0.25 * t, to);
+      return;
+    }
+
     const m = (t + f) / 2;
     if (from.lessThan(m)) {
       this.#segment(from, to, f, m);
@@ -212,10 +224,18 @@ export type Placeholder = {
 };
 export class Lilyponder2 {
   #fourFourSplitter = new FourFourSplitter();
-
   #buffer: Placeholder[] = [];
 
   #note(note: Note) {
+    const from = note.start;
+    const to = note.stop;
+    this.#fourFourSplitter.set(from, to);
+    const duration = [...this.#fourFourSplitter.get()];
+    const voice = note.attributes.get("voice");
+    this.#buffer.push({ pitch: this.#pitch(note), duration, voice, from, to });
+  }
+
+  #pitch(note: Note) {
     let pitch = "cdefgab"[mod(note.pitch.step, 7)];
     if (note.pitch.alter < 0) {
       for (let i = note.pitch.alter; i < 0; i++) {
@@ -227,12 +247,7 @@ export class Lilyponder2 {
         pitch += "is";
       }
     }
-    const from = note.time;
-    const to = note.time.plus(note.duration);
-    this.#fourFourSplitter.set(from, to);
-    const duration = [...this.#fourFourSplitter.get()];
-    const voice = note.attributes.get("voice");
-    this.#buffer.push({ pitch, duration, voice, from, to });
+    return pitch;
   }
 
   push(notes: Note[]) {
@@ -245,4 +260,123 @@ export class Lilyponder2 {
   pop(): Placeholder[] {
     return Array.from(this.#buffer);
   }
+
+  #voices: Value[] = [];
+  #vi(value: Value) {
+    const i = this.#voices.indexOf(value);
+    if (i === -1) {
+      this.#voices.push(value);
+      return this.#voices.length - 1;
+    }
+    return i;
+  }
+
+  // some invariant to preserve: none of the existing chords may overlap.
+  #chords: Chord[][][] = [];
+
+  add(notes: Note[]) {
+    for (const note of notes) {
+      const voice = note.attributes.get("voice");
+      if (voice === undefined) return false;
+      const vi = this.#vi(voice);
+      const bar = note.start.value | 0;
+      this.#add(vi, bar, note);
+    }
+  }
+
+  /* could be much more efficient by ordering and binary searching based on time,
+   * a smarter data structure etc.
+   * that adds overhead for what are presumably small sets of notes.
+   */
+  #addTo(
+    start: Ratio,
+    stop: Ratio,
+    pitch: string,
+    tied: boolean,
+    chords: Chord[],
+  ) {
+    const uncovered: { start: Ratio; stop: Ratio; tied: boolean }[] = [
+      { start, stop, tied },
+    ];
+    // avoid adding to a collection while looping through it
+    const newChords: Chord[] = [];
+    for (const chord of chords) {
+      // short cut
+      if (uncovered.length === 0) {
+        break;
+      }
+      let task: { start: Ratio; stop: Ratio; tied: boolean } | undefined =
+        undefined;
+      for (let i = 0; i < uncovered.length; i++) {
+        const { start, stop } = uncovered[i];
+        if (start.less(chord.stop) && chord.start.less(stop)) {
+          // this can not happen more than once, as neither the todo
+          // nor the chords can overlap
+          [task] = uncovered.splice(i, 1);
+          break;
+        }
+      }
+      if (task === undefined) {
+        // no overlap, no manipulation
+        continue;
+      }
+      const b = start.compare(chord.start);
+      if (b < 0) { // note starts earlier, so its tsart remains uncovered
+        uncovered.push({ start, stop: chord.start, tied: true });
+      } else if (b > 0) {
+        // chord start earlier, so split it up.
+        newChords.push({
+          start: chord.start,
+          stop: start,
+          parts: [...chord.parts],
+        });
+        chord.start = start;
+      }
+      const c = stop.compare(chord.stop);
+      if (c < 0) {
+        // chord stops later, so split it up.
+        newChords.push({
+          start: start,
+          stop: chord.start,
+          parts: [...chord.parts],
+        });
+        chord.stop = stop;
+      } else if (c > 0) {
+        // note stops later, keep track of the uncovered part.
+        uncovered.push({ start: chord.stop, stop, tied });
+        tied = true;
+        stop = chord.stop;
+      }
+      chord.parts.push({ pitch, tied });
+    }
+    chords.push(...newChords);
+    // not covered by existing chords
+    for (const { start, stop, tied } of uncovered) {
+      chords.push({ start, stop, parts: [{ pitch, tied }] });
+    }
+  }
+
+  #add(vi: number, bar: number, note0: Note) {
+    const tied = note0.stop.moreThan(bar + 1);
+    if (tied) {
+      const m = Ratio.int(bar + 1);
+      this.#add(vi, bar + 1, { ...note0, start: m });
+      note0.stop = m;
+    }
+    if (!this.#chords[vi]) {
+      this.#chords[vi] = [];
+    }
+    // not changing
+    const pitch = this.#pitch(note0);
+    if (!this.#chords[vi][bar]) {
+      // early exit?
+      this.#chords[vi][bar] = [];
+    }
+    this.#addTo(note0.start, note0.stop, pitch, tied, this.#chords[vi][bar]);
+  }
 }
+type Chord = {
+  start: Ratio;
+  stop: Ratio;
+  parts: { pitch: string; tied: boolean }[];
+};

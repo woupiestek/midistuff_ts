@@ -6,8 +6,8 @@ export type Note = {
     step: number;
     alter: number;
   };
-  time: Ratio;
-  duration: Ratio;
+  start: Ratio;
+  stop: Ratio;
   attributes: Map<string, Value>;
 };
 
@@ -109,8 +109,8 @@ export class Transformer {
         const _params = this.#params(params, node.options);
         this.#buffer.push({
           attributes: _params.attributes,
-          time: this.#time,
-          duration: _params.duration,
+          start: this.#time,
+          stop: this.#time.plus(_params.duration),
           pitch: {
             step: node.degree,
             alter: node.accident + _params.alter(node.degree),

@@ -1,5 +1,50 @@
 # Midistuff logs
 
+## 2023-11-18
+
+- generate music xml / lilypond
+- pretty printer
+- generate from nwctxt
+- review metadata (are limited ranges of values okay?)
+
+### chording
+
+Making progress with the chording algorithm. It should give good results for
+normal use cases, And reasonable workarounds otherwise.
+
+The current version keep track of the start and end of each chord, but this
+should not be needed. Keeping the durations or the start times should be enough.
+Start times are better though, for computing durations.
+
+## 2023-11-17
+
+- generate music xml / lilypond
+- pretty printer
+- generate from nwctxt
+- review metadata (are limited ranges of values okay?)
+
+### what am I aiming for?
+
+Am I close but jst too tired to see it?
+
+1. group by voice
+2. group and sort by time
+3. create a sequence of chords out of each voice, suing _some_ strategy for
+   mismatches.
+4. break up the duration of each chord into conventional durations.
+
+Mismatches: ideally simultaneous notes match up perfectrly in time, but what if
+they dont? A rest between one note and the next is fine, so the main concenr is
+overlap.
+
+Perhaps the best strategy is to break up all the notes, and add ties. It seems
+that tie through case cannot normally be ommitted in lilypond, so let's not.
+
+Okay, are we ready then?
+
+The new new created by splitting up may not be in the right order. so they may
+have to be reconsidered on a second pass through.
+
 ## 2023-11-16
 
 - generate music xml / lilypond

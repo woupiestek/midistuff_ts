@@ -1,4 +1,4 @@
-import { Lilyponder, Lilyponder2 } from "./src/lilyponder.ts";
+import { Lilyponder2 } from "./src/lilyponder.ts";
 import { Parser } from "./src/parser3.ts";
 import { Transformer } from "./src/transformer.ts";
 
