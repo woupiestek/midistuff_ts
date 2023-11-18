@@ -37,5 +37,4 @@ const notes = transformer.transform(ast);
 
 // where are my note lengths!?
 const printer = new Lilyponder2();
-printer.push(notes);
-console.log(printer.pop());
+console.log(printer.process(notes));

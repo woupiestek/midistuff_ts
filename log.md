@@ -16,6 +16,15 @@ The current version keep track of the start and end of each chord, but this
 should not be needed. Keeping the durations or the start times should be enough.
 Start times are better though, for computing durations.
 
+### lilypond quirk
+
+Watch out: `c~8` is interpreted as a two notes `<c~>8` as one!
+
+### success
+
+After this much puzzling the lilyponder is done. I can now produce notation form
+the script. It was a lot more work than generating midi.
+
 ## 2023-11-17
 
 - generate music xml / lilypond
