@@ -97,7 +97,7 @@ export class XMLPrinter {
         this.#time += _params.duration;
         return;
       }
-      case NodeType.SEQUENCE: {
+      case NodeType.ARRAY: {
         const _params = params.with(node.options);
         for (const child of node.children) {
           this.#node(child, _params);

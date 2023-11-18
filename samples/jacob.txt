@@ -8,6 +8,6 @@
   ]
 
   % changing the program or octave now is not possible, alas
-  [ A A, _2r A,_4r A, _6r A ]
-]
+  { [A A] [_2r A] [_4r A] [_6r A] }
+],
 { "bpm" = 135 }

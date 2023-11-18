@@ -125,7 +125,7 @@ export class Transformer {
         );
         return;
       }
-      case NodeType.SEQUENCE: {
+      case NodeType.ARRAY: {
         const _params = this.#params(params, node.options);
         for (const child of node.children) {
           this.#node(child, _params);

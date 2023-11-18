@@ -31,7 +31,7 @@ Deno.test(function durations() {
 
 Deno.test(function simpleChord() {
   const messages = new Interpreter(
-    new Parser(textEncoder.encode("_/2[ 0, 2-, 4 ]")).parse(),
+    new Parser(textEncoder.encode("_/2{ 0 2- 4 }")).parse(),
   ).messages;
   assertEquals(messages.length, 6);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 3);

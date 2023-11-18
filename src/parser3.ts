@@ -2,11 +2,11 @@ import { Scanner, Token, TokenType } from "./scanner3.ts";
 import { Ratio } from "./util.ts";
 
 export enum NodeType {
+  ARRAY,
   ERROR,
   INSERT,
   NOTE,
   REST,
-  SEQUENCE,
   SET,
 }
 export type Options = {
@@ -19,7 +19,7 @@ export type Dict = { [_: string]: Value };
 export type Value = Dict | number | string | Value[];
 export type Node =
   | {
-    type: NodeType.SET | NodeType.SEQUENCE;
+    type: NodeType.SET | NodeType.ARRAY;
     children: Node[];
     options?: Options;
   }
@@ -83,9 +83,8 @@ export class Parser {
       main = { type: NodeType.ERROR, token: this.#current, error };
       return { metadata: {}, main, sections: [] };
     }
-
     let metadata: Dict = {};
-    if (this.#match(TokenType.LEFT_BRACE)) {
+    if (this.#match(TokenType.COMMA) && this.#match(TokenType.LEFT_BRACE)) {
       try {
         metadata = this.dict();
       } catch (error) {
@@ -95,7 +94,7 @@ export class Parser {
           main: {
             type: NodeType.ERROR,
             token: this.#current,
-            error: this.#error("input left over"),
+            error: this.#error("error parsing metadata"),
           },
           sections: [],
         };
@@ -253,7 +252,14 @@ export class Parser {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
         const scope = this.#bindings.length;
-        const set = this.#set(options);
+        const set = this.#set(NodeType.ARRAY, TokenType.RIGHT_BRACKET, options);
+        this.#bindings.length = scope; // bindings go out of scope
+        return set;
+      }
+      case TokenType.LEFT_BRACE: {
+        this.#advance();
+        const scope = this.#bindings.length;
+        const set = this.#set(NodeType.SET, TokenType.RIGHT_BRACE, options);
         this.#bindings.length = scope; // bindings go out of scope
         return set;
       }
@@ -299,79 +305,52 @@ export class Parser {
     };
   }
 
-  #sequencEnd() {
-    return [TokenType.END, TokenType.COMMA, TokenType.RIGHT_BRACKET].includes(
-      this.#current.type,
-    );
-  }
-
-  #sequence(): Node {
-    try {
-      const children: Node[] = [];
-      while (!this.#sequencEnd()) {
-        children.push(this.#node());
-      }
-      if (children.length === 1) return children[0];
-      return { type: NodeType.SEQUENCE, children };
-    } catch (error) {
-      const token = this.#current;
-      this.#panic();
-      return { type: NodeType.ERROR, token, error };
-    }
-  }
-
   #panic() {
-    while (!this.#sequencEnd()) {
-      if (this.#current.type === TokenType.LEFT_BRACKET) {
-        let depth = 1;
-        while (depth > 0 && !this.#done()) {
-          this.#advance();
-          if (this.#current.type === TokenType.LEFT_BRACKET) {
-            depth++;
-          } else if (this.#current.type === TokenType.RIGHT_BRACKET) {
-            depth--;
-          }
-        }
+    let depth = 1;
+    for (;;) {
+      switch (this.#current.type) {
+        case TokenType.END:
+          return;
+        case TokenType.LEFT_BRACE:
+          depth++;
+          break;
+        case TokenType.LEFT_BRACKET:
+          depth++;
+          break;
+        case TokenType.RIGHT_BRACE:
+          depth--;
+          break;
+        case TokenType.RIGHT_BRACKET:
+          depth--;
+          break;
+        default:
+          break;
       }
       this.#advance();
+      if (depth === 0) return;
     }
   }
 
-  #set(options?: Options): Node {
-    const children: Node[] = [];
-    if (this.#match(TokenType.RIGHT_BRACKET)) {
+  #set(
+    type: NodeType.SET | NodeType.ARRAY,
+    stop: TokenType,
+    options?: Options,
+  ): Node {
+    try {
+      const children: Node[] = [];
+      while (!this.#match(stop)) {
+        children.push(this.#node());
+      }
       return {
-        type: NodeType.SET,
+        type,
         children,
         options,
       };
+    } catch (error) {
+      const token = this.#current;
+      this.#panic();
+      return { type: NodeType.ERROR, error, token };
     }
-    for (;;) {
-      children.push(this.#sequence());
-      if (!this.#match(TokenType.COMMA)) break;
-    }
-    this.#consume(TokenType.RIGHT_BRACKET);
-    if (children.length === 1) {
-      const child = children[0];
-      if (!options) return child;
-      switch (child.type) {
-        case NodeType.ERROR:
-        case NodeType.INSERT:
-          break;
-        case NodeType.NOTE:
-        case NodeType.REST:
-        case NodeType.SEQUENCE:
-        case NodeType.SET:
-          if (child.options) break;
-          child.options = options;
-          return child;
-      }
-    }
-    return {
-      type: NodeType.SET,
-      children,
-      options,
-    };
   }
 
   #pop(): Token {
@@ -417,11 +396,6 @@ export class Parser {
       switch (token1.type) {
         case TokenType.RIGHT_BRACE:
           return result;
-        // case TokenType.IDENTIFIER:
-        //   key = Parser.#decoder.decode(
-        //     this.source.slice(token1.from, token1.to),
-        //   );
-        //   break;
         case TokenType.TEXT:
           key = Parser.#decoder
             .decode(this.source.slice(token1.from + 1, token1.to - 1))

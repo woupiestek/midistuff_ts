@@ -169,7 +169,7 @@ export class Printer {
         if (node.options) this.#options(node.options);
         this.#emit("r");
         break;
-      case NodeType.SEQUENCE:
+      case NodeType.ARRAY:
         if (node.options) this.#options(node.options);
         this.#node(node.children[0], sections);
         for (let i = 1; i < node.children.length; i++) {

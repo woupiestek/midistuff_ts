@@ -42,7 +42,7 @@ Deno.test(function durations() {
 
 Deno.test(function simpleChord() {
   const { file } = new Filer(
-    new Parser(textEncoder.encode("_/2[ 0, 2-, 4 ]")).parse(),
+    new Parser(textEncoder.encode("_/2{ 0 2- 4 }")).parse(),
   );
   assertEquals(file.tracks[1].length, 7);
   assertEquals(
