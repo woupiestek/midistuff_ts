@@ -1,4 +1,4 @@
-import { Printer } from "./src/midiFIlePrinter.ts";
+import { Printer } from "./src/midiFilePrinter.ts";
 import { Scanner } from "./src/midiFileScanner.ts";
 import { transform1 } from "./src/transformations.ts";
 import { midi } from "https://deno.land/x/deno_midi/mod.ts";

@@ -1,6 +1,6 @@
 import { Filer } from "./filer3.ts";
 import { Parser } from "./parser3.ts";
-import { Printer } from "./midiFIlePrinter.ts";
+import { Printer } from "./midiFilePrinter.ts";
 if (Deno.args.length < 2) {
   console.error("Usage: writer3 [soruce] [target]\n");
   Deno.exit(64);

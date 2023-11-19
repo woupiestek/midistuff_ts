@@ -2,7 +2,7 @@ import {
   assertEquals,
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Printer } from "./midiFIlePrinter.ts";
+import { Printer } from "./midiFilePrinter.ts";
 import { Scanner } from "./midiFileScanner.ts";
 import { MessageType } from "./midiTypes.ts";
 

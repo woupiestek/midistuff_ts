@@ -1,5 +1,28 @@
 # Midistuff logs
 
+## 2023-11-19
+
+- pretty printer
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### the metadata question
+
+The current transforms class adds a set of attributes to each note, based on a
+dictionary of data related to labels that can be mixed into the scores.
+
+### pretty printing
+
+So this just works too. What I want is an optional line break in the sequences,
+but I don't know how that would work yet.
+
+Nodes in sequences can be grouped, and the rest then just works. I now have an
+ad hoc rule that gives ok results, but ideally line breaks are added where the
+bar lines go. This can be done by keeping track of time while generating the
+document, like the other interpreters. Syncopes are added to the bar they
+preceed.
+
 ## 2023-11-18
 
 - generate music xml / lilypond

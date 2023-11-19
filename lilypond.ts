@@ -22,10 +22,7 @@ const sample = `key 1 "allegro" "f" _/8[
     "bass" [-2 -6 -1 0 -5 -1 -2 -4 _ {-3 -1}]
   }
 ],
-{ "bpm" = 140 }
-
-
-`;
+{ "bpm" = 140 }`;
 
 const encoder = new TextEncoder();
 const ast = new Parser(encoder.encode(sample)).parse();

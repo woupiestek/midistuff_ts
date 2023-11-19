@@ -8,5 +8,4 @@ if (Deno.args.length < 1) {
 
 const data = await Deno.readFile(Deno.args[0]);
 const printer = new Printer();
-printer.file(new Parser(data).parse());
-console.log(printer.pop());
+console.log(printer.pretty(64, new Parser(data).parse()));
