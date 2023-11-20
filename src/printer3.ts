@@ -4,6 +4,7 @@ import { Ratio } from "./util.ts";
 type Doc =
   | ["concat", Doc[]]
   | ["line"]
+  | ["limit line"]
   | ["error", Error]
   | ["nest", number, Doc]
   | ["text", string]
@@ -30,6 +31,9 @@ const Doc = {
   line(): Doc {
     return ["line"];
   },
+  limitLine(): Doc {
+    return ["limit line"];
+  },
   nest(depth: number, doc: Doc): Doc {
     return ["nest", depth, doc];
   },
@@ -37,10 +41,21 @@ const Doc = {
     return ["text", value];
   },
   delimit(left: Doc, middle: Doc[], right: Doc) {
+    if (middle.length === 0) {
+      return Doc.concat([left, right]);
+    }
+    const [h, ...t] = middle;
     return Doc.group([
       left,
-      Doc.nest(2, Doc.concat(middle.flatMap((it) => [Doc.line(), it]))),
-      Doc.line(),
+      Doc.nest(
+        2,
+        Doc.concat([
+          Doc.limitLine(),
+          h,
+          ...t.flatMap((it) => [Doc.line(), it]),
+        ]),
+      ),
+      Doc.limitLine(),
       right,
     ]);
   },
@@ -53,7 +68,9 @@ function flatten(doc: Doc): Doc {
     case "error":
       return doc;
     case "line":
-      return ["text", " "];
+      return Doc.text(" ");
+    case "limit line":
+      return Doc.concat([]);
     case "nest":
       return flatten(doc[2]);
     case "text":
@@ -101,6 +118,7 @@ function be(width: number, count: number, pairs: [number, Doc][]): Doc2 | null {
         null
       );
     case "line":
+    case "limit line":
       return be(width, indent, pairs)?.push(indent) || null;
     case "text":
       return be(width, count += doc[1].length, pairs)?.push(doc[1]) || null;
@@ -117,26 +135,32 @@ function be(width: number, count: number, pairs: [number, Doc][]): Doc2 | null {
   }
 }
 
+type Combi = {
+  doc: Doc;
+  duration: number;
+};
 export class Printer {
+  constructor(private groupingDuration = 2) {}
+
   pretty(width: number, ast: AST): string | undefined {
     const file = this.#file(ast);
     return be(width, 0, [[0, file]])?.layout();
   }
 
   #file(ast: AST): Doc {
-    const node = this.#node(ast.main, ast.sections);
+    const node = this.#node(ast.main, ast.sections, 0.25);
     if (Object.keys(ast.metadata).length === 0) {
-      return node;
+      return node.doc;
     }
     return Doc.group([
-      node,
+      node.doc,
       Doc.text(","),
       Doc.line(),
       this.#map(ast.metadata),
     ]);
   }
 
-  #map(map: Record<string, Value>, key?: string) {
+  #map(map: Record<string, Value>, key?: string): Doc {
     return Doc.delimit(
       this.#assign(Doc.text("{"), key),
       Object.entries(map).map(([k, v]) => this.#value(v, k)),
@@ -212,59 +236,94 @@ export class Printer {
     return Doc.text(y.join(""));
   }
 
-  static RATIO = 2;
-  // simplistic grouping
-  // to be replaced with grouping by measure
-  // how? we have a kind of interpreter here,
-  // it just needs a time variable
-  #group(doc: Doc[]): Doc[] {
-    let group: Doc[] = [];
-    const groups: Doc[] = [];
-    const l = Math.ceil(Math.sqrt(doc.length * Printer.RATIO));
-    for (let i = 0; i < doc.length; i++) {
-      group.push(doc[i]);
-      if (i % l === l - 1) {
-        groups.push(Doc.group(group));
-        group = [];
+  /* use duration to group a series of documents. The idea was to put each measure on a
+  line. Currently it just takes a duration of 2 whole notes, which can be set in the
+  constructor.
+   */
+  #group(combies: Combi[]): Combi[] {
+    if (combies.length === 0) return [];
+    const groups: Combi[] = [];
+    let group: Doc[] = [combies[0].doc];
+    let time = combies[0].duration;
+    for (let i = 1; i < combies.length; i++) {
+      const { duration, doc } = combies[i];
+      if (time + duration / 2 >= this.groupingDuration) {
+        groups.push({ doc: Doc.group(group), duration: time });
+        group = [doc];
+        time = duration;
       } else {
+        time += duration;
         group.push(Doc.line());
+        group.push(doc);
       }
     }
-    if (group.length > 0) groups.push(Doc.group(group));
+    if (group.length > 0) {
+      groups.push({ doc: Doc.group(group), duration: time });
+    }
     return groups;
   }
 
   #node(
     node: Node,
-    sections: { mark: string; node: Node; done?: boolean }[],
+    sections: { mark: string; node: Node; duration?: number }[],
+    currentDuration: number,
     key?: string,
-  ): Doc {
+  ): Combi {
     switch (node.type) {
       case NodeType.ERROR:
-        return Doc.error(node.error);
+        return { doc: Doc.error(node.error), duration: 0 };
       case NodeType.INSERT: {
         const section = sections[node.index];
         const mark = Doc.text(section.mark);
-        if (!section.done) {
-          section.done = true;
-          return this.#node(section.node, sections, section.mark);
+        if (section.duration === undefined) {
+          const y = this.#node(
+            section.node,
+            sections,
+            currentDuration,
+            section.mark,
+          );
+          section.duration = y.duration;
+          return y;
         }
-        return mark;
+        return { doc: mark, duration: section.duration };
       }
       case NodeType.SET: {
-        return Doc.delimit(
+        let duration = 0;
+        const doc = Doc.delimit(
           this.#assign(
             node.options
               ? this.#options(node.options, Doc.text("{"))
               : Doc.text("{"),
             key,
           ),
-          node.children.map((it) => this.#node(it, sections)),
+          node.children.map((it) => {
+            const { duration: d, doc } = this.#node(
+              it,
+              sections,
+              node.options?.duration?.value || currentDuration,
+            );
+            if (d > duration) duration = d;
+            return doc;
+          }),
           Doc.text("}"),
         );
+        return { doc, duration };
       }
       case NodeType.ARRAY: {
-        return Doc.delimit(
+        const groups = this.#group(
+          node.children.map((child) =>
+            this.#node(
+              child,
+              sections,
+              node.options?.duration?.value || currentDuration,
+            )
+          ),
+        );
+        const duration = groups.reduce(
+          (time, { duration }) => (time += duration),
+          0,
+        );
+        const doc = Doc.delimit(
           this.#assign(
             node.options
               ? this.#options(node.options, Doc.text("["))
@@ -272,28 +331,33 @@ export class Printer {
             key,
           ),
           // group by measure?
-          this.#group(
-            node.children.map((child) => this.#node(child, sections)),
-          ),
+          groups.map(({ doc }) => doc),
           Doc.text("]"),
         );
+        return { doc, duration };
       }
       case NodeType.NOTE: {
         const doc = Doc.text(
           (node.degree | 0).toString() +
             ["--", "-", "", "+", "++"][node.accident + 2],
         );
-        return this.#assign(
-          node.options ? this.#options(node.options, doc) : doc,
-          key,
-        );
+        return {
+          doc: this.#assign(
+            node.options ? this.#options(node.options, doc) : doc,
+            key,
+          ),
+          duration: node.options?.duration?.value || currentDuration,
+        };
       }
       case NodeType.REST: {
         const doc = Doc.text("r");
-        return this.#assign(
-          node.options ? this.#options(node.options, doc) : doc,
-          key,
-        );
+        return {
+          doc: this.#assign(
+            node.options ? this.#options(node.options, doc) : doc,
+            key,
+          ),
+          duration: node.options?.duration?.value || currentDuration,
+        };
       }
     }
   }

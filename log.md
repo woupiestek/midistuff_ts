@@ -1,5 +1,23 @@
 # Midistuff logs
 
+## 2023-11-20
+
+- ~~pretty printer~~
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### pretty printing
+
+Two improvements were:
+
+1. using duration to group notes in sequences together, leading to lines that
+   are broken up sensibly.
+2. introducing a special line document for delimiters, which is replaced by an
+   empy string.
+
+It took little time to get nice results.
+
 ## 2023-11-19
 
 - pretty printer
