@@ -18,6 +18,50 @@ Two improvements were:
 
 It took little time to get nice results.
 
+### nwctxt
+
+Copy and paste generates the same format:
+
+!NoteWorthyComposerClip(2.751,Single) |Clef|Type:Treble
+|Key|Signature:Bb|Tonic:F |TimeSig|Signature:3/4 |Dynamic|Style:mp|Pos:8
+|Tempo|Tempo:115|Pos:12 |Rest|Dur:4th
+|Note|Dur:8th,Slur|Pos:-5|Opts:Stem=Up,Beam=First
+|Note|Dur:8th,Slur|Pos:-4|Opts:Stem=Up,Beam=End
+|Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=First
+|Note|Dur:8th,Slur|Pos:-1|Opts:Stem=Up,Beam=End !NoteWorthyComposerClip-End
+
+The goals is to writing a parser for an unknown language. Though it should not
+be too hard, since this language was for machine manipulation...
+
+Do we really get different types of token out of this file? The main issue is
+that each symbol may have implications for what to do with the following ones,
+And I don't know any of the rules.
+
+!NoteWorthyComposerClip(2.751,Single) |Chord|Dur:Half|Pos:2,4
+!NoteWorthyComposerClip-End
+
+I could just look at existing converters
+
+The list of symbols is :
+`!"(),-./0123456789:<=>ABCDEFGHIJKLMNOPRSTUVWYZ^abcdefghiklmnoprstuvwxyz|©`
+
+- numbers and letters are obvious
+- `!` first & last line, delmit the file
+- `"` string encoding, straightforward
+- `()` first line only--no structural use
+- `,` for lists throughout the file
+- `-` negative numbers
+- `.` 5 uses: version and page margins
+- `/` 2 uses: time signatures
+- `:` key value association, it seems
+- `<>` only used inside strings
+- `=` key value associeitons withing lists
+- `^` a tie! discovered by adding it to a clipping and pasting it back in
+- `|` seem like a sigil for keywords
+- `©` used once in a string.
+
+Note that sometimes newlines are used, other times that are not.
+
 ## 2023-11-19
 
 - pretty printer
