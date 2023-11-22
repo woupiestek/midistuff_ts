@@ -72,12 +72,11 @@ const transformer = new Transformer({
   bass: { voice: 2 },
 });
 const lilyponder = new Lilyponder();
-const encoder = new TextEncoder();
 Deno.test(function simpleExample() {
   assertEquals(Ratio.int(0).compare(Ratio.int(1)), -1);
   const sample = '"treble" [ 0 1 2 0 ]';
   const result = lilyponder.process(
-    transformer.transform(new Parser(encoder.encode(sample)).parse()),
+    transformer.transform(new Parser(sample).parse()),
   );
   assertEquals(result, "<<{c'4 d'4 e'4 c'4}>>");
 });

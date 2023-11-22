@@ -1,5 +1,15 @@
 # Midistuff logs
 
+## 2023-11-22
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### continue analysis
+
+Every seem te represent one object, with a class name and a few attributes.
+
 ## 2023-11-20
 
 - ~~pretty printer~~
@@ -37,7 +47,7 @@ Do we really get different types of token out of this file? The main issue is
 that each symbol may have implications for what to do with the following ones,
 And I don't know any of the rules.
 
-!NoteWorthyComposerClip(2.751,Single) |Chord|Dur:Half|Pos:2,4
+!NoteWorthyComposerClip(2.751,Single) |Note|Dur:4th|Pos:0
 !NoteWorthyComposerClip-End
 
 I could just look at existing converters

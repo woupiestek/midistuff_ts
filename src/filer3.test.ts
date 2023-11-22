@@ -3,11 +3,9 @@ import { Filer } from "./filer3.ts";
 import { Parser } from "./parser3.ts";
 import { MessageType } from "./midiTypes.ts";
 
-const textEncoder = new TextEncoder();
-
 Deno.test(function simpleMelody() {
   const { file } = new Filer(
-    new Parser(textEncoder.encode("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]")).parse(),
+    new Parser("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
   );
 
   assertEquals(file.tracks[1].length, 9);
@@ -30,20 +28,12 @@ Deno.test(function simpleMelody() {
 });
 
 Deno.test(function durations() {
-  assertEquals(
-    new Filer(new Parser(textEncoder.encode("_13/16[0]")).parse()).time,
-    312,
-  );
-  assertEquals(
-    new Filer(new Parser(textEncoder.encode("[_13/16 0]")).parse()).time,
-    312,
-  );
+  assertEquals(new Filer(new Parser("_13/16[0]").parse()).time, 312);
+  assertEquals(new Filer(new Parser("[_13/16 0]").parse()).time, 312);
 });
 
 Deno.test(function simpleChord() {
-  const { file } = new Filer(
-    new Parser(textEncoder.encode("_/2{ 0 2- 4 }")).parse(),
-  );
+  const { file } = new Filer(new Parser("_/2{ 0 2- 4 }").parse());
   assertEquals(file.tracks[1].length, 7);
   assertEquals(
     file.tracks[1].filter(({ event }) => event?.type === MessageType.noteOff)
@@ -64,9 +54,7 @@ Deno.test(function simpleChord() {
 });
 
 Deno.test(function simpleRepeat() {
-  const { file } = new Filer(
-    new Parser(textEncoder.encode("[$C = _/4 0 $C]")).parse(),
-  );
+  const { file } = new Filer(new Parser("[$C = _/4 0 $C]").parse());
   assertEquals(file.tracks[1].length, 5);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 2);
   // assertEquals(messages.filter((it) => it.message[0] === 144).length, 2);
@@ -75,9 +63,7 @@ Deno.test(function simpleRepeat() {
 
 Deno.test(function simpleProgram() {
   const { file } = new Filer(
-    new Parser(
-      textEncoder.encode('"program_64" [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]'),
-    ).parse(),
+    new Parser('"program_64" [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]').parse(),
   );
   assertEquals(file.tracks[1].length, 10);
   // assertEquals(messages[0].message[0], 0xc0);
@@ -88,9 +74,7 @@ Deno.test(function simpleProgram() {
 
 Deno.test(function otherParamsChange() {
   const { file } = new Filer(
-    new Parser(
-      textEncoder.encode('"vivace" key 3 "fff" [ _/8 0 1 2 0 _/8 r ]'),
-    ).parse(),
+    new Parser('"vivace" key 3 "fff" [ _/8 0 1 2 0 _/8 r ]').parse(),
   );
   assertEquals(file.tracks[1].length, 9);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
@@ -102,14 +86,12 @@ Deno.test(function otherParamsChange() {
 Deno.test(function jacob() {
   const { file } = new Filer(
     new Parser(
-      textEncoder.encode(
-        '"allegro" "f" [\n' +
-          "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
-          "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
-          "% this was a puzzle to get right!\n" +
-          "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
-          "$D = [_/8 0 -3 _/2 0 _/8 r] $D\n]",
-      ),
+      '"allegro" "f" [\n' +
+        "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
+        "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
+        "% this was a puzzle to get right!\n" +
+        "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
+        "$D = [_/8 0 -3 _/2 0 _/8 r] $D\n]",
     ).parse(),
   );
   assertEquals(file.tracks[1].length, 65);

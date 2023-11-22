@@ -7,17 +7,11 @@ if (Deno.args.length < 1) {
   Deno.exit(64);
 }
 
-const data = await Deno.readFile(Deno.args[0]);
+const data = await Deno.readTextFile(Deno.args[0]);
 const { messages, realTime } = new Interpreter(new Parser(data).parse());
 const midi_out = new midi.Output();
 midi_out.openPort(0);
 for (const { realTime, message } of messages) {
-  setTimeout(
-    () => midi_out.sendMessage(message),
-    Math.floor(realTime),
-  );
+  setTimeout(() => midi_out.sendMessage(message), Math.floor(realTime));
 }
-setTimeout(
-  () => console.log("done"),
-  Math.floor(realTime) + 250,
-);
+setTimeout(() => console.log("done"), Math.floor(realTime) + 250);

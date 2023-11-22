@@ -49,7 +49,7 @@ export class Scanner {
   #current = 0;
   #from = 0;
   #line = 1;
-  constructor(private readonly source: Uint8Array) {}
+  constructor(private readonly source: string) {}
 
   #token(type: TokenType, value?: number): Token {
     return {
@@ -66,21 +66,21 @@ export class Scanner {
   }
 
   #match(char: string): boolean {
-    if (this.done() || this.source[this.#current] !== CODES[char]) return false;
+    if (this.done() || this.source[this.#current] !== char) return false;
     this.#current++;
     return true;
   }
 
   #pop(): number {
     if (this.done()) throw new Error(`Out of input`);
-    return this.source[this.#current++];
+    return this.source.charCodeAt(this.#current++);
   }
 
   #text(): Token {
     for (;;) {
       if (this.done()) return this.#token(TokenType.ERROR);
-      if (this.source[this.#current++] === CODES['"']) {
-        if (this.source[this.#current] === CODES['"']) {
+      if (this.source[this.#current++] === '"') {
+        if (this.source[this.#current] === '"') {
           this.#current++;
         } else return this.#token(TokenType.TEXT);
       }
@@ -89,7 +89,7 @@ export class Scanner {
 
   #whitespace() {
     while (!this.done()) {
-      const value = this.source[this.#current];
+      const value = this.source.charCodeAt(this.#current);
       if (Scanner.#white(value)) {
         this.#current++;
         if (value === CODES["\n"]) {
@@ -143,14 +143,16 @@ export class Scanner {
   }
 
   #identifier() {
-    while (!this.done() && Scanner.#ic(this.source[this.#current])) {
+    while (!this.done() && Scanner.#ic(this.source.charCodeAt(this.#current))) {
       this.#current++;
     }
   }
 
   #integer(value: number, positive: boolean): Token {
-    while (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
-      value = 10 * value + (this.source[this.#current++] - 48);
+    while (
+      !this.done() && Scanner.#isDigit(this.source.charCodeAt(this.#current))
+    ) {
+      value = 10 * value + (this.source.charCodeAt(this.#current++) - 48);
     }
     let type = TokenType.INTEGER;
     if (this.#match("+")) {
@@ -176,13 +178,16 @@ export class Scanner {
     if (Scanner.#isLetter(code)) {
       this.#identifier();
       return this.#token(
-        KEYWORDS.getByArray(this.source.slice(this.#from, this.#current)) ||
+        KEYWORDS.get(this.source.slice(this.#from, this.#current)) ||
           TokenType.IDENTIFIER,
       );
     }
     switch (code) {
       case CODES["-"]: {
-        if (!this.done() && Scanner.#isDigit(this.source[this.#current])) {
+        if (
+          !this.done() &&
+          Scanner.#isDigit(this.source.charCodeAt(this.#current))
+        ) {
           return this.#integer(this.#pop() - 48, false);
         }
         return this.#token(TokenType.ERROR);

@@ -6,6 +6,6 @@ if (Deno.args.length < 1) {
   Deno.exit(64);
 }
 
-const data = await Deno.readFile(Deno.args[0]);
+const data = await Deno.readTextFile(Deno.args[0]);
 const printer = new Printer();
 console.log(printer.pretty(64, new Parser(data).parse()));

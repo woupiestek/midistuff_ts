@@ -8,6 +8,6 @@ if (Deno.args.length < 2) {
 
 const printer = new Printer();
 printer.file(
-  new Filer(new Parser(await Deno.readFile(Deno.args[0])).parse()).file,
+  new Filer(new Parser(await Deno.readTextFile(Deno.args[0])).parse()).file,
 );
 await Deno.writeFile(Deno.args[1], new Uint8Array(printer.pop()));

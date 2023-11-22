@@ -57,7 +57,7 @@ export class Parser {
   #current;
   #sections: { mark: string; node: Node }[] = [];
   #bindings: { mark: string; index: number }[] = [];
-  constructor(private readonly source: Uint8Array) {
+  constructor(private readonly source: string) {
     this.#scanner = new Scanner(source);
     this.#current = this.#scanner.next();
   }
@@ -69,9 +69,7 @@ export class Parser {
   #error(message: string) {
     const type = TokenType[this.#current.type];
     const line = this.#current.line;
-    const lexeme = Parser.#decoder.decode(
-      this.source.slice(this.#current.from, this.#current.to),
-    );
+    const lexeme = this.source.slice(this.#current.from, this.#current.to);
     return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
   }
 
@@ -140,7 +138,7 @@ export class Parser {
     }
     const value = this.source.slice(this.#current.from, this.#current.to);
     this.#advance();
-    return Parser.#decoder.decode(value);
+    return value;
   }
 
   #integer(min: number, max: number): number {
@@ -158,8 +156,6 @@ export class Parser {
     this.#current = this.#scanner.next();
     return value;
   }
-
-  static #decoder = new TextDecoder();
 
   #resolve(mark: string): number {
     for (let i = this.#bindings.length - 1; i >= 0; i--) {
@@ -199,10 +195,8 @@ export class Parser {
           this.#duration(options);
           continue;
         case TokenType.TEXT: {
-          const lexeme = Parser.#decoder
-            .decode(
-              this.source.slice(this.#current.from + 1, this.#current.to - 1),
-            )
+          const lexeme = this.source
+            .slice(this.#current.from + 1, this.#current.to - 1)
             .replace('""', '"');
           if (options.labels === undefined) {
             options.labels = new Set([lexeme]);
@@ -378,8 +372,8 @@ export class Parser {
       case TokenType.INTEGER:
         return token2.value || 0;
       case TokenType.TEXT:
-        return Parser.#decoder
-          .decode(this.source.slice(token2.from + 1, token2.to - 1))
+        return this.source
+          .slice(token2.from + 1, token2.to - 1)
           .replace('""', '"');
       default:
         throw this.#error(
@@ -397,8 +391,8 @@ export class Parser {
         case TokenType.RIGHT_BRACE:
           return result;
         case TokenType.TEXT:
-          key = Parser.#decoder
-            .decode(this.source.slice(token1.from + 1, token1.to - 1))
+          key = this.source
+            .slice(token1.from + 1, token1.to - 1)
             .replace('""', '"');
           break;
         default:
