@@ -37,13 +37,19 @@ export class Ratio {
   plus(that: Ratio) {
     return new Ratio(
       this.numerator * that.denominator + this.denominator * that.numerator,
-      this.denominator * that.denominator,
+      this.denominator * that.denominator
+    );
+  }
+  times(that: Ratio) {
+    return new Ratio(
+      this.numerator * that.numerator,
+      this.denominator * that.denominator
     );
   }
   minus(that: Ratio) {
     return new Ratio(
       this.numerator * that.denominator - this.denominator * that.numerator,
-      this.denominator * that.denominator,
+      this.denominator * that.denominator
     );
   }
   compare(that: Ratio) {
@@ -66,4 +72,8 @@ export class Ratio {
   get value() {
     return this.numerator / this.denominator;
   }
+}
+
+export function unique<A>(element: A, index: number, array: A[]) {
+  return index === 0 || array[index - 1] !== element;
 }
