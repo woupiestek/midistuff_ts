@@ -6,6 +6,50 @@
 - generate music xml / lilypond
 - review metadata (are limited ranges of values okay?)
 
+### nwctxt
+
+There is a specific problem with turning chords with tied notes into polyfony
+and back. Though I have a solution of sorts for the 'back' direction, that one
+computes the position of notes in time, and then works from that. The way back
+might be harder.
+
+It seems like my version of the scores have more structure: groups of notes can
+be nested without limit. Those nests would have to be deduced from the notation,
+even when there is on objectively right way.
+
+Soppose there is a sequence of chords each is tied to the next in at least one
+note, but each also has a note that starts there, or that ends there. The
+regrouping turns that into parallel voices with unbroken notes. The question is:
+how?
+
+Ideas:
+
+- some kind of voice leading algorithm. Find melodies in the weave, by just
+  picking notes left as available.
+- minimize voices: begin by splitting in two sets of chords, in a way that lets
+  tied notes be merged together. Extra splits feel better, though.
+- perhaps a divide an conquer system, based on missing ties? I mean, break up
+  the sequence of chord in halves, take the notes that prevent the merger out?
+- assign values based on what note could belong to the same voice.
+- just calculate start times and durations. Does that make anything easier?
+
+What if the number of notes per chord varies? Is polyphony better than voices
+with nested chords? I should first make an algorithm that can do it, and then
+make it nice.
+
+The first chord lead to a split: the tied notes versus the untied ones. The
+second chord can subdivide the previously tied notes in two groups again: the
+once that stop and the ones that go on, and splits its own notes in those two
+groups as well. By the third one, the notes come in six groups. `2n` as number of groups for 
+`n` chords. Basically, any combination of starting an stopping chord is a group here,
+though.
+
+## 2023-11-22
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
 ### continue analysis
 
 Every seem te represent one object, with a class name and a few attributes.

@@ -20,7 +20,7 @@ export class Parser {
     return new Error(
       `Failed to parse ${
         TokenType[this.#current.type]
-      } '${this.#lexeme()}' at line ${this.#current.line}: ${msg}`
+      } '${this.#lexeme()}' at line ${this.#current.line}: ${msg}`,
     );
   }
 
@@ -31,7 +31,7 @@ export class Parser {
   #consume(type: TokenType) {
     if (this.#current.type !== type) {
       throw this.#error(
-        `Expected ${TokenType[type]}, got ${TokenType[this.#current.type]}`
+        `Expected ${TokenType[type]}, got ${TokenType[this.#current.type]}`,
       );
     }
     this.#advance();

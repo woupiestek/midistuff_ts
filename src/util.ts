@@ -37,19 +37,19 @@ export class Ratio {
   plus(that: Ratio) {
     return new Ratio(
       this.numerator * that.denominator + this.denominator * that.numerator,
-      this.denominator * that.denominator
+      this.denominator * that.denominator,
     );
   }
   times(that: Ratio) {
     return new Ratio(
       this.numerator * that.numerator,
-      this.denominator * that.denominator
+      this.denominator * that.denominator,
     );
   }
   minus(that: Ratio) {
     return new Ratio(
       this.numerator * that.denominator - this.denominator * that.numerator,
-      this.denominator * that.denominator
+      this.denominator * that.denominator,
     );
   }
   compare(that: Ratio) {

@@ -96,8 +96,8 @@ export class Scanner {
     this.#returns();
     this.#from = this.#current;
     switch (this.#pop()) {
-      case undefined: 
-      return this.#token(TokenType.END);
+      case undefined:
+        return this.#token(TokenType.END);
       case "!":
         this.#bang();
         return this.#token(TokenType.BANG);
