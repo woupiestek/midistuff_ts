@@ -1,5 +1,45 @@
 # Midistuff logs
 
+## 2023-11-26
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### untying
+
+Work back to front, from the chord that does not have ties forward. No spliting
+up of voices is needed if some notes end early. The starting late are the issue.
+
+Breaking up into voices ok, how many levels do we want? Puting every tone in its
+won voice always works, so it is interesting to reduce the number of voices at
+much as possible. This means that voices must break up and combine all the time.
+This seems to imply nesting to arbitrary depth.
+
+There is another approach, which is to compute time and duration from start,
+then fit the results togetehr again.
+
+1. ordinarily all notes with the same start times can be joined togtehr in a
+   chord.
+2. The late start is the problem, so a split is needed between and here is a
+   choice: the notes that end in time can fit before the late starters, or a
+   rest can be put in their place. Which makes more sense?
+
+The main thing is, it all ends at a chord without ties, so that is the point
+when the number of voices goes down.
+
+After break up into any number of voices, multiple of them can end at the same
+time, creating an opportunity to join them together.
+
+Very basic: first group notes together with the same start Then break these
+groups based on which end before the next group of notes.
+
+### alternatives
+
+Assume the number of voices throughout is the max number of element per chord.
+Of course, no need to groep untied chords together, so the number of voices
+stays limited. I.e. at that point open voices can be closed.
+
 ## 2023-11-25
 
 - ~~duration limitation~~

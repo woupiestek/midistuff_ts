@@ -1,7 +1,9 @@
 import { mod, Ratio } from "../util.ts";
 import { Row, Value } from "./parser.ts";
 
-type Pitch = { degree: number; alter: number; tie: boolean };
+type Pitch = { tone: number; tie: boolean };
+const TONES = [0, 2, 4, 5, 7, 9, 11];
+
 type Chord = {
   staff: number;
   duration: Ratio;
@@ -122,10 +124,7 @@ export class Processor {
       this.#last !== undefined &&
       this.#last.staff === this.#staff &&
       this.#last.pitches.length === pitches.length &&
-      this.#last.pitches.every(
-        ({ degree, alter }, i) =>
-          pitches[i].degree === degree && pitches[i].alter === alter,
-      )
+      this.#last.pitches.every(({ tone }, i) => pitches[i].tone === tone)
     ) {
       this.#last.duration = this.#last.duration.plus(duration);
       this.#last.pitches = pitches;
@@ -195,7 +194,8 @@ export class Processor {
     if (i !== Pos.length) {
       console.warn(`Problems with position ${Pos}`);
     }
-    return { degree, alter, tie };
+    const tone = 60 + Math.floor(degree / 7) * 12 + TONES[index] + alter;
+    return { tone, tie };
   }
 
   #duration(Dur: Value[]) {
@@ -238,4 +238,64 @@ export class Processor {
     }
     return duration;
   }
+}
+
+// voices for the whole length,
+// or deeply nested structures?
+// actually, pttuing every note in a seperate voice always works,
+// so being economical with voices withing the constraint that
+// tones cannot be tied seems to be the way to go.
+
+type Note = { pitch?: Pitch; duration: Ratio };
+type Voice = { notes: Note[] };
+type Phrase = { voices: Voice[] };
+type Staff = { phrases: Phrase[] };
+
+function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
+  const a = array.pop();
+  if (a === undefined || condition(a)) return a;
+  for (let i = 0; i < array.length; i++) {
+    if (condition(array[i])) {
+      const b = array[i];
+      array[i] = a;
+      return b;
+    }
+  }
+  return undefined;
+}
+
+export function untie(chords: Chord[]): Staff {
+  const phrases: Phrase[] = [];
+  const closed: { start: Ratio; tone: number; stop: Ratio }[] = [];
+  const open: { start: Ratio; tone: number; stop: undefined }[] = [];
+  let max = 0;
+  let time = Ratio.int(0);
+  for (let i = 0; i < chords.length; i++) {
+    const chord = chords[i];
+    if (max < chord.pitches.length) {
+      max = chord.pitches.length;
+    }
+    const stop = time.plus(chord.duration);
+    // plan: just collect notes until all are closed,
+    // then do something else.
+    for (const pitch of chord.pitches) {
+      const o = take(open, ({ tone }) => tone === pitch.tone) || {
+        start: time,
+        tone: pitch.tone,
+        stop: undefined,
+      };
+      if (pitch.tie) {
+        open.push(o);
+      } else {
+        closed.push({ ...o, stop });
+      }
+    }
+    if (open.length === 0) {
+      closed.sort((a, b) => a.start.compare(b.start));
+      // todo
+      // the aim is to
+    }
+    time = stop;
+  }
+  return { phrases };
 }
