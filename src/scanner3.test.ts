@@ -1,5 +1,9 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import {
+  assertEquals,
+  fail,
+} from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Scanner, TokenType } from "./scanner3.ts";
+import { Ratio } from "./util.ts";
 
 function scanAndMatch(input: string, type: TokenType) {
   Deno.test(`scan '${input}' gives ${TokenType[type]}`, () => {
@@ -18,10 +22,20 @@ scanAndMatch("[", TokenType.LEFT_BRACKET);
 scanAndMatch("]", TokenType.RIGHT_BRACKET);
 scanAndMatch("r", TokenType.REST);
 scanAndMatch("=", TokenType.IS);
-scanAndMatch("_", TokenType.UNDERSCORE);
-scanAndMatch("/", TokenType.SLASH);
 scanAndMatch("{", TokenType.LEFT_BRACE);
 scanAndMatch("}", TokenType.RIGHT_BRACE);
+
+Deno.test(function scanDuration() {
+  const scanner = new Scanner("_3/4");
+  const { type, from, to, line, value } = scanner.next();
+  assertEquals(type, TokenType.DURATION);
+  if (!(value instanceof Ratio)) fail("Wrong value type");
+  assertEquals(value.numerator, 3);
+  assertEquals(value.denominator, 4);
+  assertEquals(from, 0);
+  assertEquals(to, 4);
+  assertEquals(line, 1);
+});
 
 Deno.test(function scanInteger() {
   const scanner = new Scanner("1739");

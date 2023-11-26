@@ -5,15 +5,20 @@ import { AST } from "./parser3.ts";
 export class Interpreter {
   messages: { realTime: number; message: number[] }[] = [];
   realTime = 0;
-  constructor(ast: AST) {
-    this.#process(new MidiPlanner(ast));
+  constructor(ast: AST, from: number, to: number) {
+    this.#process(new MidiPlanner(ast), from, to);
   }
 
-  #process(planner: MidiPlanner) {
+  #process(planner: MidiPlanner, from: number, to: number) {
     const tempo = 2.4e5 / planner.bpm;
-    let lastTime = 0;
+    let lastTime = from;
+    let realTime = 0;
     for (const { time, event } of planner.messages) {
-      this.realTime += tempo * (time - lastTime);
+      if (time < from) {
+        continue;
+      }
+      if (time > to) break;
+      realTime += tempo * (time - lastTime);
       lastTime = time;
       if (event === null || event.type === MessageType.meta) continue;
       const message = [(event.type << 4) | event.channel];
@@ -39,7 +44,8 @@ export class Interpreter {
           message.push(0x7f & event.value, (event.value >> 7) + 0x40);
           break;
       }
-      this.messages.push({ realTime: this.realTime, message });
+      this.messages.push({ realTime, message });
     }
+    this.realTime = realTime;
   }
 }

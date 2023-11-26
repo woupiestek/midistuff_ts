@@ -146,7 +146,7 @@ export class Parser {
       throw this.#error(`Expected an integer`);
     }
     const value = this.#current.value;
-    if (value === undefined) {
+    if (typeof value !== "number") {
       // should not be reachable
       throw this.#error(`Expected integer to have a value`);
     }
@@ -164,18 +164,6 @@ export class Parser {
     throw this.#error(`Could not resolve '${mark}'`);
   }
 
-  #duration(options: Options) {
-    let numerator = 1;
-    let denominator = 1;
-    if (this.#current.type === TokenType.INTEGER) {
-      numerator = this.#integer(1, Number.MAX_SAFE_INTEGER);
-    }
-    if (this.#match(TokenType.SLASH)) {
-      denominator = this.#integer(1, Number.MAX_SAFE_INTEGER);
-    }
-    options.duration = new Ratio(numerator, denominator);
-  }
-
   #options(): Options | undefined {
     const options: Options = {};
     a: for (;;) {
@@ -187,12 +175,13 @@ export class Parser {
           this.#advance();
           options.key = this.#integer(-7, 7);
           continue;
-        case TokenType.UNDERSCORE:
-          if (options.duration !== undefined) {
-            throw this.#error("Double duration");
+        case TokenType.DURATION:
+          if (this.#current.value instanceof Ratio) {
+            options.duration = this.#current.value;
+            this.#advance();
+          } else {
+            throw new Error("expected a ratio");
           }
-          this.#advance();
-          this.#duration(options);
           continue;
         case TokenType.TEXT: {
           const lexeme = this.source
@@ -221,7 +210,7 @@ export class Parser {
 
   #note(accident: -2 | -1 | 0 | 1 | 2, options?: Options): Node {
     const degree = this.#current.value;
-    if (degree === undefined) {
+    if (typeof degree !== "number") {
       // should not be reachable
       throw this.#error(`Expected integer to have a value`);
     }
@@ -370,7 +359,8 @@ export class Parser {
       case TokenType.LEFT_BRACKET:
         return this.#array();
       case TokenType.INTEGER:
-        return token2.value || 0;
+        if (typeof token2.value === "number") return token2.value;
+        else throw new Error("Expected integer here");
       case TokenType.TEXT:
         return this.source
           .slice(token2.from + 1, token2.to - 1)

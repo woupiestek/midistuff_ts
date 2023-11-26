@@ -1,8 +1,10 @@
 import {} from "https://deno.land/std@0.184.0/path/_constants.ts";
 import { TrieMap } from "./trieMap.ts";
+import { Ratio } from "./util.ts";
 
 export enum TokenType {
   COMMA,
+  DURATION,
   END,
   ERROR,
   IDENTIFIER,
@@ -18,9 +20,7 @@ export enum TokenType {
   REST,
   RIGHT_BRACE,
   RIGHT_BRACKET,
-  SLASH,
   TEXT,
-  UNDERSCORE,
 }
 
 export type Token = {
@@ -28,7 +28,7 @@ export type Token = {
   from: number;
   to: number;
   line: number;
-  value?: number;
+  value?: number | Ratio;
 };
 
 export const Token = {
@@ -51,7 +51,7 @@ export class Scanner {
   #line = 1;
   constructor(private readonly source: string) {}
 
-  #token(type: TokenType, value?: number): Token {
+  #token(type: TokenType, value?: number | Ratio): Token {
     return {
       type,
       value,
@@ -150,7 +150,8 @@ export class Scanner {
 
   #integer(value: number, positive: boolean): Token {
     while (
-      !this.done() && Scanner.#isDigit(this.source.charCodeAt(this.#current))
+      !this.done() &&
+      Scanner.#isDigit(this.source.charCodeAt(this.#current))
     ) {
       value = 10 * value + (this.source.charCodeAt(this.#current++) - 48);
     }
@@ -165,6 +166,30 @@ export class Scanner {
         : TokenType.INTEGER_MINUS;
     }
     return this.#token(type, positive ? value : -value);
+  }
+
+  #duration(): Token {
+    let numerator = 0;
+    while (
+      !this.done() &&
+      Scanner.#isDigit(this.source.charCodeAt(this.#current))
+    ) {
+      numerator = 10 * numerator +
+        (this.source.charCodeAt(this.#current++) - 48);
+    }
+    if (numerator === 0) numerator = 1;
+    let denominator = 0;
+    if (this.#match("/")) {
+      while (
+        !this.done() &&
+        Scanner.#isDigit(this.source.charCodeAt(this.#current))
+      ) {
+        denominator = 10 * denominator +
+          (this.source.charCodeAt(this.#current++) - 48);
+      }
+    }
+    if (denominator === 0) denominator = 1;
+    return this.#token(TokenType.DURATION, new Ratio(numerator, denominator));
   }
 
   next(): Token {
@@ -204,10 +229,8 @@ export class Scanner {
         return this.#token(TokenType.RIGHT_BRACE);
       case CODES["="]:
         return this.#token(TokenType.IS);
-      case CODES["/"]:
-        return this.#token(TokenType.SLASH);
       case CODES["_"]:
-        return this.#token(TokenType.UNDERSCORE);
+        return this.#duration();
       case CODES['"']:
         return this.#text();
       case CODES["$"]:

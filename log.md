@@ -1,5 +1,23 @@
 # Midistuff logs
 
+## 2023-11-25
+
+- ~~duration limitation~~
+- ~~partial playback somehow~~
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### problem
+
+Underscore and slash now functions as operators, allowing white space inside
+durations. It also means `_` on its own is a valid duration before anything but
+a note. This was practical: a token can now contain an optional value of type
+number, but I wanted durations to be `Ratio` instead. To turn durations into
+tokens, more types of value will have to be supported.
+
+For now, I will have the printer print `_1` instead of `_`.
+
 ## 2023-11-22
 
 - generate from nwctxt
@@ -40,9 +58,9 @@ make it nice.
 The first chord lead to a split: the tied notes versus the untied ones. The
 second chord can subdivide the previously tied notes in two groups again: the
 once that stop and the ones that go on, and splits its own notes in those two
-groups as well. By the third one, the notes come in six groups. `2n` as number of groups for 
-`n` chords. Basically, any combination of starting an stopping chord is a group here,
-though.
+groups as well. By the third one, the notes come in six groups. `2n` as number
+of groups for `n` chords. Basically, any combination of starting an stopping
+chord is a group here, though.
 
 ## 2023-11-22
 
