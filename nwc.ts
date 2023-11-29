@@ -21,5 +21,4 @@ console.log(dur.sort().filter(unique));
 
 const processor = new Processor();
 output.forEach((it) => processor.push(it));
-console.log(processor.output);
-// console.log(new Scanner(await Deno.readTextFile(Deno.args[0])).next());
+console.log(processor.staves);

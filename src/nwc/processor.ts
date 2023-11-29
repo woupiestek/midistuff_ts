@@ -5,7 +5,6 @@ type Pitch = { tone: number; tie: boolean };
 const TONES = [0, 2, 4, 5, 7, 9, 11];
 
 type Chord = {
-  staff: number;
   duration: Ratio;
   pitches: Pitch[];
 };
@@ -13,13 +12,24 @@ export class Processor {
   #offset = 6; // for treble clef
   #signature: number[] = [0, 0, 0, 0, 0, 0, 0];
   #accidentals: number[] = [0, 0, 0, 0, 0, 0, 0];
-  #staff = 0;
-  output: Chord[] = [];
+  #chords: Chord[] = [];
+  #staves: Staff[] = [];
+
+  get staves() {
+    if (this.#chords.length > 0) {
+      this.#staves.push(untie(this.#chords));
+      this.#chords.length = 0;
+    }
+    return this.#staves;
+  }
 
   push(row: Row) {
     switch (row.class) {
       case "AddStaff":
-        this.#staff++;
+        if (this.#chords.length > 0) {
+          this.#staves.push(untie(this.#chords));
+          this.#chords.length = 0;
+        }
         break;
       case "Bar":
         this.#accidentals = Array.from(this.#signature);
@@ -75,6 +85,12 @@ export class Processor {
           const i = { A: 5, B: 6, C: 0, D: 1, E: 2, F: 3, G: 4 }[s[0]] || 7;
           this.#signature[i] = { "#": 1, b: -1 }[s[1]] || 0;
         }
+
+        // two things: compute that key &
+        // group notes together under the signature
+        // Noteworthy allows used defined signatures, even allowing combinations of flats and sharps.
+        // what is the best fitting regular signature?
+
         this.#accidentals = Array.from(this.#signature);
         break;
       case "Note": {
@@ -117,34 +133,8 @@ export class Processor {
     }
   }
 
-  #last: Chord | undefined = undefined;
-
   #add(duration: Ratio, pitches: Pitch[]) {
-    if (
-      this.#last !== undefined &&
-      this.#last.staff === this.#staff &&
-      this.#last.pitches.length === pitches.length &&
-      this.#last.pitches.every(({ tone }, i) => pitches[i].tone === tone)
-    ) {
-      this.#last.duration = this.#last.duration.plus(duration);
-      this.#last.pitches = pitches;
-      for (let i = 0; i < pitches.length; i++) {
-        if (!pitches[i].tie) {
-          this.#last = undefined;
-          return;
-        }
-      }
-      return;
-    }
-
-    const x = { staff: this.#staff, duration, pitches };
-    this.output.push(x);
-    if (pitches.every(({ tie }) => tie)) {
-      this.#last = x;
-    } else {
-      this.#last = undefined;
-    }
-    return;
+    this.#chords.push({ duration, pitches });
   }
 
   #positions(Pos: Value[]): Pitch[] {
@@ -240,15 +230,13 @@ export class Processor {
   }
 }
 
-// voices for the whole length,
-// or deeply nested structures?
-// actually, pttuing every note in a seperate voice always works,
-// so being economical with voices withing the constraint that
-// tones cannot be tied seems to be the way to go.
-
-type Note = { pitch?: Pitch; duration: Ratio };
+// note or rest actually: that is why tone is optional
+type Note = { tone?: number; duration: Ratio };
+// a sequence of notes
 type Voice = { notes: Note[] };
+// parallel sequences over a short time
 type Phrase = { voices: Voice[] };
+// a sequence of phrases
 type Staff = { phrases: Phrase[] };
 
 function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
@@ -270,6 +258,7 @@ export function untie(chords: Chord[]): Staff {
   const open: { start: Ratio; tone: number; stop: undefined }[] = [];
   let max = 0;
   let time = Ratio.int(0);
+  let phraseStart = Ratio.int(0);
   for (let i = 0; i < chords.length; i++) {
     const chord = chords[i];
     if (max < chord.pitches.length) {
@@ -292,8 +281,43 @@ export function untie(chords: Chord[]): Staff {
     }
     if (open.length === 0) {
       closed.sort((a, b) => a.start.compare(b.start));
-      // todo
-      // the aim is to
+      // set up expected number of voices
+      const vs: { start: Ratio; tone?: number; stop: Ratio }[][] = [];
+      for (let i = 0; i < max; i++) {
+        vs[i] = [];
+      }
+      // greedy algorithm for placing notes:
+      // just pick the first voice where it fits
+      // there should be enough space, but perhaps the voice leading would be bad
+      // or something combinatorial could go off.
+      a: for (let i = 0; i < closed.length; i++) {
+        const x = closed[i];
+        for (const v of vs) {
+          const s = v.length === 0 ? phraseStart : v[v.length - 1].stop;
+          const c = s.compare(x.start);
+          if (c > 0) continue;
+          if (c < 0) {
+            // insert rest
+            v.push({ start: s, stop: x.start });
+          }
+          v.push(x);
+          continue a;
+        }
+        // sanity check
+        throw new Error(`Failed to place ${JSON.stringify(x)}`);
+      }
+      const voices: Voice[] = [];
+      for (const v of vs) {
+        const notes: Note[] = [];
+        for (const n of v) {
+          notes.push({ tone: n.tone, duration: n.stop.minus(n.start) });
+        }
+        voices.push({ notes });
+      }
+      phrases.push({ voices });
+      // set these values for the next 'phrase'
+      phraseStart = stop;
+      closed.length = 0;
     }
     time = stop;
   }

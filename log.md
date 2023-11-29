@@ -1,12 +1,35 @@
 # Midistuff logs
 
+## 2023-11-29
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### grouping
+
+Dynamics and key signatures offer the challenge that they apply to groups of
+notes, but only their start is marked.
+
+Dynamics could be added to every note, but that makes less sense for the keys.
+Worse still, everything could intersect...
+
+The keys are tricky because notes can even tie over key signatures. What
+grouping of notes to use in such cases?
+
+Sort of hindsight best fit idea. To some extend needed since noteworthy allows
+so much in key signatures.
+
+Tied notes create possibilities in notation, that may not be too meaningful, and
+rightfully left out of my system. This does raise questions on how to translate.
+
 ## 2023-11-26
 
 - generate from nwctxt
 - generate music xml / lilypond
 - review metadata (are limited ranges of values okay?)
 
-### untying
+### untieing
 
 Work back to front, from the chord that does not have ties forward. No spliting
 up of voices is needed if some notes end early. The starting late are the issue.
