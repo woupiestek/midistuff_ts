@@ -1,5 +1,24 @@
 # Midistuff logs
 
+## 2023-12-4
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### pythagorean coordinates
+
+Count in whole and half tones. Note: a whole tone then in not two half tones,
+they are independent units. Reason to encode tones like that. Firstly, correctly
+and uniquely identify all notes and intervals. Secondly, simplify computation,
+by allowing straightforward addition of intervals. Important! The distance
+between c and c sharp must be considered as whole minus half.
+
+c: 25W + 10H, c#: 26W + 9H, d: 26W + 10H, eb: 26W + 11H,
+e: 27W + 10H, f: 27W + 9H, : 26W + 10H, eb: 26W + 11H,
+c: 25W + 10H, c#: 26W + 9H, d: 26W + 10H, eb: 26W + 11H,
+
+
 ## 2023-11-29
 
 - generate from nwctxt
