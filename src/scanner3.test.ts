@@ -95,7 +95,7 @@ Deno.test(function scanIdentifier() {
 });
 
 Deno.test(function scanText() {
-  const scanner = new Scanner('"make "" it 😉 hard\n"');
+  const scanner = new Scanner("'make '' it 😉 hard\n'");
   const { type, from, to, line, value } = scanner.next();
   assertEquals(type, TokenType.TEXT);
   assertEquals(value, undefined);

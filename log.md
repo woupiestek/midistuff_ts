@@ -2,6 +2,13 @@
 
 ## 2023-12-4
 
+- ~~reconsider number of quotes on labels (' vs ")~~
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+## 2023-12-4
+
 - generate from nwctxt
 - generate music xml / lilypond
 - review metadata (are limited ranges of values okay?)
@@ -14,10 +21,20 @@ and uniquely identify all notes and intervals. Secondly, simplify computation,
 by allowing straightforward addition of intervals. Important! The distance
 between c and c sharp must be considered as whole minus half.
 
-c: 25W + 10H, c#: 26W + 9H, d: 26W + 10H, eb: 26W + 11H,
-e: 27W + 10H, f: 27W + 9H, : 26W + 10H, eb: 26W + 11H,
-c: 25W + 10H, c#: 26W + 9H, d: 26W + 10H, eb: 26W + 11H,
+c: 25W + 10H, c#: 26W + 9H, d: 26W + 10H, eb: 26W + 11H, e: 27W + 10H, f: 27W +
+11H, f#: 28W + 10H, g: 28W + 11H, g#: 29W + 10H, a: 28W + 11H, bb: 28W + 12H, b:
+29W + 11H,
 
+### diatonic scoring
+
+Could the multiplicity of the third overtone: W is 2 and H is -5. Result: c:0,
+d:2, e:4, f:-1, g:1, a:3, b:5, pretty much the places in the circle of fifths.
+Note however, that this gives a way to compute key signatures. For c, the
+numbers for all the notes together add up to 14. Each sharp adds 7, each flat
+subtracks 7. So divide by 7 and subtract 2. This also gives results for
+noteworthy's 'custom' signatures.
+
+Actually, this is the same as adding sharps and subtracting flats!
 
 ## 2023-11-29
 

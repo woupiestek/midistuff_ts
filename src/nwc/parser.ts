@@ -9,11 +9,15 @@ export type Row = {
 export class Parser {
   #scanner: Scanner;
   #current: Token;
-  output: Row[] = [];
+
   constructor(private readonly source: string) {
     this.#scanner = new Scanner(source);
     this.#current = this.#scanner.next();
-    this.#file();
+    this.#consume(TokenType.BANG);
+  }
+
+  done() {
+    return this.#scanner.done() || this.#match(TokenType.BANG);
   }
 
   #error(msg: string) {
@@ -63,7 +67,8 @@ export class Parser {
     }
   }
 
-  #row() {
+  next(): Row {
+    this.#consume(TokenType.PIPE);
     const klaz = this.#key();
     const fields: { [_: string]: Value[] } = {};
     while (this.#match(TokenType.PIPE)) {
@@ -87,10 +92,10 @@ export class Parser {
       fields[key] = values;
     }
     this.#consume(TokenType.LINE);
-    this.output.push({
+    return {
       class: klaz,
       fields,
-    });
+    };
   }
 
   #match(type: TokenType) {
@@ -99,13 +104,5 @@ export class Parser {
       return true;
     }
     return false;
-  }
-
-  #file() {
-    this.#consume(TokenType.BANG);
-    while (this.#match(TokenType.PIPE)) {
-      this.#row();
-    }
-    this.#consume(TokenType.BANG);
   }
 }

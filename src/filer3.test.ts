@@ -63,7 +63,7 @@ Deno.test(function simpleRepeat() {
 
 Deno.test(function simpleProgram() {
   const { file } = new Filer(
-    new Parser('"program_64" [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]').parse(),
+    new Parser("'program_64' [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
   );
   assertEquals(file.tracks[1].length, 10);
   // assertEquals(messages[0].message[0], 0xc0);
@@ -74,7 +74,7 @@ Deno.test(function simpleProgram() {
 
 Deno.test(function otherParamsChange() {
   const { file } = new Filer(
-    new Parser('"vivace" key 3 "fff" [ _/8 0 1 2 0 _/8 r ]').parse(),
+    new Parser("'vivace' key 3 'fff' [ _/8 0 1 2 0 _/8 r ]").parse(),
   );
   assertEquals(file.tracks[1].length, 9);
   // assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
@@ -86,7 +86,7 @@ Deno.test(function otherParamsChange() {
 Deno.test(function jacob() {
   const { file } = new Filer(
     new Parser(
-      '"allegro" "f" [\n' +
+      "'allegro' 'f' [\n" +
         "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
         "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
         "% this was a puzzle to get right!\n" +

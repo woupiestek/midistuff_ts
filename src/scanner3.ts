@@ -79,8 +79,8 @@ export class Scanner {
   #text(): Token {
     for (;;) {
       if (this.done()) return this.#token(TokenType.ERROR);
-      if (this.source[this.#current++] === '"') {
-        if (this.source[this.#current] === '"') {
+      if (this.source[this.#current++] === "'") {
+        if (this.source[this.#current] === "'") {
           this.#current++;
         } else return this.#token(TokenType.TEXT);
       }
@@ -231,7 +231,7 @@ export class Scanner {
         return this.#token(TokenType.IS);
       case CODES["_"]:
         return this.#duration();
-      case CODES['"']:
+      case CODES["'"]:
         return this.#text();
       case CODES["$"]:
         this.#identifier();

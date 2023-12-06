@@ -74,7 +74,7 @@ const transformer = new Transformer({
 const lilyponder = new Lilyponder();
 Deno.test(function simpleExample() {
   assertEquals(Ratio.int(0).compare(Ratio.int(1)), -1);
-  const sample = '"treble" [ 0 1 2 0 ]';
+  const sample = "'treble' [ 0 1 2 0 ]";
   const result = lilyponder.process(
     transformer.transform(new Parser(sample).parse()),
   );

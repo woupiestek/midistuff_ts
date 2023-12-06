@@ -101,7 +101,7 @@ Deno.test(function parseRepeat() {
 
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
-    '"program_64" "vivace" key -3 "fff" _5/16[ _/8 0 1 2 0 _/8 r ]',
+    "'program_64' 'vivace' key -3 'fff' _5/16[ _/8 0 1 2 0 _/8 r ]",
   ).parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
@@ -113,18 +113,18 @@ Deno.test(function parseOperations() {
 });
 
 Deno.test(function parseDoubleDynamics() {
-  const { main: node } = new Parser('"f" "f" _/4[ _/8 0 1 2 0 _/8 r ]').parse();
+  const { main: node } = new Parser("'f' 'f' _/4[ _/8 0 1 2 0 _/8 r ]").parse();
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.token.type, TokenType.TEXT);
   assertEquals(
     node.error.message,
-    "Error at line 1 (TEXT '\"f\"'): Double 'f'",
+    "Error at line 1 (TEXT ''f''): Double 'f'",
   );
 });
 
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(
-    '"allegro" "f" [\n' +
+    "'allegro' 'f' [\n" +
       "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
       "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
       "% this was a puzzle to get right!\n" +
@@ -183,7 +183,7 @@ Deno.test(function noFalseDurations() {
 
 Deno.test(function addMetaData() {
   const { main, metadata } = new Parser(
-    '0,{ "tempo"= 500000 "title"="one note" "cresc poco a poco"={"from"=43"to"=85} "parts"=["piano" "viola"]}',
+    "0,{ 'tempo'= 500000 'title'='one note' 'cresc poco a poco'={'from'=43'to'=85} 'parts'=['piano' 'viola']}",
   ).parse();
   if (main.type === NodeType.ERROR) {
     throw main.error;

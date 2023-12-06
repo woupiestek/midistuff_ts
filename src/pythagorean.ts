@@ -1,50 +1,68 @@
 import { mod } from "./util.ts";
 
-export function pythToMidi(wholes: number, halves: number): number {
-  return 2 * wholes + halves;
-}
+export class Pyth {
+  constructor(readonly wholes: number, readonly halves: number) {}
 
-export type Pyth = {
-  wholes: number;
-  halves: number;
-};
+  toMidi() {
+    return 2 * this.wholes + this.halves;
+  }
 
-// choices have to be made to account for data loss
-export function midiToPyth(tone: number): Pyth {
-  const wholes = Math.floor((tone * 5 + 8) / 12);
-  const halves = tone - 2 * wholes;
-  // t = 2 w + h
-  // 2w - 5h minimized.
-  return { wholes, halves };
+  static fromMidi(tone: number) {
+    const wholes = Math.floor((tone * 5 + 8) / 12);
+    return new Pyth(wholes, tone - 2 * wholes);
+  }
+
+  diatone() {
+    const octave = Math.floor((this.wholes + this.halves / 2) / 6);
+    const tone = "abcdefg"[mod(this.wholes + this.halves + 3, 7)] as
+      | "a"
+      | "b"
+      | "c"
+      | "d"
+      | "e"
+      | "f"
+      | "g";
+    const alter = 2 * this.wholes - 8 * octave - this.halves;
+    return { octave, tone, alter };
+  }
+
+  fifths() {
+    return 2 * this.wholes - 5 * this.halves;
+  }
+
+  toString() {
+    return `${this.wholes}W + ${this.halves}H`;
+  }
+
+  toPitch(key = 0): Pitch {
+    return {
+      degree: this.wholes + this.halves,
+      alter: Math.floor((this.fifths() + 1 - key) / 7),
+    };
+  }
+
+  static fromPitch(key: number, degree: number, alter: number) {
+    return new Pyth(
+      Math.floor((key + 5 * degree + 5) / 7) + alter,
+      Math.floor((-key + 2 * degree + 1) / 7) - alter,
+    );
+  }
+
+  equals(that: Pyth): boolean {
+    return this.wholes === that.wholes && this.halves === that.halves;
+  }
 }
-// cases to get this 'correct'
-// b : 59 : 25w + 9h
-// c : 60 : 25w + 10h
-// f : 65 : 27w + 11h
 
 export type Diatone = {
   octave: number;
   tone: "a" | "b" | "c" | "d" | "e" | "f" | "g";
   alter: number;
 };
-export function pythToDiatone(wholes: number, halves: number): Diatone {
-  const octave = Math.floor((wholes + halves / 2) / 6);
-  const tone = "abcdefg"[mod(wholes + halves + 3, 7)] as
-    | "a"
-    | "b"
-    | "c"
-    | "d"
-    | "e"
-    | "f"
-    | "g";
-  const alter = 2 * wholes - 8 * octave - halves;
-  return { octave, tone, alter };
-}
 
 export function diatoneToPyth(
   octave: number,
   tone: "a" | "b" | "c" | "d" | "e" | "f" | "g",
-  alter: number
+  alter: number,
 ): Pyth {
   const x = {
     a: [4, 1],
@@ -55,7 +73,17 @@ export function diatoneToPyth(
     f: [2, 1],
     g: [3, 1],
   }[tone];
-  const wholes = 5 * octave + x[0] + alter;
-  const halves = 2 * octave + x[1] - alter;
-  return { wholes, halves };
+  return new Pyth(5 * octave + x[0] + alter, 2 * octave + x[1] - alter);
+}
+
+type Pitch = {
+  degree: number;
+  alter: number;
+};
+
+export function pitchToPyth(key: number, degree: number, alter: number) {
+  return new Pyth(
+    Math.floor((key + 5 * degree + 5) / 7) + alter,
+    Math.floor((-key + 2 * degree + 1) / 7) - alter,
+  );
 }

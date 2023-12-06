@@ -186,7 +186,7 @@ export class Parser {
         case TokenType.TEXT: {
           const lexeme = this.source
             .slice(this.#current.from + 1, this.#current.to - 1)
-            .replace('""', '"');
+            .replace("''", "'");
           if (options.labels === undefined) {
             options.labels = new Set([lexeme]);
           } else {

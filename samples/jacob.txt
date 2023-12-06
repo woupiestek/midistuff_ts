@@ -1,4 +1,4 @@
-"program_53" [
+'program_53' [
   A = [
     A = [_/8 0 1 2 0 _/8 r] A
     B = [_/8 2 3 _/2 4 _/8 r] B
@@ -10,4 +10,4 @@
   % changing the program or octave now is not possible, alas
   { [A A] [_2r A] [_4r A] [_6r A] }
 ],
-{ "bpm" = 135 }
+{ 'bpm' = 135 }
