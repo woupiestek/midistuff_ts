@@ -4,8 +4,12 @@ import { Parser, Row, Value } from "./parser.ts";
 
 type Pitch = { tone: Pyth; tie: boolean };
 
+type Event = { time: Ratio; offset?: number; key?: number; signature?: string };
+type TempoEvent = { time: Ratio; bpm: string };
+
 type Chord = {
-  duration: Ratio;
+  start: Ratio;
+  stop: Ratio;
   pitches: Pitch[];
 };
 export class Processor {
@@ -27,11 +31,10 @@ export class Processor {
   }
 
   get staves() {
-    if (this.#chords.length > 0) {
-      this.#staves.push(untie(this.#chords));
-      this.#chords.length = 0;
-    }
-    return this.#staves;
+    return {
+      tempo: this.#tempo,
+      staves: this.#staves,
+    };
   }
 
   #header() {
@@ -45,6 +48,8 @@ export class Processor {
     }
   }
 
+  #time = Ratio.ZERO;
+
   #staff() {
     // todo: capture data
     for (;;) {
@@ -56,12 +61,20 @@ export class Processor {
       }
     }
     this.#chords.length = 0;
+    this.#events = [];
+    this.#time = Ratio.ZERO;
     while (!this.parser.done() && this.#current.class !== "AddStaff") {
       this.#row();
       this.#current = this.parser.next();
     }
-    this.#staves.push(untie(this.#chords));
+    this.#staves.push({
+      events: this.#events,
+      phrases: untie(this.#chords),
+    });
   }
+
+  #events: Event[] = [];
+  #tempo: TempoEvent[] = [];
 
   #row() {
     switch (this.#current.class) {
@@ -106,6 +119,7 @@ export class Processor {
           default:
             break;
         }
+        this.#events.push({ time: this.#time, offset: this.#offset });
         break;
       case "Dynamic":
         // todo
@@ -128,6 +142,7 @@ export class Processor {
         // what is the best fitting regular signature?
 
         this.#accidentals = Array.from(this.#signature);
+        this.#events.push({ time: this.#time, key: this.#key });
         break;
       case "Note": {
         // Dur, Pos, Opts
@@ -146,19 +161,35 @@ export class Processor {
       case "SustainPedal":
         // todo;
         break;
-      case "Tempo":
-        // todo;
+      case "Tempo": {
+        const bpm = this.#current.fields.Tempo[0];
+        if (typeof bpm === "string") {
+          this.#tempo.push({ time: this.#time, bpm });
+        } else console.log("unprocessed tempo", this.#current.fields.Tempo);
         break;
-      case "TimeSig":
-        // todo
+      }
+      case "TimeSig": {
+        const signature = this.#current.fields.Signature[0];
+        if (typeof signature === "string") {
+          this.#events.push({
+            time: this.#time,
+            signature: signature,
+          });
+        } else {console.log(
+            "unprocessed time signature",
+            this.#current.fields.Signature,
+          );}
         break;
+      }
       default:
         throw new Error(`class ${this.#current.class} not supported`);
     }
   }
 
   #add(duration: Ratio, pitches: Pitch[]) {
-    this.#chords.push({ duration, pitches });
+    const stop = this.#time.plus(duration);
+    this.#chords.push({ start: this.#time, stop, pitches });
+    this.#time = stop;
   }
 
   #positions(Pos: Value[]): Pitch[] {
@@ -214,7 +245,7 @@ export class Processor {
 }
 
 function duration(Dur: Value[]) {
-  let duration = Ratio.int(0);
+  let duration = Ratio.ZERO;
   switch (Dur[0]) {
     case "4th":
       duration = new Ratio(1, 4);
@@ -226,7 +257,7 @@ function duration(Dur: Value[]) {
       duration = new Ratio(1, 2);
       break;
     case "Whole":
-      duration = Ratio.int(1);
+      duration = Ratio.ONE;
       break;
   }
   // interesting to see what pops up after
@@ -261,7 +292,7 @@ type Voice = { notes: Note[] };
 // parallel sequences over a short time
 type Phrase = { voices: Voice[] };
 // a sequence of phrases
-type Staff = { phrases: Phrase[] };
+type Staff = { events: Event[]; phrases: Phrase[] };
 
 function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
   const a = array.pop();
@@ -276,31 +307,27 @@ function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
   return undefined;
 }
 
-export function untie(chords: Chord[]): Staff {
+export function untie(chords: Chord[]): Phrase[] {
   const phrases: Phrase[] = [];
   const closed: { start: Ratio; tone: Pyth; stop: Ratio }[] = [];
   const open: { start: Ratio; tone: Pyth; stop: undefined }[] = [];
   let max = 0;
-  let time = Ratio.int(0);
-  let phraseStart = Ratio.int(0);
+  let phraseStart = Ratio.ZERO;
   for (let i = 0; i < chords.length; i++) {
     const chord = chords[i];
     if (max < chord.pitches.length) {
       max = chord.pitches.length;
     }
-    const stop = time.plus(chord.duration);
-    // plan: just collect notes until all are closed,
-    // then do something else.
     for (const pitch of chord.pitches) {
       const o = take(open, ({ tone }) => tone.equals(pitch.tone)) || {
-        start: time,
+        start: chord.start,
         tone: pitch.tone,
         stop: undefined,
       };
       if (pitch.tie) {
         open.push(o);
       } else {
-        closed.push({ ...o, stop });
+        closed.push({ ...o, stop: chord.stop });
       }
     }
     if (open.length === 0) {
@@ -340,10 +367,9 @@ export function untie(chords: Chord[]): Staff {
       }
       phrases.push({ voices });
       // set these values for the next 'phrase'
-      phraseStart = stop;
+      phraseStart = chord.stop;
       closed.length = 0;
     }
-    time = stop;
   }
-  return { phrases };
+  return phrases;
 }

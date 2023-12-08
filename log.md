@@ -1,5 +1,27 @@
 # Midistuff logs
 
+## 2023-12-8
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### groupings
+
+Group stuff together, to attach propertties to notes. what to do with tied notes
+then, though?
+
+- Clef: important for notation, does not remain in notes
+- Dynamics: can only affect notes later on.
+- Key: this is needed, and has the same logic as dynamics.
+- Sustain on and off: seperate events, could just get their own score. so...
+- Tempo: this affects everthing, it does not belong anywhere
+- Time signature: important for notation, not recording in thet notes.
+
+So Clef and Time Signature are merely for notation, and key is somewhat like
+that. Dynamic and Key have a delayd logic: they apply to lots of. Sustain is
+like its parallel sequence of notes. Tempo: belongs in its own lane.
+
 ## 2023-12-4
 
 - ~~reconsider number of quotes on labels (' vs ")~~
@@ -440,16 +462,16 @@ Aim for something like this, perhaps:
 ```
 {"bpm" = 140} key 1 "allegro" "f" _/8 [
   $A = [
-    4 1 5 6 1 5 4 [0+, 3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5 
-      [2-, 4] [1, 6] _/4 4 _5/8 4 4 1 5 6 1 5 4 2 4 _/4 2 
-      _5/8 2, _ [-3, -1] -2 -6 -1 0 -6 -1 -2 [-3, -6] _ [-4, 0] 
-      -3 -6 -2 -1 -6 -2 -3 [-4, -6] _ [-3, -1] -2 -7 -1 0 -7 -1 
+    4 1 5 6 1 5 4 [0+, 3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5
+      [2-, 4] [1, 6] _/4 4 _5/8 4 4 1 5 6 1 5 4 2 4 _/4 2
+      _5/8 2, _ [-3, -1] -2 -6 -1 0 -6 -1 -2 [-3, -6] _ [-4, 0]
+      -3 -6 -2 -1 -6 -2 -3 [-4, -6] _ [-3, -1] -2 -7 -1 0 -7 -1
       -2 [-7+, -3]
   ]
   [
     3 1 4 5 0+ 4 3 [0+, 2] _/2 [0, 1] _/2 [0, 3], -2 -6 -1 0
       -5 -1 -2 -5+ _/2 [-4, -2] _/2 [-6, -2+]
-  ] 
+  ]
   $A
   [
     3 1 4 5 1 4 3 1 _ [1, 4], -2 -6 -1 0 -5 -1 -2 -4 _
@@ -480,12 +502,12 @@ space.
 
 ```
 {"bpm" = 140} key 1 "allegro" "f" _/8 [$A = [4 1 5 6 1 5 4 [0+,
-      3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5 [2-, 4] [1, 6] _/4 4 
+      3] [0, 5] _/4 3 _5/8 3 5 1 6 7 2 6 5 [2-, 4] [1, 6] _/4 4
     _5/8 4 4 1 5 6 1 5 4 2 4 _/4 2 _5/8 2, _ [-3, -1] -2 -6 -1 0
-    -6 -1 -2 [-3, -6] _ [-4, 0] -3 -6 -2 -1 -6 -2 -3 [-4, -6] _ 
+    -6 -1 -2 [-3, -6] _ [-4, 0] -3 -6 -2 -1 -6 -2 -3 [-4, -6] _
     [-3, -1] -2 -7 -1 0 -7 -1 -2 [-7+, -3]] [3 1 4 5 0+ 4 3 [0+,
       2] _/2 [0, 1] _/2 [0, 3], -2 -6 -1 0 -5 -1 -2 -5+ _/2 [-4,
-      -2] _/2 [-6, -2+]] $A [3 1 4 5 1 4 3 1 _ [1, 4], -2 -6 -1 
+      -2] _/2 [-6, -2+]] $A [3 1 4 5 1 4 3 1 _ [1, 4], -2 -6 -1
     0 -5 -1 -2 -4 _ [-3, -1]]]
 ```
 
@@ -1018,7 +1040,7 @@ Note: perhaps the ultimate solution is to build a trie of operands, each with
 separate token types. Main exception is duration: every note and rest has one,
 and a lot is allowed. There are non hex numbers too, for tempo and program, etc.
 
-This could be split up: the normal pattern becomes (rest/note duration)*,
+This could be split up: the normal pattern becomes (rest/note duration)\*,
 seperated with spaces if needed. duration follows, because the note or rest
 applies to it i.e. they are not themselves the events.
 

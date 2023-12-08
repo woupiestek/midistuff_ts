@@ -69,6 +69,8 @@ export class Ratio {
   static int(n: number) {
     return new Ratio(n | 0, 1);
   }
+  static ZERO = Ratio.int(0);
+  static ONE = Ratio.int(1);
   get value() {
     return this.numerator / this.denominator;
   }
