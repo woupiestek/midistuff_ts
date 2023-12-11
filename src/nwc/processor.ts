@@ -4,36 +4,47 @@ import { Parser, Row, Value } from "./parser.ts";
 
 type Pitch = { tone: Pyth; tie: boolean };
 
-type Event = { time: Ratio; offset?: number; key?: number; signature?: string };
+type Event = {
+  time: Ratio;
+  offset?: number;
+  key?: number;
+  signature?: string;
+  dynamic?: string;
+  pedal?: boolean;
+};
 type TempoEvent = { time: Ratio; bpm: string };
 
-type Chord = {
-  start: Ratio;
-  stop: Ratio;
-  pitches: Pitch[];
-};
+// note or rest actually: that is why tone is optional
+type Note = { tone?: Pyth; duration: Ratio };
+// a sequence of notes
+type Voice = { notes: Note[] };
+type Phrase = { start: Ratio; voices: Voice[]; events: Event[] };
+type Staff = { phrases: Phrase[] };
 export class Processor {
   #offset = 6; // for treble clef
   #signature: number[] = [0, 0, 0, 0, 0, 0, 0];
   #accidentals: number[] = [0, 0, 0, 0, 0, 0, 0];
-  #chords: Chord[] = [];
-  #staves: Staff[] = [];
   #key = 0;
 
   #current: Row;
 
   constructor(private parser: Parser) {
     this.#current = parser.next();
-    this.#header();
-    while (this.#current.class === "AddStaff") {
-      this.#staff();
-    }
   }
 
-  get staves() {
+  staves() {
+    this.#header();
+    const staves: Staff[] = [];
+    while (this.#current.class === "AddStaff") {
+      this.#offset = 6; // for treble clef
+      this.#signature = [0, 0, 0, 0, 0, 0, 0];
+      this.#accidentals = [0, 0, 0, 0, 0, 0, 0];
+      this.#key = 0;
+      staves.push(this.#staff());
+    }
     return {
       tempo: this.#tempo,
-      staves: this.#staves,
+      staves,
     };
   }
 
@@ -41,17 +52,15 @@ export class Processor {
     while (
       ["Editor", "Font", "PgMargins", "PgSetup", "SongInfo"].includes(
         this.#current.class,
-      ) &&
-      !this.parser.done()
+      )
     ) {
-      this.#current = this.parser.next();
+      this.#advance();
     }
   }
 
   #time = Ratio.ZERO;
 
-  #staff() {
-    // todo: capture data
+  #staff(): Staff {
     for (;;) {
       this.#current = this.parser.next();
       if (
@@ -60,142 +69,207 @@ export class Processor {
         break;
       }
     }
-    this.#chords.length = 0;
-    this.#events = [];
     this.#time = Ratio.ZERO;
+    const phrases: Phrase[] = [];
     while (!this.parser.done() && this.#current.class !== "AddStaff") {
-      this.#row();
-      this.#current = this.parser.next();
+      phrases.push(this.#phrase());
     }
-    this.#staves.push({
-      events: this.#events,
-      phrases: untie(this.#chords),
-    });
+    return {
+      phrases,
+    };
   }
 
-  #events: Event[] = [];
   #tempo: TempoEvent[] = [];
 
-  #row() {
-    switch (this.#current.class) {
-      case "Bar":
-        this.#accidentals = Array.from(this.#signature);
-        // reset temporary alterations...
-        break;
-      case "Chord": {
-        // Dur, Pos, Opts
-        // todo: Opts
-        this.#add(
-          duration(this.#current.fields.Dur),
-          this.#positions(this.#current.fields.Pos),
-        );
-        break;
-      }
-      case "Clef":
-        switch (this.#current.fields.Type[0]) {
-          case "Bass":
-            this.#offset = -6;
-            break;
-          case "Treble":
-            this.#offset = 6;
-            break;
-          case "Alto":
-            this.#offset = 0;
-            break;
-          case "Tenor":
-            this.#offset = -2;
-            break;
-          default:
-            break;
-        }
-        if (!this.#current.fields.OctaveShift) break;
-        switch (this.#current.fields.OctaveShift[0]) {
-          case "Octave Up":
-            this.#offset += 7;
-            break;
-          case "Octave Down":
-            this.#offset -= 7;
-            break;
-          default:
-            break;
-        }
-        this.#events.push({ time: this.#time, offset: this.#offset });
-        break;
-      case "Dynamic":
-        // todo
-        break;
-      case "Key":
-        this.#key = 0;
-        // todo: actually capture the key and use it
-        for (const s of this.#current.fields.Signature) {
-          const i = "CDEFGAB".indexOf(s[0]);
-          this.#signature[i] = { "#": 1, b: -1 }[s[1]] || 0;
-          // count sharps and flats to determine.
-          // this has a rounding effect on the customer signatures.
-          this.#key += this.#signature[i];
-          // todo: grouping notes by shared key.
-        }
-
-        // two things: compute that key &
-        // group notes together under the signature
-        // Noteworthy allows used defined signatures, even allowing combinations of flats and sharps.
-        // what is the best fitting regular signature?
-
-        this.#accidentals = Array.from(this.#signature);
-        this.#events.push({ time: this.#time, key: this.#key });
-        break;
-      case "Note": {
-        // Dur, Pos, Opts
-        // todo: Opts
-        this.#add(
-          duration(this.#current.fields.Dur),
-          this.#positions(this.#current.fields.Pos),
-        );
-        break;
-      }
-      case "Rest": {
-        // Dur, Pos, Opts
-        this.#add(duration(this.#current.fields.Dur), []);
-        break;
-      }
-      case "SustainPedal":
-        // todo;
-        break;
-      case "Tempo": {
-        const bpm = this.#current.fields.Tempo[0];
-        if (typeof bpm === "string") {
-          this.#tempo.push({ time: this.#time, bpm });
-        } else console.log("unprocessed tempo", this.#current.fields.Tempo);
-        break;
-      }
-      case "TimeSig": {
-        const signature = this.#current.fields.Signature[0];
-        if (typeof signature === "string") {
-          this.#events.push({
-            time: this.#time,
-            signature: signature,
-          });
-        } else {console.log(
-            "unprocessed time signature",
-            this.#current.fields.Signature,
-          );}
-        break;
-      }
-      default:
-        throw new Error(`class ${this.#current.class} not supported`);
+  #advance() {
+    if (!this.parser.done()) {
+      this.#current = this.parser.next();
     }
   }
 
-  #add(duration: Ratio, pitches: Pitch[]) {
-    const stop = this.#time.plus(duration);
-    this.#chords.push({ start: this.#time, stop, pitches });
-    this.#time = stop;
+  #phrase(): Phrase {
+    const closed: { start: Ratio; tone: Pyth; stop: Ratio }[] = [];
+    const open: { start: Ratio; tone: Pyth; stop: undefined }[] = [];
+    const start = this.#time;
+    let max = 0;
+    let _duration = Ratio.ZERO;
+    let pitches: Pitch[] = [];
+    const events: Event[] = [];
+    for (;;) {
+      switch (this.#current.class) {
+        case "Bar":
+          // reset temporary alterations...
+          this.#accidentals = Array.from(this.#signature);
+          this.#advance();
+          continue;
+        case "Chord": {
+          // todo: Opts
+          _duration = duration(this.#current.fields.Dur);
+          pitches = this.#pitches(this.#current.fields.Pos);
+          break;
+        }
+        case "Clef":
+          switch (this.#current.fields.Type[0]) {
+            case "Bass":
+              this.#offset = -6;
+              break;
+            case "Treble":
+              this.#offset = 6;
+              break;
+            case "Alto":
+              this.#offset = 0;
+              break;
+            case "Tenor":
+              this.#offset = -2;
+              break;
+            default:
+              break;
+          }
+          if (!this.#current.fields.OctaveShift) {
+            events.push({ time: this.#time, offset: this.#offset });
+            this.#advance();
+            continue;
+          }
+          switch (this.#current.fields.OctaveShift[0]) {
+            case "Octave Up":
+              this.#offset += 7;
+              break;
+            case "Octave Down":
+              this.#offset -= 7;
+              break;
+            default:
+              break;
+          }
+          events.push({ time: this.#time, offset: this.#offset });
+          this.#advance();
+          continue;
+        case "Dynamic": {
+          const dynamic = this.#current.fields.Style[0];
+          if (typeof dynamic === "string") {
+            events.push({ time: this.#time, dynamic });
+          } else console.log("unprocessed dynamic", this.#current.fields.Style);
+          this.#advance();
+          continue;
+        }
+        case "Key":
+          this.#key = 0;
+          for (const s of this.#current.fields.Signature) {
+            const i = "CDEFGAB".indexOf(s[0]);
+            this.#signature[i] = { "#": 1, b: -1 }[s[1]] || 0;
+            // count sharps and flats to determine.
+            // this has a rounding effect on the custom signatures.
+            this.#key += this.#signature[i];
+          }
+          this.#accidentals = Array.from(this.#signature);
+          events.push({ time: this.#time, key: this.#key });
+          this.#advance();
+          continue;
+        case "Note": {
+          // todo:Opts
+          _duration = duration(this.#current.fields.Dur);
+          pitches = this.#pitches(this.#current.fields.Pos);
+          break;
+        }
+        case "Rest": {
+          // todo:Opts
+          _duration = duration(this.#current.fields.Dur);
+          pitches.length = 0;
+          break;
+        }
+        case "SustainPedal":
+          events.push({
+            time: this.#time,
+            pedal: this.#current.fields.Status?.[0] !== "Released",
+          });
+          this.#advance();
+          continue;
+        case "Tempo": {
+          const bpm = this.#current.fields.Tempo[0];
+          if (typeof bpm === "string") {
+            this.#tempo.push({ time: this.#time, bpm });
+          } else console.log("unprocessed tempo", this.#current.fields.Tempo);
+          this.#advance();
+          continue;
+        }
+        case "TimeSig": {
+          const signature = this.#current.fields.Signature[0];
+          if (typeof signature === "string") {
+            events.push({
+              time: this.#time,
+              signature: signature,
+            });
+          } else {console.log(
+              "unprocessed time signature",
+              this.#current.fields.Signature,
+            );}
+          this.#advance();
+          continue;
+        }
+        default:
+          throw new Error(`class ${this.#current.class} not supported`);
+      }
+      // new chord, rest or note found.
+      const stop = this.#time.plus(_duration);
+      if (max < pitches.length) max = pitches.length;
+      for (const pitch of pitches) {
+        const o = take(open, ({ tone }) => tone.equals(pitch.tone)) || {
+          start: this.#time,
+          tone: pitch.tone,
+          stop: undefined,
+        };
+        if (pitch.tie) {
+          open.push(o);
+        } else {
+          closed.push({ ...o, stop });
+        }
+      }
+      this.#time = stop;
+      this.#advance();
+      if (open.length > 0) continue;
+      // all notes closed
+
+      closed.sort((a, b) => a.start.compare(b.start));
+      // set up expected number of voices
+      const vs: { start: Ratio; tone?: Pyth; stop: Ratio }[][] = [];
+      for (let i = 0; i < max; i++) {
+        vs[i] = [];
+      }
+      // greedy algorithm for placing notes:
+      // just pick the first voice where it fits
+      // there should be enough space, but perhaps the voice leading would be bad
+      // or something combinatorial could go off.
+      a: for (let i = 0; i < closed.length; i++) {
+        const x = closed[i];
+        for (const v of vs) {
+          const s = v.length === 0 ? start : v[v.length - 1].stop;
+          const c = s.compare(x.start);
+          if (c > 0) continue;
+          if (c < 0) {
+            // insert rest
+            v.push({ start: s, stop: x.start });
+          }
+          v.push(x);
+          continue a;
+        }
+        // sanity check
+        throw new Error(`Failed to place ${JSON.stringify(x)}`);
+      }
+      const voices: Voice[] = [];
+      for (const v of vs) {
+        const notes: Note[] = [];
+        for (const n of v) {
+          notes.push({ tone: n.tone, duration: n.stop.minus(n.start) });
+        }
+        voices.push({ notes });
+      }
+      return { events, start, voices };
+    }
   }
 
-  #positions(Pos: Value[]): Pitch[] {
+  #pitches(Pos: Value[]): Pitch[] {
     const pitches: Pitch[] = [];
     for (const pos of Pos) {
-      const pitch = this.#position(pos);
+      const pitch = this.#pitch(pos);
       if (pitch) {
         pitches.push(pitch);
       }
@@ -203,7 +277,7 @@ export class Processor {
     return pitches;
   }
 
-  #position(Pos: Value): Pitch | undefined {
+  #pitch(Pos: Value): Pitch | undefined {
     if (Pos instanceof Array) {
       console.warn(`Problems with position ${Pos}`);
       return undefined;
@@ -285,15 +359,6 @@ function duration(Dur: Value[]) {
   return duration;
 }
 
-// note or rest actually: that is why tone is optional
-type Note = { tone?: Pyth; duration: Ratio };
-// a sequence of notes
-type Voice = { notes: Note[] };
-// parallel sequences over a short time
-type Phrase = { voices: Voice[] };
-// a sequence of phrases
-type Staff = { events: Event[]; phrases: Phrase[] };
-
 function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
   const a = array.pop();
   if (a === undefined || condition(a)) return a;
@@ -305,71 +370,4 @@ function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
     }
   }
   return undefined;
-}
-
-export function untie(chords: Chord[]): Phrase[] {
-  const phrases: Phrase[] = [];
-  const closed: { start: Ratio; tone: Pyth; stop: Ratio }[] = [];
-  const open: { start: Ratio; tone: Pyth; stop: undefined }[] = [];
-  let max = 0;
-  let phraseStart = Ratio.ZERO;
-  for (let i = 0; i < chords.length; i++) {
-    const chord = chords[i];
-    if (max < chord.pitches.length) {
-      max = chord.pitches.length;
-    }
-    for (const pitch of chord.pitches) {
-      const o = take(open, ({ tone }) => tone.equals(pitch.tone)) || {
-        start: chord.start,
-        tone: pitch.tone,
-        stop: undefined,
-      };
-      if (pitch.tie) {
-        open.push(o);
-      } else {
-        closed.push({ ...o, stop: chord.stop });
-      }
-    }
-    if (open.length === 0) {
-      closed.sort((a, b) => a.start.compare(b.start));
-      // set up expected number of voices
-      const vs: { start: Ratio; tone?: Pyth; stop: Ratio }[][] = [];
-      for (let i = 0; i < max; i++) {
-        vs[i] = [];
-      }
-      // greedy algorithm for placing notes:
-      // just pick the first voice where it fits
-      // there should be enough space, but perhaps the voice leading would be bad
-      // or something combinatorial could go off.
-      a: for (let i = 0; i < closed.length; i++) {
-        const x = closed[i];
-        for (const v of vs) {
-          const s = v.length === 0 ? phraseStart : v[v.length - 1].stop;
-          const c = s.compare(x.start);
-          if (c > 0) continue;
-          if (c < 0) {
-            // insert rest
-            v.push({ start: s, stop: x.start });
-          }
-          v.push(x);
-          continue a;
-        }
-        // sanity check
-        throw new Error(`Failed to place ${JSON.stringify(x)}`);
-      }
-      const voices: Voice[] = [];
-      for (const v of vs) {
-        const notes: Note[] = [];
-        for (const n of v) {
-          notes.push({ tone: n.tone, duration: n.stop.minus(n.start) });
-        }
-        voices.push({ notes });
-      }
-      phrases.push({ voices });
-      // set these values for the next 'phrase'
-      phraseStart = chord.stop;
-      closed.length = 0;
-    }
-  }
-  return phrases;
 }

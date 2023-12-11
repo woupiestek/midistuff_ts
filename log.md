@@ -1,5 +1,60 @@
 # Midistuff logs
 
+## 2023-12-11
+
+- generate from nwctxt
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### key and dynamic
+
+Here is the deal: a key sugnature or dynamic may be placed under a tie, which
+essentially means the change applies to untied notes from that point on. It
+could be different for dynamics. In the system of this project notes are grouped
+together and then a dynamic is applied to the whole group. Same for the key.
+
+Ideas:
+
+- Don't solve this edge case, just move the key or dynamic to the start or end
+  of the tied note group. Give an error message, or even ignore the
+  unfortunately placed marking.
+- Come of with a way to group individual voices to best match the intetiona of
+  the marking.
+- Change the model to allow things like this: periods that affect the
+  interpretation of notes, but that don't sync up with their starts and ends.
+- Delayed dynamics: there is an indication that a change in dynamics should come
+  after a delay. This won't be the way we deal with keys, which will simply move
+  to the nearest convenient place. For the dynamic though, the indication could
+  be like "f_in_7/4", and the processor could leave a legenda to explain what
+  indicators like these mean.
+
+Why delayed dynamics: it feels like combining parallel data, but it is a
+transformation of the meansing of the notes in the group.
+
+There is some trouble here: basically, a dynamic remains valid until it is
+revoked. What happens before the delay of a delayed dynamic, however? The
+implication of notation is nested dynamic, each one embedded in the former. This
+is not what I want to come out. The delayed dynamics should be limited to
+dynamics under ties, as a special effect.
+
+Okay, sort the problem I foresee is this: a change from p to f happens halfway
+through a possibly tied note. If we just register what the dynamic changes to,
+then the whole group needs to be part of the previous dynamic grouping for p. So
+either notes get be tied between groups, or three groups are created: the p
+phrases, the f phrases and the dynamic change phrase.
+
+### deriving keys
+
+Every pyth has a diatonic measure. This can be averaged over a group of notes to
+get the avaerge numder of shaprs or flats for that group. Commonly used
+alteration like lead tones in minor scales could skew this assessment. Also,
+this workd from grouping to key signatures. Finding proper groupings could be
+challenging.
+
+### alternatives
+
+XSD.exe can create JS classes from the musicxml xsd. Maybe a better way to go.
+
 ## 2023-12-8
 
 - generate from nwctxt
