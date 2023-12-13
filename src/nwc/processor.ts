@@ -1,3 +1,4 @@
+import { AST, Dict, Node } from "../parser3.ts";
 import { Pyth } from "../pythagorean.ts";
 import { mod, Ratio } from "../util.ts";
 import { Parser, Row, Value } from "./parser.ts";
@@ -32,7 +33,7 @@ export class Processor {
     this.#current = parser.next();
   }
 
-  staves() {
+  staves(): { tempo: TempoEvent[]; staves: Staff[] } {
     this.#header();
     const staves: Staff[] = [];
     while (this.#current.class === "AddStaff") {
@@ -95,6 +96,7 @@ export class Processor {
     let _duration = Ratio.ZERO;
     let pitches: Pitch[] = [];
     const events: Event[] = [];
+    let event: Event | null = null; //{time:this.#time};
     for (;;) {
       switch (this.#current.class) {
         case "Bar":
@@ -126,7 +128,6 @@ export class Processor {
               break;
           }
           if (!this.#current.fields.OctaveShift) {
-            events.push({ time: this.#time, offset: this.#offset });
             this.#advance();
             continue;
           }
@@ -140,14 +141,19 @@ export class Processor {
             default:
               break;
           }
-          events.push({ time: this.#time, offset: this.#offset });
+          if (!event) event = { time: this.#time.minus(start) };
+          event.offset = this.#offset;
           this.#advance();
           continue;
         case "Dynamic": {
           const dynamic = this.#current.fields.Style[0];
           if (typeof dynamic === "string") {
-            events.push({ time: this.#time, dynamic });
-          } else console.log("unprocessed dynamic", this.#current.fields.Style);
+            if (!event) event = { time: this.#time.minus(start) };
+            event.dynamic = dynamic;
+          } else {console.warn(
+              "unprocessed dynamic",
+              this.#current.fields.Style,
+            );}
           this.#advance();
           continue;
         }
@@ -161,7 +167,8 @@ export class Processor {
             this.#key += this.#signature[i];
           }
           this.#accidentals = Array.from(this.#signature);
-          events.push({ time: this.#time, key: this.#key });
+          if (!event) event = { time: this.#time.minus(start) };
+          event.key = this.#key;
           this.#advance();
           continue;
         case "Note": {
@@ -177,28 +184,24 @@ export class Processor {
           break;
         }
         case "SustainPedal":
-          events.push({
-            time: this.#time,
-            pedal: this.#current.fields.Status?.[0] !== "Released",
-          });
+          if (!event) event = { time: this.#time.minus(start) };
+          event.pedal = this.#current.fields.Status?.[0] !== "Released";
           this.#advance();
           continue;
         case "Tempo": {
           const bpm = this.#current.fields.Tempo[0];
           if (typeof bpm === "string") {
             this.#tempo.push({ time: this.#time, bpm });
-          } else console.log("unprocessed tempo", this.#current.fields.Tempo);
+          } else console.warn("unprocessed tempo", this.#current.fields.Tempo);
           this.#advance();
           continue;
         }
         case "TimeSig": {
           const signature = this.#current.fields.Signature[0];
           if (typeof signature === "string") {
-            events.push({
-              time: this.#time,
-              signature: signature,
-            });
-          } else {console.log(
+            if (!event) event = { time: this.#time.minus(start) };
+            event.signature = signature;
+          } else {console.warn(
               "unprocessed time signature",
               this.#current.fields.Signature,
             );}
@@ -223,8 +226,14 @@ export class Processor {
           closed.push({ ...o, stop });
         }
       }
+
       this.#time = stop;
+      if (event) {
+        events.push(event);
+        event = null;
+      }
       this.#advance();
+
       if (open.length > 0) continue;
       // all notes closed
 
@@ -262,6 +271,7 @@ export class Processor {
         }
         voices.push({ notes });
       }
+      if (event) events.push(event);
       return { events, start, voices };
     }
   }
@@ -348,12 +358,12 @@ function duration(Dur: Value[]) {
           duration = duration.times(new Ratio(2, 3));
           break;
         default:
-          console.log("not processed", Dur[i]);
+          console.warn("not processed", Dur[i]);
       }
     } else if (Dur[i] instanceof Array && Dur[i][0] === "Triplet") {
       duration = duration.times(new Ratio(2, 3));
     } else {
-      console.log("not processed", Dur[i]);
+      console.warn("not processed", Dur[i]);
     }
   }
   return duration;
@@ -370,4 +380,107 @@ function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
     }
   }
   return undefined;
+}
+
+export function fullAST(
+  { tempo, staves }: { tempo: TempoEvent[]; staves: Staff[] },
+): AST {
+  const metadata: Dict = { bpm: 120 };
+  const te = tempo.find((te) => !te.time.moreThan(0));
+  if (te) {
+    // ignore all the other tempos for now
+    metadata.bpm = Number.parseInt(te.bpm, 10);
+  }
+
+  // stave is sequence of phrases
+  // groups according to events...
+
+  // offset?: number;
+  // key?: number;
+  // signature?: string;
+  // dynamic?: string;
+  // pedal?: boolean;
+
+  // different treatments again.
+
+  // o boy: duration, key, labels
+  // offset becomes label with attachment
+  // keys can be moved formward
+  // signature becomes label with attachment
+  //
+  // dynamic becomes label
+  // pedal becomes label
+  //
+
+  // lets just take it one at the time!?
+
+  // leave out the label first?
+  const main: Node = staves.length === 0
+    ? staffAST(staves[0])
+    : Node.set(staves.map(staffAST));
+
+  return {
+    metadata,
+    main,
+    sections: [],
+  };
+}
+
+function staffAST({ phrases }: Staff): Node {
+  if (phrases.length === 0) return Node.array([]);
+  if (phrases.length === 1) return phraseAST(phrases[0]);
+  // break up based on events
+  const groups: Node[] = [];
+  let group: Phrase[] = [phrases[0]];
+  for (let i = 0; i < phrases.length; i++) {
+    const phrase = phrases[i];
+    if (phrase.events.length > 0) {
+      if (group.length === 1) {
+        groups.push(phraseAST(group[0]));
+      } else {
+        groups.push(Node.array(group.map(phraseAST)));
+      }
+      group = [phrase];
+    } else {
+      group.push(phrase);
+    }
+  }
+  if (group.length === 1) {
+    groups.push(phraseAST(group[0]));
+  } else {
+    groups.push(Node.array(group.map(phraseAST)));
+  }
+  if (groups.length === 1) {
+    return groups[0];
+  }
+  return Node.array(groups);
+}
+
+function phraseAST({ voices }: Phrase): Node {
+  switch (voices.length) {
+    case 1:
+      return voiceAST(voices[0]);
+    default:
+      return Node.set(voices.map(voiceAST));
+  }
+}
+
+function voiceAST({ notes }: Voice): Node {
+  switch (notes.length) {
+    case 1:
+      return noteAST(notes[0]);
+    default:
+      return Node.array(notes.map(noteAST));
+  }
+}
+
+function noteAST({ tone, duration }: Note) {
+  if (tone) {
+    // todo: get the key
+    const { degree, alter } = tone.toPitch();
+    return Node.note(degree, alter as -2 | -1 | 0 | 1 | 2, {
+      duration,
+    });
+  }
+  return Node.rest({ duration });
 }

@@ -43,6 +43,27 @@ export type Node =
     error: Error;
   };
 
+export const Node = {
+  array(children: Node[], options?: Options): Node {
+    return { type: NodeType.ARRAY, children, options };
+  },
+  error(token: Token, e: Error): Node {
+    return { type: NodeType.ERROR, error: e, token };
+  },
+  insert(index: number): Node {
+    return { type: NodeType.INSERT, index };
+  },
+  note(degree: number, accident: -2 | -1 | 0 | 1 | 2, options?: Options): Node {
+    return { type: NodeType.NOTE, accident, degree, options };
+  },
+  rest(options?: Options): Node {
+    return { type: NodeType.REST, options };
+  },
+  set(children: Node[], options?: Options): Node {
+    return { type: NodeType.SET, children, options };
+  },
+};
+
 export type AST = {
   metadata: Dict;
   main: Node;
@@ -78,7 +99,7 @@ export class Parser {
     try {
       main = this.#node();
     } catch (error) {
-      main = { type: NodeType.ERROR, token: this.#current, error };
+      main = Node.error(this.#current, error);
       return { metadata: {}, main, sections: [] };
     }
     let metadata: Dict = {};
@@ -86,14 +107,13 @@ export class Parser {
       try {
         metadata = this.dict();
       } catch (error) {
-        main = { type: NodeType.ERROR, token: this.#current, error };
+        main = Node.error(this.#current, error);
         return {
           metadata: {},
-          main: {
-            type: NodeType.ERROR,
-            token: this.#current,
-            error: this.#error("error parsing metadata"),
-          },
+          main: Node.error(
+            this.#current,
+            this.#error("error parsing metadata"),
+          ),
           sections: [],
         };
       }
@@ -101,11 +121,7 @@ export class Parser {
     if (!this.#done()) {
       return {
         metadata: {},
-        main: {
-          type: NodeType.ERROR,
-          token: this.#current,
-          error: this.#error("input left over"),
-        },
+        main: Node.error(this.#current, this.#error("input left over")),
         sections: [],
       };
     }
@@ -218,12 +234,11 @@ export class Parser {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
     this.#current = this.#scanner.next();
-    return {
-      type: NodeType.NOTE,
+    return Node.note(
       degree,
       accident,
       options,
-    };
+    );
   }
 
   #node(): Node {
@@ -263,10 +278,7 @@ export class Parser {
           }
         }
         this.#advance();
-        return {
-          type: NodeType.REST,
-          options,
-        };
+        return Node.rest(options);
       default:
         throw this.#error(`Expected note, rest or set here`);
     }
@@ -275,17 +287,11 @@ export class Parser {
   #insert(): Node {
     const mark = this.#mark();
     if (!this.#match(TokenType.IS)) {
-      return {
-        type: NodeType.INSERT,
-        index: this.#resolve(mark),
-      };
+      return Node.insert(this.#resolve(mark));
     }
     const index = this.#sections.push({ mark, node: this.#node() }) - 1;
     this.#bindings.push({ mark, index });
-    return {
-      type: NodeType.INSERT,
-      index,
-    };
+    return Node.insert(index);
   }
 
   #panic() {
@@ -332,7 +338,7 @@ export class Parser {
     } catch (error) {
       const token = this.#current;
       this.#panic();
-      return { type: NodeType.ERROR, error, token };
+      return Node.error(token, error);
     }
   }
 

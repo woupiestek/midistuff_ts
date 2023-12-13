@@ -3,6 +3,24 @@
 ## 2023-12-11
 
 - generate from nwctxt
+  - accents
+  - special bar lines
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### some ideas about the translation
+
+A perfect rendering is not necessary, though the more comes over automatically
+the easier it gets.
+
+### no midi sound
+
+The script is not working anymore. Probabaly lost some dev tools in the factory
+reset.
+
+## 2023-12-11
+
+- generate from nwctxt
 - generate music xml / lilypond
 - review metadata (are limited ranges of values okay?)
 
