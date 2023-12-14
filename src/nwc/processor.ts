@@ -1,4 +1,4 @@
-import { AST, Dict, Node } from "../parser3.ts";
+import { AST, Dict, Node, NodeType, Options } from "../parser3.ts";
 import { Pyth } from "../pythagorean.ts";
 import { mod, Ratio } from "../util.ts";
 import { Parser, Row, Value } from "./parser.ts";
@@ -19,7 +19,7 @@ type TempoEvent = { time: Ratio; bpm: string };
 type Note = { tone?: Pyth; duration: Ratio };
 // a sequence of notes
 type Voice = { notes: Note[] };
-type Phrase = { start: Ratio; voices: Voice[]; events: Event[] };
+type Phrase = { duration: Ratio; voices: Voice[]; events: Event[] };
 type Staff = { phrases: Phrase[] };
 export class Processor {
   #offset = 6; // for treble clef
@@ -90,7 +90,7 @@ export class Processor {
 
   #phrase(): Phrase {
     const closed: { start: Ratio; tone: Pyth; stop: Ratio }[] = [];
-    const open: { start: Ratio; tone: Pyth; stop: undefined }[] = [];
+    const open: { [_: string]: { start: Ratio; tone: Pyth } } = {};
     const start = this.#time;
     let max = 0;
     let _duration = Ratio.ZERO;
@@ -161,6 +161,7 @@ export class Processor {
           this.#key = 0;
           for (const s of this.#current.fields.Signature) {
             const i = "CDEFGAB".indexOf(s[0]);
+            if (i < 0) continue;
             this.#signature[i] = { "#": 1, b: -1 }[s[1]] || 0;
             // count sharps and flats to determine.
             // this has a rounding effect on the custom signatures.
@@ -180,7 +181,7 @@ export class Processor {
         case "Rest": {
           // todo:Opts
           _duration = duration(this.#current.fields.Dur);
-          pitches.length = 0;
+          pitches = [];
           break;
         }
         case "SustainPedal":
@@ -215,14 +216,15 @@ export class Processor {
       const stop = this.#time.plus(_duration);
       if (max < pitches.length) max = pitches.length;
       for (const pitch of pitches) {
-        const o = take(open, ({ tone }) => tone.equals(pitch.tone)) || {
+        const k = pitch.tone.degree;
+        const o = open[k] || {
           start: this.#time,
           tone: pitch.tone,
-          stop: undefined,
         };
         if (pitch.tie) {
-          open.push(o);
+          open[k] = o;
         } else {
+          delete open[k];
           closed.push({ ...o, stop });
         }
       }
@@ -234,7 +236,7 @@ export class Processor {
       }
       this.#advance();
 
-      if (open.length > 0) continue;
+      if (Object.entries(open).length > 0) continue;
       // all notes closed
 
       closed.sort((a, b) => a.start.compare(b.start));
@@ -272,7 +274,7 @@ export class Processor {
         voices.push({ notes });
       }
       if (event) events.push(event);
-      return { events, start, voices };
+      return { events, duration: stop.minus(start), voices };
     }
   }
 
@@ -369,19 +371,6 @@ function duration(Dur: Value[]) {
   return duration;
 }
 
-function take<A>(array: A[], condition: (_: A) => boolean): A | undefined {
-  const a = array.pop();
-  if (a === undefined || condition(a)) return a;
-  for (let i = 0; i < array.length; i++) {
-    if (condition(array[i])) {
-      const b = array[i];
-      array[i] = a;
-      return b;
-    }
-  }
-  return undefined;
-}
-
 export function fullAST(
   { tempo, staves }: { tempo: TempoEvent[]; staves: Staff[] },
 ): AST {
@@ -415,9 +404,7 @@ export function fullAST(
   // lets just take it one at the time!?
 
   // leave out the label first?
-  const main: Node = staves.length === 0
-    ? staffAST(staves[0])
-    : Node.set(staves.map(staffAST));
+  const main: Node = groupDurations(NodeType.SET, staves.map(staffAST));
 
   return {
     metadata,
@@ -427,60 +414,111 @@ export function fullAST(
 }
 
 function staffAST({ phrases }: Staff): Node {
-  if (phrases.length === 0) return Node.array([]);
-  if (phrases.length === 1) return phraseAST(phrases[0]);
-  // break up based on events
   const groups: Node[] = [];
-  let group: Phrase[] = [phrases[0]];
-  for (let i = 0; i < phrases.length; i++) {
-    const phrase = phrases[i];
-    if (phrase.events.length > 0) {
-      if (group.length === 1) {
-        groups.push(phraseAST(group[0]));
-      } else {
-        groups.push(Node.array(group.map(phraseAST)));
-      }
-      group = [phrase];
-    } else {
-      group.push(phrase);
+  let key = 0;
+  let dynamic: string | null = null;
+  for (let i = 0; i < phrases.length;) {
+    let pedal = false;
+    for (const event of phrases[i].events) {
+      if (event.key !== undefined) key = event.key;
+      if (event.pedal) pedal = true;
+      if (event.dynamic) dynamic = event.dynamic;
     }
+    const group: Node[] = [];
+    for (;;) {
+      group.push(phraseAST(phrases[i], key));
+      i++;
+      if (i >= phrases.length || phrases[i].events.length > 0) break;
+    }
+    const labels = [];
+    if (pedal) labels.push("pedal");
+    if (dynamic) labels.push(dynamic);
+    groups.push(groupDurations(
+      NodeType.ARRAY,
+      group,
+      { key, labels: labels.length > 0 ? new Set(labels) : undefined },
+    ));
   }
-  if (group.length === 1) {
-    groups.push(phraseAST(group[0]));
-  } else {
-    groups.push(Node.array(group.map(phraseAST)));
-  }
-  if (groups.length === 1) {
-    return groups[0];
-  }
-  return Node.array(groups);
+  return groupDurations(NodeType.ARRAY, groups);
 }
 
-function phraseAST({ voices }: Phrase): Node {
-  switch (voices.length) {
-    case 1:
-      return voiceAST(voices[0]);
-    default:
-      return Node.set(voices.map(voiceAST));
+function phraseAST({ voices, duration }: Phrase, key: number): Node {
+  if (voices.length === 0) {
+    return Node.rest({ duration });
   }
+  return groupDurations(NodeType.SET, voices.map((v) => voiceAST(v, key)));
 }
 
-function voiceAST({ notes }: Voice): Node {
-  switch (notes.length) {
-    case 1:
-      return noteAST(notes[0]);
-    default:
-      return Node.array(notes.map(noteAST));
-  }
+function voiceAST({ notes }: Voice, key: number): Node {
+  return groupDurations(NodeType.ARRAY, notes.map((n) => noteAST(n, key)));
 }
 
-function noteAST({ tone, duration }: Note) {
+function noteAST({ tone, duration }: Note, key: number) {
   if (tone) {
-    // todo: get the key
-    const { degree, alter } = tone.toPitch();
+    const { degree, alter } = tone.toPitch(key);
     return Node.note(degree, alter as -2 | -1 | 0 | 1 | 2, {
       duration,
     });
   }
   return Node.rest({ duration });
+}
+
+function groupDurations(
+  type: NodeType.ARRAY | NodeType.SET,
+  children: Node[],
+  options: Options = {},
+): Node {
+  if (children.length === 1) {
+    const node = children[0];
+    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) {
+      return node;
+    }
+    if (!node.options) {
+      node.options = options;
+      return node;
+    }
+    node.options.key = options.key || node.options.key;
+    node.options.labels = options.labels || node.options.labels;
+    return children[0];
+  }
+
+  const durations: { [_: string]: [number, Ratio] } = {};
+  const keys: { [_: string]: [number, number] } = {};
+
+  for (const node of children) {
+    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) continue;
+    const duration = node.options?.duration;
+    if (duration instanceof Ratio) {
+      const k = `${duration.numerator}/${duration.denominator}`;
+      durations[k] = [1 + (durations[k]?.[0] || 0), duration];
+    }
+    const key = node.options?.key;
+    if (typeof key === "number") {
+      const k = `${key}`;
+      keys[k] = [1 + (keys[k]?.[0] || 0), key];
+    }
+  }
+
+  const duration = Object.values(durations).find((it) =>
+    it[0] > .5 * children.length
+  )?.[1];
+  if (duration) options.duration = duration;
+  const key = Object.values(keys).find((it) => it[0] > .5 * children.length)
+    ?.[1];
+  if (key !== undefined) options.key = key;
+  options.duration = duration;
+  if (duration !== undefined || key !== undefined) {
+    for (const n of children) {
+      if (n.type === NodeType.ERROR || n.type === NodeType.INSERT) continue;
+      if (
+        duration && n.options?.duration && n.options?.duration.equals(duration)
+      ) {
+        n.options.duration = undefined;
+      }
+      if (key !== undefined && n.options?.key && n.options?.key === key) {
+        n.options.key = undefined;
+      }
+    }
+  }
+  return { type, children, options };
 }

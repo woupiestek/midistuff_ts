@@ -14,7 +14,7 @@ export class Pyth {
 
   diatone() {
     const octave = Math.floor((this.wholes + this.halves / 2) / 6);
-    const tone = "abcdefg"[mod(this.wholes + this.halves + 3, 7)] as
+    const tone = "abcdefg"[mod(this.degree + 3, 7)] as
       | "a"
       | "b"
       | "c"
@@ -34,9 +34,13 @@ export class Pyth {
     return `${this.wholes}W + ${this.halves}H`;
   }
 
+  get degree() {
+    return this.wholes + this.halves;
+  }
+
   toPitch(key = 0): Pitch {
     return {
-      degree: this.wholes + this.halves,
+      degree: this.degree,
       alter: Math.floor((this.fifths() + 1 - key) / 7),
     };
   }

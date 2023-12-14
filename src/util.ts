@@ -57,6 +57,11 @@ export class Ratio {
       this.numerator * that.denominator - this.denominator * that.numerator
     );
   }
+  equals(that: Ratio) {
+    return (
+      this.numerator * that.denominator === this.denominator * that.numerator
+    );
+  }
   less(that: Ratio) {
     return this.compare(that) < 0;
   }

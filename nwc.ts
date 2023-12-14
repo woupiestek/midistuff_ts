@@ -6,5 +6,5 @@ const processor = new Processor(
   new Parser(await Deno.readTextFile(Deno.args[0])),
 );
 
-const printer = new Printer();
+const printer = new Printer(1);
 console.log(printer.pretty(64, fullAST(processor.staves())));
