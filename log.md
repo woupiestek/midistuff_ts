@@ -1,5 +1,53 @@
 # Midistuff logs
 
+## 2023-12-20
+
+- generate from nwctxt
+  - accents
+  - special bar lines
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### silence
+
+The factory reset removed dll linking, which was reinstalled with the help of a
+reinstallation of rust!
+
+### actually running blue
+
+Missing some stuff, mainly pedals and repeats.
+
+I guess up to now I assumed that labels distibute: `'happy' [ x, y, z]` is
+equivalent to `[ 'happy' x, 'happy' y, 'happy' z]` But this does not work for:
+
+- delayed dynamics, which where a way of delaing both with notations as with an
+  effect seen in mozart, where the chour was to switch from 'f' to 'p' halfway
+  down a whole note.
+- dynamic dynamics (crescendo, decresendo)
+- pedals, interpreted as and effect like those dynamics.
+
+Pedals have on and off like midi notes, but they don't have tones or velocities,
+and they modify sound, rather than making it on their own. Which is why I'd
+rather keep them as modifications of sets of tones.
+
+So there is a distinction here. It is the difference between transformations
+that affect each note the same way, and transformations that affect notes as a
+group, but that don't come down to doing the same thing to each individual note.
+
+I could add somthing like function systax, but the semantics make me hesitate:
+should labels commute with functions? Perhaps everything inside the function is
+not affected.
+
+Options:
+
+- have functions
+- have parallel tracks for pedals and perhaps for dynamics
+- have events between the tones
+
+The last one is probably the easiest, and fits with traditional notation.
+Perhaps it makes labels mostly pointless, but at least it does raise difficult
+questions.
+
 ## 2023-12-11
 
 - generate from nwctxt

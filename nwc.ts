@@ -7,4 +7,7 @@ const processor = new Processor(
 );
 
 const printer = new Printer(1);
-console.log(printer.pretty(64, fullAST(processor.staves())));
+const print = printer.pretty(64, fullAST(processor.staves()));
+if (print) {
+  await Deno.writeTextFile(Deno.args[1], print);
+}

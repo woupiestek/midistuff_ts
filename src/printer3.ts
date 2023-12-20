@@ -179,7 +179,7 @@ export class Printer {
   #assign(end: Doc, key?: string): Doc {
     if (!key) return end;
     return Doc.group([
-      Doc.text(key),
+      this.#label(key),
       Doc.line(),
       Doc.text("="),
       Doc.line(),
@@ -202,6 +202,10 @@ export class Printer {
     }
   }
 
+  #label(string: string): Doc {
+    return Doc.text(`'${string.replace("'", "''")}'`);
+  }
+
   #options(options: Options, end: Doc): Doc {
     const docs = [];
     if (options.key) {
@@ -214,7 +218,7 @@ export class Printer {
     }
     if (options.labels) {
       for (const label of options.labels) {
-        docs.push(Doc.text(`"${label.replace('"', '""')}"`), Doc.line());
+        docs.push(this.#label(label), Doc.line());
       }
     }
     if (options.duration) {
