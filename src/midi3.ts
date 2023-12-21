@@ -1,21 +1,19 @@
 import { MessageType, MidiEvent } from "./midiTypes.ts";
-import { AST, Dict } from "./parser3.ts";
-import { Note, Transformer } from "./transformer.ts";
+import { AST } from "./parser3.ts";
+import { Event, Note, Transformer } from "./transformer.ts";
 
-const config: Record<string, Dict> = {};
+const config: Record<string, [string, number]> = {};
 for (let i = 0; i < 128; i++) {
-  config[`program_${i}`] = { program: i };
+  config[`program_${i}`] = ["program", i];
 }
 ["pppp", "ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "ffff"].forEach(
-  (k, i) => (config[k] = { velocity: 1 + 14 * i }),
+  (k, i) => (config[k] = ["velocity", 1 + 14 * i]),
 );
 
 export class MidiPlanner {
-  #transformer = new Transformer(config);
+  #transformer = new Transformer();
   #messages: { time: number; event: MidiEvent }[] = [];
-  // #time = 0;
   #programs: (number | undefined)[] = Array(16);
-  // #sections: { mark: string; node: Node; params?: Params }[];
   bpm = 120;
   time = 0;
   constructor(ast: AST) {
@@ -23,21 +21,66 @@ export class MidiPlanner {
     if (typeof bpm === "number") {
       this.bpm = bpm;
     }
-    for (const note of this.#transformer.transform(ast)) {
-      this.#note(note);
+    for (const item of this.#transformer.transform(ast)) {
+      switch (item.type) {
+        case "event":
+          this.#event(item);
+          break;
+        case "note":
+          this.#note(item);
+          break;
+      }
     }
     this.#messages.sort((x, y) => x.time - y.time);
   }
 
-  #note(_note: Note) {
-    let velocity = _note.attributes.velocity; //||71;
-    if (typeof velocity !== "number") {
-      velocity = 71;
+  #channel = 0;
+  #velocity = 71;
+
+  #event(_event: Event) {
+    switch (_event.value) {
+      case "sustain down":
+        this.#messages.push({
+          time: _event.time.value,
+          event: {
+            type: MessageType.controller,
+            channel: this.#channel,
+            controller: 0x40,
+            value: 0xff,
+          },
+        });
+        return;
+      case "sustain up":
+        this.#messages.push({
+          time: _event.time.value,
+          event: {
+            type: MessageType.controller,
+            channel: this.#channel,
+            controller: 0x40,
+            value: 0,
+          },
+        });
+        return;
+      default:
+        break;
     }
-    const note = Math.floor((425 + 12 * _note.pitch.step) / 7) +
-      _note.pitch.alter;
-    const program = _note.attributes.program;
-    const channel = typeof program === "number" ? this.#getChannel(program) : 0;
+
+    const pair = config[_event.value];
+    if (!pair) return;
+    switch (pair[0]) {
+      case "program":
+        this.#channel = this.#getChannel(pair[1]);
+        return;
+      case "velocity":
+        this.#velocity = pair[1];
+        return;
+    }
+  }
+
+  #note(_note: Note) {
+    const channel = this.#channel;
+    const note = _note.pyth.toMidi() + 60;
+    const velocity = this.#velocity;
     this.#messages.push({
       time: _note.start.value,
       event: { type: MessageType.noteOn, channel, note, velocity },

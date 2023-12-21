@@ -56,37 +56,26 @@ Deno.test(function simpleChord() {
 Deno.test(function simpleRepeat() {
   const { file } = new Filer(new Parser("[$C = _/4 0 $C]").parse());
   assertEquals(file.tracks[1].length, 5);
-  // assertEquals(messages.filter((it) => it.message[0] === 128).length, 2);
-  // assertEquals(messages.filter((it) => it.message[0] === 144).length, 2);
-  // assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
 Deno.test(function simpleProgram() {
   const { file } = new Filer(
-    new Parser("'program_64' [ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
+    new Parser("['program_64' _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
   );
   assertEquals(file.tracks[1].length, 10);
-  // assertEquals(messages[0].message[0], 0xc0);
-  // assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
-  // assertEquals(messages.filter((it) => it.message[0] === 144).length, 4);
-  // assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
 Deno.test(function otherParamsChange() {
   const { file } = new Filer(
-    new Parser("'vivace' key 3 'fff' [ _/8 0 1 2 0 _/8 r ]").parse(),
+    new Parser("key 3 ['vivace' 'fff' _/8 0 1 2 0 _/8 r ]").parse(),
   );
   assertEquals(file.tracks[1].length, 9);
-  // assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
-  // assertEquals(messages.filter((it) => it.message[0] === 144).length, 4);
-  // assertEquals(messages.filter((it) => it.message[1] === 61).length, 4);
-  // assertEquals(messages.filter((it) => it.message[2] === 113).length, 8);
 });
 
 Deno.test(function jacob() {
   const { file } = new Filer(
     new Parser(
-      "'allegro' 'f' [\n" +
+      "['allegro' 'f' \n" +
         "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
         "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
         "% this was a puzzle to get right!\n" +
@@ -95,8 +84,4 @@ Deno.test(function jacob() {
     ).parse(),
   );
   assertEquals(file.tracks[1].length, 65);
-  // assertEquals(messages.filter((it) => it.message[0] === 128).length, 32);
-  // assertEquals(messages.filter((it) => it.message[0] === 144).length, 32);
-  // assertEquals(messages.filter((it) => it.message[1] === 60).length, 20);
-  // assertEquals(messages.filter((it) => it.message[2] === 85).length, 64);
 });

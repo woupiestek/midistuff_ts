@@ -2,7 +2,7 @@ import {
   assertEquals,
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { NodeType, Parser } from "./parser3.ts";
+import { Node, NodeType, Parser } from "./parser3.ts";
 import { TokenType } from "./scanner3.ts";
 
 Deno.test(function parseRest() {
@@ -101,30 +101,25 @@ Deno.test(function parseRepeat() {
 
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
-    "'program_64' 'vivace' key -3 'fff' _5/16[ _/8 0 1 2 0 _/8 r ]",
+    "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
   ).parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
   assertEquals(node.options?.key, -3);
-  assertEquals(node.options?.labels, new Set(["program_64", "vivace", "fff"]));
+  assertEquals(
+    node.children.slice(0, 3).map((it) =>
+      it.type === NodeType.EVENT ? it.value : ""
+    ),
+    ["program_64", "vivace", "fff"],
+  );
   assertEquals(node.options?.duration?.numerator, 5);
   assertEquals(node.options?.duration?.denominator, 16);
 });
 
-Deno.test(function parseDoubleDynamics() {
-  const { main: node } = new Parser("'f' 'f' _/4[ _/8 0 1 2 0 _/8 r ]").parse();
-  if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
-  assertEquals(node.token.type, TokenType.TEXT);
-  assertEquals(
-    node.error.message,
-    "Error at line 1 (TEXT ''f''): Double 'f'",
-  );
-});
-
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(
-    "'allegro' 'f' [\n" +
+    "['allegro' 'f' \n" +
       "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
       "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
       "% this was a puzzle to get right!\n" +
@@ -136,14 +131,12 @@ Deno.test(function parseCombination() {
   }
   assertEquals(sections.length, 4);
   assertEquals(node.options?.key, undefined);
-  assertEquals(node.options?.labels, new Set(["allegro", "f"]));
+  assertEquals(node.children[0], Node.event("allegro"));
+  assertEquals(node.children[1], Node.event("f"));
 });
 
 Deno.test(function parseError() {
   const { main } = new Parser("{ 3h 2 4 }").parse();
-  //if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
-  //assertEquals(node.children.length, 3);
-  //const child = node.children[0];
   if (main.type !== NodeType.ERROR) {
     fail(`wrong child type ${NodeType[main.type]}`);
   }
@@ -172,6 +165,7 @@ Deno.test(function noFalseDurations() {
   }
   const durations = node.children.map((it) =>
     it.type !== NodeType.ERROR &&
+      it.type !== NodeType.EVENT &&
       it.type !== NodeType.INSERT &&
       it.options?.duration?.numerator &&
       it.options?.duration?.denominator

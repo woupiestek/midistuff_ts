@@ -1,5 +1,5 @@
 import { Value } from "./parser3.ts";
-import { Note } from "./transformer.ts";
+import { Event, Note } from "./transformer.ts";
 import { mod, Ratio } from "./util.ts";
 export class FourFourSplitter {
   #chunks: string[] = [];
@@ -101,25 +101,26 @@ export type Placeholder = {
 export class Lilyponder {
   #fourFourSplitter = new FourFourSplitter();
   #pitch(note: Note) {
-    let pitch = "cdefgab"[mod(note.pitch.step, 7)];
-    if (note.pitch.alter < 0) {
-      for (let i = note.pitch.alter; i < 0; i++) {
+    const { degree, alter } = note.pyth.toPitch();
+    let pitch = "cdefgab"[mod(degree, 7)];
+    if (alter < 0) {
+      for (let i = alter; i < 0; i++) {
         pitch += "es";
       }
     }
-    if (note.pitch.alter > 0) {
-      for (let i = 0; i < note.pitch.alter; i++) {
+    if (alter > 0) {
+      for (let i = 0; i < alter; i++) {
         pitch += "is";
       }
     }
-    const octave = 1 + Math.floor(note.pitch.step / 7);
+    const octave = 1 + Math.floor(degree / 7);
     if (octave > 0) for (let i = 0; i < octave; i++) pitch += "'";
     if (octave < 0) for (let i = octave; i < 0; i++) pitch += ",";
     return pitch;
   }
 
   // put both together...
-  process(notes: Note[]) {
+  process(notes: (Event | Note)[]) {
     this.#addAll(notes);
     return this.#stringify();
   }
@@ -177,20 +178,24 @@ export class Lilyponder {
 
   // some invariant to preserve: none of the existing chords may overlap.
   #chords: Chord[][][] = [];
-  #addAll(notes: Note[]) {
+  #addAll(items: (Event | Note)[]) {
     this.#chords.length = 0;
-    for (const note of notes) {
-      const voice = note.attributes.voice;
-
+    let voice = -1;
+    for (const item of items) {
+      if (item.type === "event") {
+        // todo: handle others
+        voice = ["treble", "bass"].indexOf(item.value);
+        continue;
+      }
       // silently ignore?
-      if (voice === undefined) {
+      if (voice < 0) {
         console.warn("Dropping note not assigned to voice");
         continue;
       }
 
       const vi = this.#vi(voice);
-      const bar = note.start.value | 0;
-      this.#add(vi, bar, note);
+      const bar = item.start.value | 0;
+      this.#add(vi, bar, item);
     }
   }
 

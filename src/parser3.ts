@@ -4,6 +4,7 @@ import { Ratio } from "./util.ts";
 export enum NodeType {
   ARRAY,
   ERROR,
+  EVENT,
   INSERT,
   NOTE,
   REST,
@@ -12,7 +13,6 @@ export enum NodeType {
 export type Options = {
   duration?: Ratio;
   key?: number;
-  labels?: Set<string>;
 };
 
 export type Dict = { [_: string]: Value };
@@ -26,6 +26,10 @@ export type Node =
   | {
     type: NodeType.INSERT;
     index: number;
+  }
+  | {
+    type: NodeType.EVENT;
+    value: string;
   }
   | {
     type: NodeType.REST;
@@ -49,6 +53,9 @@ export const Node = {
   },
   error(token: Token, e: Error): Node {
     return { type: NodeType.ERROR, error: e, token };
+  },
+  event(value: string): Node {
+    return { type: NodeType.EVENT, value };
   },
   insert(index: number): Node {
     return { type: NodeType.INSERT, index };
@@ -199,21 +206,6 @@ export class Parser {
             throw new Error("expected a ratio");
           }
           continue;
-        case TokenType.TEXT: {
-          const lexeme = this.source
-            .slice(this.#current.from + 1, this.#current.to - 1)
-            .replace("''", "'");
-          if (options.labels === undefined) {
-            options.labels = new Set([lexeme]);
-          } else {
-            if (options.labels.has(lexeme)) {
-              throw this.#error(`Double '${lexeme}'`);
-            }
-            options.labels.add(lexeme);
-          }
-          this.#advance();
-          continue;
-        }
         default:
           break a;
       }
@@ -279,6 +271,15 @@ export class Parser {
         }
         this.#advance();
         return Node.rest(options);
+      case TokenType.TEXT: {
+        const value = this.source
+          .slice(this.#current.from + 1, this.#current.to - 1)
+          .replace("''", "'");
+        this.#advance();
+        return Node.event(
+          value,
+        );
+      }
       default:
         throw this.#error(`Expected note, rest or set here`);
     }

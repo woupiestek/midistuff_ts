@@ -1,5 +1,20 @@
 # Midistuff logs
 
+## 2023-12-21
+
+- ~~event vs classes~~
+- generate from nwctxt
+  - accents
+  - special bar lines
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### event vs classes
+
+Using the strings to denote events that happen between notes or rests fits other
+music notation and midi better than the lables I have now, so, time for a major
+refactor.
+
 ## 2023-12-20
 
 - generate from nwctxt

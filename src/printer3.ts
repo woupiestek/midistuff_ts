@@ -97,7 +97,7 @@ class Doc2 {
   }
   layout() {
     return this.#elements
-      .map((it) => (typeof it === "string" ? it : "\n".padEnd(it)))
+      .map((it) => (typeof it === "string" ? it : "\n".padEnd(1 + it)))
       .join("");
   }
 }
@@ -160,15 +160,15 @@ export class Printer {
     ]);
   }
 
-  #map(map: Record<string, Value>, key?: string): Doc {
+  #map(map: Record<string, Value>, key?: Doc): Doc {
     return Doc.delimit(
       this.#assign(Doc.text("{"), key),
-      Object.entries(map).map(([k, v]) => this.#value(v, k)),
+      Object.entries(map).map(([k, v]) => this.#value(v, this.#label(k))),
       Doc.text("}"),
     );
   }
 
-  #array(array: Value[], key?: string): Doc {
+  #array(array: Value[], key?: Doc): Doc {
     return Doc.delimit(
       this.#assign(Doc.text("["), key),
       Object.entries(array).map((it) => this.#value(it)),
@@ -176,10 +176,10 @@ export class Printer {
     );
   }
 
-  #assign(end: Doc, key?: string): Doc {
+  #assign(end: Doc, key?: Doc): Doc {
     if (!key) return end;
     return Doc.group([
-      this.#label(key),
+      key,
       Doc.line(),
       Doc.text("="),
       Doc.line(),
@@ -187,7 +187,7 @@ export class Printer {
     ]);
   }
 
-  #value(value: Value, key?: string): Doc {
+  #value(value: Value, key?: Doc): Doc {
     switch (typeof value) {
       case "string":
         return this.#assign(Doc.text(value), key);
@@ -215,11 +215,6 @@ export class Printer {
         Doc.text((options.key | 0).toString()),
         Doc.line(),
       );
-    }
-    if (options.labels) {
-      for (const label of options.labels) {
-        docs.push(this.#label(label), Doc.line());
-      }
     }
     if (options.duration) {
       docs.push(this.#duration(options.duration), Doc.line());
@@ -271,11 +266,13 @@ export class Printer {
     node: Node,
     sections: { mark: string; node: Node; duration?: number }[],
     currentDuration: number,
-    key?: string,
+    key?: Doc,
   ): Combi {
     switch (node.type) {
       case NodeType.ERROR:
         return { doc: Doc.error(node.error), duration: 0 };
+      case NodeType.EVENT:
+        return { doc: this.#label(node.value), duration: 0 };
       case NodeType.INSERT: {
         const section = sections[node.index];
         const mark = Doc.text(section.mark);
@@ -284,7 +281,7 @@ export class Printer {
             section.node,
             sections,
             currentDuration,
-            section.mark,
+            Doc.text(section.mark),
           );
           section.duration = y.duration;
           return y;

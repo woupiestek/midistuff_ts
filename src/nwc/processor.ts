@@ -10,15 +10,13 @@ type Event = {
   offset?: number;
   key?: number;
   signature?: string;
-  dynamic?: string;
-  pedal?: boolean;
 };
 type TempoEvent = { time: Ratio; bpm: string };
 
 // note or rest actually: that is why tone is optional
 type Note = { tone?: Pyth; duration: Ratio };
 // a sequence of notes
-type Voice = { notes: Note[] };
+type Voice = { notes: (Note | string)[] };
 type Phrase = { duration: Ratio; voices: Voice[]; events: Event[] };
 type Staff = { phrases: Phrase[] };
 export class Processor {
@@ -89,6 +87,7 @@ export class Processor {
   }
 
   #phrase(): Phrase {
+    const strings: string[] = [];
     const closed: { start: Ratio; tone: Pyth; stop: Ratio }[] = [];
     const open: { [_: string]: { start: Ratio; tone: Pyth } } = {};
     const start = this.#time;
@@ -147,15 +146,23 @@ export class Processor {
           continue;
         case "Dynamic": {
           const dynamic = this.#current.fields.Style[0];
-          if (typeof dynamic === "string") {
-            if (!event) event = { time: this.#time.minus(start) };
-            event.dynamic = dynamic;
-          } else {console.warn(
+          this.#advance();
+          if (typeof dynamic !== "string") {
+            console.warn(
               "unprocessed dynamic",
               this.#current.fields.Style,
-            );}
-          this.#advance();
-          continue;
+            );
+            continue;
+          }
+          if (Object.entries(open).length > 0) {
+            strings.push(dynamic);
+            continue;
+          }
+          return {
+            events,
+            duration: Ratio.int(0),
+            voices: [{ notes: [dynamic] }],
+          };
         }
         case "Key":
           this.#key = 0;
@@ -184,11 +191,21 @@ export class Processor {
           pitches = [];
           break;
         }
-        case "SustainPedal":
-          if (!event) event = { time: this.#time.minus(start) };
-          event.pedal = this.#current.fields.Status?.[0] !== "Released";
+        case "SustainPedal": {
+          const pedal = this.#current.fields.Status?.[0] !== "Released"
+            ? "sustain down"
+            : "sustain up";
           this.#advance();
-          continue;
+          if (Object.entries(open).length > 0) {
+            strings.push(pedal);
+            continue;
+          }
+          return {
+            events,
+            duration: Ratio.int(0),
+            voices: [{ notes: [pedal] }],
+          };
+        }
         case "Tempo": {
           const bpm = this.#current.fields.Tempo[0];
           if (typeof bpm === "string") {
@@ -267,7 +284,7 @@ export class Processor {
       }
       const voices: Voice[] = [];
       for (const v of vs) {
-        const notes: Note[] = [];
+        const notes: (Note | string)[] = [...strings];
         for (const n of v) {
           notes.push({ tone: n.tone, duration: n.stop.minus(n.start) });
         }
@@ -416,13 +433,9 @@ export function fullAST(
 function staffAST({ phrases }: Staff): Node {
   const groups: Node[] = [];
   let key = 0;
-  let dynamic: string | null = null;
   for (let i = 0; i < phrases.length;) {
-    let pedal = false;
     for (const event of phrases[i].events) {
       if (event.key !== undefined) key = event.key;
-      if (event.pedal) pedal = true;
-      if (event.dynamic) dynamic = event.dynamic;
     }
     const group: Node[] = [];
     for (;;) {
@@ -430,13 +443,10 @@ function staffAST({ phrases }: Staff): Node {
       i++;
       if (i >= phrases.length || phrases[i].events.length > 0) break;
     }
-    const labels = [];
-    if (pedal) labels.push("pedal");
-    if (dynamic) labels.push(dynamic);
     groups.push(groupDurations(
       NodeType.ARRAY,
       group,
-      { key, labels: labels.length > 0 ? new Set(labels) : undefined },
+      { key },
     ));
   }
   return groupDurations(NodeType.ARRAY, groups);
@@ -450,7 +460,10 @@ function phraseAST({ voices, duration }: Phrase, key: number): Node {
 }
 
 function voiceAST({ notes }: Voice, key: number): Node {
-  return groupDurations(NodeType.ARRAY, notes.map((n) => noteAST(n, key)));
+  return groupDurations(
+    NodeType.ARRAY,
+    notes.map((n) => typeof n === "string" ? Node.event(n) : noteAST(n, key)),
+  );
 }
 
 function noteAST({ tone, duration }: Note, key: number) {
@@ -470,7 +483,10 @@ function groupDurations(
 ): Node {
   if (children.length === 1) {
     const node = children[0];
-    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) {
+    if (
+      node.type === NodeType.ERROR || node.type === NodeType.EVENT ||
+      node.type === NodeType.INSERT
+    ) {
       return node;
     }
     if (!node.options) {
@@ -478,7 +494,6 @@ function groupDurations(
       return node;
     }
     node.options.key = options.key || node.options.key;
-    node.options.labels = options.labels || node.options.labels;
     return children[0];
   }
 
@@ -486,7 +501,10 @@ function groupDurations(
   const keys: { [_: string]: [number, number] } = {};
 
   for (const node of children) {
-    if (node.type === NodeType.ERROR || node.type === NodeType.INSERT) continue;
+    if (
+      node.type === NodeType.ERROR || node.type === NodeType.EVENT ||
+      node.type === NodeType.INSERT
+    ) continue;
     const duration = node.options?.duration;
     if (duration instanceof Ratio) {
       const k = `${duration.numerator}/${duration.denominator}`;
@@ -509,7 +527,10 @@ function groupDurations(
   options.duration = duration;
   if (duration !== undefined || key !== undefined) {
     for (const n of children) {
-      if (n.type === NodeType.ERROR || n.type === NodeType.INSERT) continue;
+      if (
+        n.type === NodeType.ERROR || n.type === NodeType.EVENT ||
+        n.type === NodeType.INSERT
+      ) continue;
       if (
         duration && n.options?.duration && n.options?.duration.equals(duration)
       ) {

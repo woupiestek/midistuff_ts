@@ -1,7 +1,6 @@
 // first one: get a load of the available symbols
 
 //  !"(),-./0123456789:<=>ABCDEFGHIJKLMNOPRSTUVWYZ^abcdefghiklmnoprstuvwxyz|©
-//
 
 export enum TokenType {
   BANG,

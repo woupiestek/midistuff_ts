@@ -1,46 +1,29 @@
-import { AST, Dict, Node, NodeType, Options } from "./parser3.ts";
-import { mod, Ratio } from "./util.ts";
+import { AST, Node, NodeType, Options } from "./parser3.ts";
+import { Pyth } from "./pythagorean.ts";
+import { Ratio } from "./util.ts";
 
 export type Note = {
-  pitch: {
-    step: number;
-    alter: number;
-  };
+  type: "note";
+  pyth: Pyth;
   start: Ratio;
   stop: Ratio;
-  attributes: Dict;
+};
+export type Event = {
+  type: "event";
+  value: string;
+  time: Ratio;
 };
 
 export class Params {
-  __attributes: Dict;
   __duration?: Ratio;
   __key?: number;
   constructor(
-    attributes?: Dict,
     duration?: Ratio,
     key?: number,
     readonly parent?: Params,
   ) {
-    if (parent) {
-      if (attributes) {
-        this.__attributes = Object.create(parent.__attributes);
-        for (const [k, v] of Object.entries(attributes)) {
-          this.__attributes[k] = v;
-        }
-      } else {
-        this.__attributes = parent.__attributes;
-      }
-    } else if (attributes) {
-      this.__attributes = attributes;
-    } else {
-      this.__attributes = {};
-    }
     this.__duration = duration;
     this.__key = key;
-  }
-
-  get attributes(): Dict {
-    return this.__attributes;
   }
 
   get duration(): Ratio {
@@ -56,18 +39,12 @@ export class Params {
     }
     return this.__key;
   }
-
-  alter(degree: number) {
-    return Math.floor((this.key + [5, 3, 1, 6, 4, 2, 0][mod(degree, 7)]) / 7);
-  }
 }
 
 export class Transformer {
   #sections: { node: Node; mark: string; __params?: Params }[] = [];
-  #buffer: Note[] = [];
+  #buffer: (Event | Note)[] = [];
   #time: Ratio = new Ratio(0, 1);
-  constructor(readonly sheet: Record<string, Dict>) {}
-
   transform(ast: AST) {
     this.#sections = ast.sections;
     // todo: something with the metadata
@@ -79,23 +56,20 @@ export class Transformer {
 
   #params(params: Params, options?: Options): Params {
     if (!options) return params;
-    const _attributes: Dict = {};
-    if (options.labels) {
-      for (const label of options.labels) {
-        const attributes = this.sheet[label];
-        if (!attributes) continue;
-        for (const [k, v] of Object.entries(attributes)) {
-          _attributes[k] = v;
-        }
-      }
-    }
-    return new Params(_attributes, options.duration, options.key, params);
+    return new Params(options.duration, options.key, params);
   }
 
   #node(node: Node, params: Params) {
     switch (node.type) {
       case NodeType.ERROR:
         return console.error(node.error);
+      case NodeType.EVENT:
+        this.#buffer.push({
+          type: "event",
+          value: node.value,
+          time: this.#time,
+        });
+        return;
       case NodeType.INSERT: {
         const section = this.#sections[node.index];
         if (!section) console.error(`section ${node.index} is missing`);
@@ -108,13 +82,10 @@ export class Transformer {
       case NodeType.NOTE: {
         const _params = this.#params(params, node.options);
         this.#buffer.push({
-          attributes: _params.attributes,
+          type: "note",
           start: this.#time,
           stop: this.#time.plus(_params.duration),
-          pitch: {
-            step: node.degree,
-            alter: node.accident + _params.alter(node.degree),
-          },
+          pyth: Pyth.fromPitch(_params.key, node.degree, node.accident),
         });
         this.#time = this.#time.plus(_params.duration);
         return;
