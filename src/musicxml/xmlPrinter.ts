@@ -1,4 +1,4 @@
-import { AST, Node, NodeType, Options } from "./parser3.ts";
+import { AST, Node, NodeType, Options } from "../parser3.ts";
 
 export type XMLStep = "A" | "B" | "C" | "D" | "E" | "F" | "G";
 export type XMLPitch = {

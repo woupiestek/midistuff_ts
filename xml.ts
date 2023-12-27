@@ -23,8 +23,7 @@ const sample = `key 1 "allegro" "f" _/8[
 ],
 { "bpm" = 140 }`;
 
-const encoder = new TextEncoder();
-const ast = new Parser(encoder.encode(sample)).parse();
+const ast = new Parser(sample).parse();
 
 const printer = new XMLPrinter();
 console.log(stringify(printer.transform(ast)));

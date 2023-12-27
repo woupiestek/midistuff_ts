@@ -12,20 +12,6 @@ export class Pyth {
     return new Pyth(wholes, tone - 2 * wholes);
   }
 
-  diatone() {
-    const octave = Math.floor((this.wholes + this.halves / 2) / 6);
-    const tone = "abcdefg"[mod(this.degree + 3, 7)] as
-      | "a"
-      | "b"
-      | "c"
-      | "d"
-      | "e"
-      | "f"
-      | "g";
-    const alter = 2 * this.wholes - 8 * octave - this.halves;
-    return { octave, tone, alter };
-  }
-
   fifths() {
     return 2 * this.wholes - 5 * this.halves;
   }

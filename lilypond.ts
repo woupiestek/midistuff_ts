@@ -24,13 +24,10 @@ const sample = `key 1 "allegro" "f" _/8[
 ],
 { "bpm" = 140 }`;
 
-const encoder = new TextEncoder();
-const ast = new Parser(encoder.encode(sample)).parse();
+const ast = new Parser(sample).parse();
 
-const transformer = new Transformer({
-  treble: { voice: 1 },
-  bass: { voice: 2 },
-});
+// todo: voices
+const transformer = new Transformer();
 const notes = transformer.transform(ast);
 
 // where are my note lengths!?

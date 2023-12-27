@@ -1,5 +1,17 @@
 # Midistuff logs
 
+## 2023-12-27
+
+- generate from nwctxt
+  - accents
+  - special bar lines
+- generate music xml / lilypond
+- review metadata (are limited ranges of values okay?)
+
+### alternatives
+
+Focus on musicxml, and even bypass the new notation for a while.
+
 ## 2023-12-21
 
 - ~~event vs classes~~
