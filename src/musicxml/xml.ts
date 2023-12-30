@@ -1,8 +1,8 @@
 export class Element {
-  readonly attributes: Map<string, string> = new Map();
-  readonly content: (string | Element)[] = [];
   constructor(
     readonly tag: string,
+    readonly attributes: Map<string, string> = new Map(),
+    readonly content: (string | Element)[] = [],
   ) {}
 
   toString(): string {
@@ -25,5 +25,25 @@ export class Element {
     const element = new Element(tag);
     element.content.push(...content);
     return element;
+  }
+}
+
+export class ElementBuilder {
+  #attributes: Map<string, string> = new Map();
+  #content: (string | Element)[] = [];
+  #tag = "";
+  constructor(t: string) {
+    this.#tag = t;
+  }
+  attribute(key: string, value: string) {
+    this.#attributes.set(key, value);
+    return this;
+  }
+  build() {
+    return new Element(this.#tag, this.#attributes, this.#content);
+  }
+  add(x: string | Element) {
+    this.#content.push(x);
+    return this;
   }
 }

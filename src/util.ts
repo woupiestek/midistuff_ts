@@ -79,8 +79,39 @@ export class Ratio {
   get value() {
     return this.numerator / this.denominator;
   }
+  toString() {
+    return `${this.numerator}/${this.denominator}`;
+  }
 }
 
 export function unique<A>(element: A, index: number, array: A[]) {
   return index === 0 || array[index - 1] !== element;
+}
+
+export function chain(input: number, depth = 100): number[] {
+  const output: number[] = [];
+  for (let i = 0; i < depth; i++) {
+    const rest = input % 1;
+    output.push(input - rest);
+    if (rest * rest < Number.EPSILON) {
+      return output;
+    } else {
+      input = 1 / rest;
+    }
+  }
+  return output;
+}
+
+export function approximate(input: number, depth: number): Ratio {
+  const _chain = chain(input, depth);
+  let n = 0;
+  let d = 1;
+  for (let i = _chain.length - 1; i >= 0; i -= 2) {
+    n += _chain[i] * d;
+    if (i === 0) {
+      return new Ratio(n, d);
+    }
+    d += _chain[i - 1] * n;
+  }
+  return new Ratio(d, n);
 }

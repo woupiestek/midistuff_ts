@@ -1,5 +1,3 @@
-import { mod } from "./util.ts";
-
 export class Pyth {
   constructor(readonly wholes: number, readonly halves: number) {}
 
@@ -43,37 +41,7 @@ export class Pyth {
   }
 }
 
-export type Diatone = {
-  octave: number;
-  tone: "a" | "b" | "c" | "d" | "e" | "f" | "g";
-  alter: number;
-};
-
-export function diatoneToPyth(
-  octave: number,
-  tone: "a" | "b" | "c" | "d" | "e" | "f" | "g",
-  alter: number,
-): Pyth {
-  const x = {
-    a: [4, 1],
-    b: [5, 1],
-    c: [0, 0],
-    d: [1, 0],
-    e: [2, 0],
-    f: [2, 1],
-    g: [3, 1],
-  }[tone];
-  return new Pyth(5 * octave + x[0] + alter, 2 * octave + x[1] - alter);
-}
-
 type Pitch = {
   degree: number;
   alter: number;
 };
-
-export function pitchToPyth(key: number, degree: number, alter: number) {
-  return new Pyth(
-    Math.floor((key + 5 * degree + 5) / 7) + alter,
-    Math.floor((-key + 2 * degree + 1) / 7) - alter,
-  );
-}
