@@ -1,5 +1,11 @@
 # Midistuff logs
 
+## 2024-09-08
+
+### data orientation
+
+Maybe finish this project with some new ideas on how to organize data.
+
 ## 2023-12-27
 
 - generate from nwctxt
@@ -48,7 +54,7 @@ I guess up to now I assumed that labels distibute: `'happy' [ x, y, z]` is
 equivalent to `[ 'happy' x, 'happy' y, 'happy' z]` But this does not work for:
 
 - delayed dynamics, which where a way of delaing both with notations as with an
-  effect seen in mozart, where the chour was to switch from 'f' to 'p' halfway
+  effect seen in mozart, where the choir was to switch from 'f' to 'p' halfway
   down a whole note.
 - dynamic dynamics (crescendo, decresendo)
 - pedals, interpreted as and effect like those dynamics.

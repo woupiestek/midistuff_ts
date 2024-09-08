@@ -95,7 +95,7 @@ Deno.test(function parseRepeat() {
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(
     node.error.message,
-    "Error at line 1 (END ''): Could not resolve '$line_1'",
+    "Error at [1;8] '…e_1…': Could not resolve '$line_1'",
   );
 });
 
@@ -143,7 +143,7 @@ Deno.test(function parseError() {
   assertEquals(main.token.type, TokenType.INTEGER);
   assertEquals(
     main.error.message,
-    "Error at line 1 (INTEGER '2'): Could not resolve 'h'",
+    "Error at [1;6] '…3h 2 4…': Could not resolve 'h'",
   );
 });
 

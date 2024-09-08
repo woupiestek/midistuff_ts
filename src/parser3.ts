@@ -95,10 +95,13 @@ export class Parser {
   }
 
   #error(message: string) {
-    const type = TokenType[this.#current.type];
-    const line = this.#current.line;
-    const lexeme = this.source.slice(this.#current.from, this.#current.to);
-    return new Error(`Error at line ${line} (${type} '${lexeme}'): ${message}`);
+    const [line, column] = this.#scanner.getLineAndColumn(this.#current.from);
+    // add a few characters of the source?
+    return new Error(
+      `Error at [${line};${column}] '\u2026${
+        this.source.slice(this.#current.from - 3, this.#current.from + 3)
+      }\u2026': ${message}`,
+    );
   }
 
   parse(): AST {
@@ -159,7 +162,7 @@ export class Parser {
     if (this.#current.type !== TokenType.IDENTIFIER) {
       throw this.#error(`Mark expected`);
     }
-    const value = this.source.slice(this.#current.from, this.#current.to);
+    const value = this.#scanner.getIdentifierName(this.#current.from);
     this.#advance();
     return value;
   }
@@ -168,7 +171,8 @@ export class Parser {
     if (this.#current.type !== TokenType.INTEGER) {
       throw this.#error(`Expected an integer`);
     }
-    const value = this.#current.value;
+
+    const value = this.#scanner.getIntegerValue(this.#current.from);
     if (typeof value !== "number") {
       // should not be reachable
       throw this.#error(`Expected integer to have a value`);
@@ -199,12 +203,8 @@ export class Parser {
           options.key = this.#integer(-7, 7);
           continue;
         case TokenType.DURATION:
-          if (this.#current.value instanceof Ratio) {
-            options.duration = this.#current.value;
-            this.#advance();
-          } else {
-            throw new Error("expected a ratio");
-          }
+          options.duration = this.#scanner.getRatio(this.#current.from);
+          this.#advance();
           continue;
         default:
           break a;
@@ -217,11 +217,7 @@ export class Parser {
   }
 
   #note(accident: -2 | -1 | 0 | 1 | 2, options?: Options): Node {
-    const degree = this.#current.value;
-    if (typeof degree !== "number") {
-      // should not be reachable
-      throw this.#error(`Expected integer to have a value`);
-    }
+    const degree = this.#scanner.getIntegerValue(this.#current.from);
     if (degree < -34 || 38 < degree) {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
@@ -272,9 +268,8 @@ export class Parser {
         this.#advance();
         return Node.rest(options);
       case TokenType.TEXT: {
-        const value = this.source
-          .slice(this.#current.from + 1, this.#current.to - 1)
-          .replace("''", "'");
+        const value = this.#scanner
+          .getText(this.#current.from);
         this.#advance();
         return Node.event(
           value,
@@ -366,12 +361,9 @@ export class Parser {
       case TokenType.LEFT_BRACKET:
         return this.#array();
       case TokenType.INTEGER:
-        if (typeof token2.value === "number") return token2.value;
-        else throw new Error("Expected integer here");
+        return this.#scanner.getIntegerValue(token2.from);
       case TokenType.TEXT:
-        return this.source
-          .slice(token2.from + 1, token2.to - 1)
-          .replace('""', '"');
+        return this.#scanner.getText(token2.from);
       default:
         throw this.#error(
           "Expected integer, label, string, array or key-value pairs",
@@ -388,9 +380,7 @@ export class Parser {
         case TokenType.RIGHT_BRACE:
           return result;
         case TokenType.TEXT:
-          key = this.source
-            .slice(token1.from + 1, token1.to - 1)
-            .replace('""', '"');
+          key = this.#scanner.getText(token1.from);
           break;
         default:
           throw this.#error("Expected label or string");

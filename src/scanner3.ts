@@ -26,14 +26,11 @@ export enum TokenType {
 export type Token = {
   type: TokenType;
   from: number;
-  to: number;
-  line: number;
-  value?: number | Ratio;
 };
 
 export const Token = {
-  stringify({ type, from, to, line, value }: Token) {
-    return `${TokenType[type]}(${value || ""}) [${from},${to}[ (line ${line})`;
+  stringify({ type, from }: Token) {
+    return `${TokenType[type]}[${from}]`;
   },
 };
 
@@ -48,16 +45,12 @@ KEYWORDS.put("r", TokenType.REST);
 export class Scanner {
   #current = 0;
   #from = 0;
-  #line = 1;
   constructor(private readonly source: string) {}
 
-  #token(type: TokenType, value?: number | Ratio): Token {
+  #token(type: TokenType): Token {
     return {
       type,
-      value,
       from: this.#from,
-      to: this.#current,
-      line: this.#line,
     };
   }
 
@@ -76,6 +69,20 @@ export class Scanner {
     return this.source.charCodeAt(this.#current++);
   }
 
+  getText(from: number): string {
+    if (this.source[from] !== "'") throw new Error("no text here");
+    let to = from;
+    while (to < this.source.length) {
+      to++;
+      if (this.source[to] !== "'") continue;
+      to++;
+      if (this.source[to] !== "'") {
+        return this.source.slice(from + 1, to - 1).replace("''", "'");
+      }
+    }
+    throw new Error("invalid text");
+  }
+
   #text(): Token {
     for (;;) {
       if (this.done()) return this.#token(TokenType.ERROR);
@@ -87,18 +94,12 @@ export class Scanner {
     }
   }
 
+  #advanceWhile(condition: (index: number) => boolean) {
+    for (; !this.done() && condition(this.#current); this.#current++);
+  }
+
   #whitespace() {
-    while (!this.done()) {
-      const value = this.source.charCodeAt(this.#current);
-      if (Scanner.#white(value)) {
-        this.#current++;
-        if (value === CODES["\n"]) {
-          this.#line++;
-        }
-      } else {
-        return;
-      }
-    }
+    this.#advanceWhile((i) => Scanner.#white(this.source.charCodeAt(i)));
   }
 
   static #white(value: number) {
@@ -106,12 +107,7 @@ export class Scanner {
   }
 
   #comment() {
-    while (!this.done()) {
-      if (this.#pop() === CODES["\n"]) {
-        this.#line++;
-        break;
-      }
-    }
+    this.#advanceWhile((i) => this.source[i] !== "\n");
   }
 
   #skip() {
@@ -142,19 +138,41 @@ export class Scanner {
     return ch === CODES["_"] || Scanner.#isLetterOrDigit(ch);
   }
 
-  #identifier() {
-    while (!this.done() && Scanner.#ic(this.source.charCodeAt(this.#current))) {
-      this.#current++;
-    }
+  getIdentifierName(from: number) {
+    let to = from + 1;
+    for (
+      ;
+      to < this.source.length &&
+      Scanner.#ic(this.source.charCodeAt(to));
+      to++
+    );
+    return this.source.slice(from, to);
   }
 
-  #integer(value: number, positive: boolean): Token {
+  #identifier() {
+    this.#advanceWhile((i) => Scanner.#ic(this.source.charCodeAt(i)));
+  }
+
+  #positiveIntegerValue(from: number): [number, number] {
+    let to = from, value = 0;
     while (
-      !this.done() &&
-      Scanner.#isDigit(this.source.charCodeAt(this.#current))
+      to < this.source.length &&
+      Scanner.#isDigit(this.source.charCodeAt(to))
     ) {
-      value = 10 * value + (this.source.charCodeAt(this.#current++) - 48);
+      value = 10 * value + (this.source.charCodeAt(to++) - 48);
     }
+    return [value, to];
+  }
+
+  getIntegerValue(from: number): number {
+    if (this.source[from] === "-") {
+      return -this.#positiveIntegerValue(from + 1)[0];
+    }
+    return this.#positiveIntegerValue(from)[0];
+  }
+
+  #integer(): Token {
+    this.#advanceWhile((i) => Scanner.#isDigit(this.source.charCodeAt(i)));
     let type = TokenType.INTEGER;
     if (this.#match("+")) {
       type = this.#match("+")
@@ -165,31 +183,24 @@ export class Scanner {
         ? TokenType.INTEGER_MINUS_MINUS
         : TokenType.INTEGER_MINUS;
     }
-    return this.#token(type, positive ? value : -value);
+    return this.#token(type);
+  }
+
+  getRatio(from: number): Ratio {
+    const [numerator, next] = this.#positiveIntegerValue(from + 1);
+    if (this.source[next] === "/") {
+      const [denominator] = this.#positiveIntegerValue(next + 1);
+      return new Ratio(numerator || 1, denominator || 1);
+    }
+    return new Ratio(numerator || 1, 1);
   }
 
   #duration(): Token {
-    let numerator = 0;
-    while (
-      !this.done() &&
-      Scanner.#isDigit(this.source.charCodeAt(this.#current))
-    ) {
-      numerator = 10 * numerator +
-        (this.source.charCodeAt(this.#current++) - 48);
-    }
-    if (numerator === 0) numerator = 1;
-    let denominator = 0;
+    this.#advanceWhile((i) => Scanner.#isDigit(this.source.charCodeAt(i)));
     if (this.#match("/")) {
-      while (
-        !this.done() &&
-        Scanner.#isDigit(this.source.charCodeAt(this.#current))
-      ) {
-        denominator = 10 * denominator +
-          (this.source.charCodeAt(this.#current++) - 48);
-      }
+      this.#advanceWhile((i) => Scanner.#isDigit(this.source.charCodeAt(i)));
     }
-    if (denominator === 0) denominator = 1;
-    return this.#token(TokenType.DURATION, new Ratio(numerator, denominator));
+    return this.#token(TokenType.DURATION);
   }
 
   next(): Token {
@@ -198,7 +209,7 @@ export class Scanner {
     if (this.done()) return this.#token(TokenType.END);
     const code = this.#pop();
     if (Scanner.#isDigit(code)) {
-      return this.#integer(code - 48, true);
+      return this.#integer();
     }
     if (Scanner.#isLetter(code)) {
       this.#identifier();
@@ -213,7 +224,7 @@ export class Scanner {
           !this.done() &&
           Scanner.#isDigit(this.source.charCodeAt(this.#current))
         ) {
-          return this.#integer(this.#pop() - 48, false);
+          return this.#integer();
         }
         return this.#token(TokenType.ERROR);
       }
@@ -241,5 +252,17 @@ export class Scanner {
     }
 
     return this.#token(TokenType.ERROR);
+  }
+
+  getLineAndColumn(from: number) {
+    let line = 1, i = 0;
+    let start = 0;
+    for (; i < from; i++) {
+      if (this.source[i] === "\n") {
+        line++;
+        start = i + 1;
+      }
+    }
+    return [line, from - start + 1];
   }
 }

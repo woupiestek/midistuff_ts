@@ -109,6 +109,8 @@ export class Converter {
 
   #signature = Object.fromEntries([..."ABCDEFG"].map((k) => [k, 0]));
 
+  #accidentals = { ...this.#signature };
+
   #key() {
     // there is a choice between traditional and nontraditional signatures!
     for (const s of this.#current.fields.Signature) {
@@ -149,8 +151,12 @@ export class Converter {
   }
 
   #measure(measure: ElementBuilder) {
+    // have an attributes block,
+    // put in divisions, like 24 per whole note
+    // const divisionsPerQuarter = 24;
     switch (this.#current.class) {
       case "Bar":
+        this.#accidentals = { ...this.#signature };
         return;
       case "Clef":
         measure.add(
@@ -187,6 +193,67 @@ export class Converter {
           ).build(),
         );
         break;
+      case "Note": {
+        break;
+      }
+      case "SustainPedal": {
+        const type = this.#current.fields.Status?.[0] !== "Released"
+          ? "start"
+          : "stop";
+        this.#advance();
+        measure.add(
+          new ElementBuilder("direction").add(
+            new ElementBuilder("direction-type").add(
+              new ElementBuilder("pedal").attribute(
+                "type",
+                type,
+              ).build(),
+            ).build(),
+          ).build(),
+        );
+        break;
+      }
+      case "Tempo": {
+        const metronome = new ElementBuilder("metronome");
+        let base = "quarter";
+        let dotted = false;
+        switch (this.#current.fields.Base?.[0]) {
+          case "Eighth Dotted":
+            dotted = true; // fall through
+          case "Eighth":
+            base = "eighth";
+            break;
+          case "Quarter Dotted":
+            dotted = true; // fall through
+          case "Quarter":
+            base = "quarter";
+            break;
+          case "Half Dotted":
+            dotted = true; // fall through
+          case "Half":
+            base = "half";
+            break;
+          default:
+            break;
+        }
+        metronome.add(new ElementBuilder("beat-unit").add(base).build());
+        if (dotted) metronome.add(new ElementBuilder("beat-unit-dot").build());
+        const bpm = this.#current.fields.Tempo[0];
+        if (typeof bpm !== "string") {
+          console.warn("unprocessed tempo", this.#current.fields.Tempo);
+          break;
+        }
+        metronome.add(new ElementBuilder("per-minute").add(bpm).build());
+        this.#advance();
+        measure.add(
+          new ElementBuilder("direction").add(
+            new ElementBuilder("direction-type").add(
+              metronome.build(),
+            ).build(),
+          ).build(),
+        );
+        break;
+      }
       case "TimeSig": {
         const s0 = this.#current.fields.Signature[0];
         this.#advance();
@@ -206,4 +273,92 @@ export class Converter {
       }
     }
   }
+
+  //   #pitch(Pos: Value): { pitch: Element; tied: boolean } | undefined {
+  //     if (Pos instanceof Array) {
+  //       console.warn(`Problems with position ${Pos}`);
+  //       return undefined;
+  //     }
+  //     let i = 0;
+  //     let alter = {
+  //       x: 2,
+  //       "#": 1,
+  //       n: 0,
+  //       b: -1,
+  //       v: -2,
+  //     }[Pos[i]];
+  //     if (alter !== undefined) i++;
+  //     let sign = 1;
+  //     if (Pos[i] === "-") {
+  //       sign = -1;
+  //       i++;
+  //     }
+  //     let value = 0;
+  //     while ("0" <= Pos[i] && Pos[i] <= "9") {
+  //       value = value * 10 + Pos.charCodeAt(i) - 48;
+  //       i++;
+  //     }
+  //     const degree = sign * value + this.#offset;
+  //     const index = mod(degree, 7);
+  //     if (alter === undefined) {
+  //       alter = this.#accidentals[index];
+  //     } else {
+  //       this.#accidentals[index] = alter;
+  //     }
+  //     const tied = Pos[i] === "^";
+  //     if (tied) i++;
+  //     if (i !== Pos.length) {
+  //       console.warn(`Problems with position ${Pos}`);
+  //     }
+  //     const pitch = new ElementBuilder("pitch")
+  //       .add(
+  //         new ElementBuilder("octave").add(
+  //           (Math.floor(degree / 7) + 4).toString(),
+  //         ).build(),
+  //       )
+  //       .add(new ElementBuilder("step").add("CDEFGAB"[index]).build());
+  //     if (alter !== 0) {
+  //       pitch.add(new ElementBuilder("alter").add(alter.toString()).build());
+  //     }
+  //     return { pitch: pitch.build(), tied };
+  //   }
 }
+
+// function duration(Dur: Value[], divisionsPerQuarter: number): number {
+//   let duration = 0;
+//   switch (Dur[0]) {
+//     case "4th":
+//       duration = divisionsPerQuarter;
+//       break;
+//     case "8th":
+//       duration = divisionsPerQuarter / 2;
+//       break;
+//     case "Half":
+//       duration = divisionsPerQuarter * 2;
+//       break;
+//     case "Whole":
+//       duration = divisionsPerQuarter * 4;
+//       break;
+//   }
+//   for (let i = 1; i < Dur.length; i++) {
+//     if (typeof Dur[i] === "string") {
+//       switch (Dur[i]) {
+//         case "Dotted":
+//           duration *= 3 / 2;
+//           break;
+//         case "DblDotted":
+//           duration *= 7 / 4;
+//           break;
+//         case "Triplet":
+//           duration *= 2 / 3;
+//           break;
+//         default:
+//           console.warn("not processed", Dur[i]);
+//       }
+//     } else if (Dur[i] instanceof Array && Dur[i][0] === "Triplet") {
+//       duration *= 2 / 3;
+//     } else {
+//       console.warn("not processed", Dur[i]);
+//     }
+//   }
+//   return duration;
