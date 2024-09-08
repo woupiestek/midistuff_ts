@@ -114,8 +114,8 @@ export class Lilyponder {
       }
     }
     const octave = 1 + Math.floor(degree / 7);
-    if (octave > 0) for (let i = 0; i < octave; i++) pitch += "'";
-    if (octave < 0) for (let i = octave; i < 0; i++) pitch += ",";
+    if (octave > 0) { for (let i = 0; i < octave; i++) pitch += "'"; }
+    if (octave < 0) { for (let i = octave; i < 0; i++) pitch += ","; }
     return pitch;
   }
 

@@ -4,4 +4,4 @@ param (
   [int]$to = 1000
 )
 
-deno run --unstable --allow-env --allow-write --allow-read --allow-ffi .\src\player3.ts $file $from $to
+deno run --unstable-ffi --allow-env --allow-write --allow-read --allow-ffi .\src\player3.ts $file $from $to
