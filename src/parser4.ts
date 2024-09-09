@@ -16,17 +16,16 @@ export type Note = {
 
 export type Node = {
   type: number;
-  index: number;
+  id: number;
   options?: Options;
 };
 
 export const NodeType = {
-  ARRAY: 0,
+  ARRAY: 1,
   EVENT: 2,
-  NOTE: 4,
-  REST: 5,
-  SET: 6,
-  NODE: 7,
+  NOTE: 3,
+  REST: 4,
+  SET: 5,
   multiply(typ: number, length: number = 1): number {
     return length * 16 + typ;
   },
@@ -42,8 +41,6 @@ export const NodeType = {
         return `array[${NodeType.length(typ)}]`;
       case NodeType.EVENT:
         return "event";
-      case NodeType.NODE:
-        return "node";
       case NodeType.NOTE:
         return "note";
       case NodeType.SET:
@@ -66,7 +63,6 @@ export class Parser {
   #scanner;
   #current;
   #bindings: { mark: string; node: Node }[] = [];
-  #stack: Node[] = [];
   #target: Nodes = {
     errors: [],
     events: [],
@@ -92,7 +88,7 @@ export class Parser {
     );
   }
 
-  errorNode(error: Error) {
+  storeError(error: Error) {
     this.#target.errors.push({ token: this.#current, error });
   }
 
@@ -100,23 +96,23 @@ export class Parser {
     try {
       this.#node();
     } catch (error) {
-      this.errorNode(error);
-      return { target: this.#target, main: this.#stack.pop() };
+      this.storeError(error);
+      return { target: this.#target };
     }
     let metadata: Dict = {};
     if (this.#match(TokenType.COMMA) && this.#match(TokenType.LEFT_BRACE)) {
       try {
         metadata = this.dict();
       } catch (error) {
-        this.errorNode(error);
-        return { target: this.#target, main: this.#stack.pop() };
+        this.storeError(error);
+        return { target: this.#target };
       }
     }
     if (!this.#done()) {
-      this.errorNode(this.#error("input left over"));
-      return { target: this.#target, main: this.#stack.pop() };
+      this.storeError(this.#error("input left over"));
+      return { metadata, target: this.#target };
     }
-    return { metadata, target: this.#target, main: this.#stack.pop() };
+    return { metadata, target: this.#target };
   }
 
   #advance() {
@@ -203,11 +199,11 @@ export class Parser {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
     this.#current = this.#scanner.next();
-    const index = this.#target.notes.length;
+    const id = this.#target.notes.length;
     this.#target.notes.push({ degree, accident });
-    this.#stack.push( {
+    this.#target.nodes.push({
       type: NodeType.NOTE,
-      index,
+      id,
       options,
     });
   }
@@ -246,15 +242,15 @@ export class Parser {
           }
         }
         this.#advance();
-        this.#stack.push({ type: NodeType.REST, index: 0, options });
+        this.#target.nodes.push({ type: NodeType.REST, id: 0, options });
         return;
       case TokenType.TEXT: {
         const value = this.#scanner.getText(this.#current.from);
         this.#advance();
         this.#target.events.push(value);
-        this.#stack.push({
+        this.#target.nodes.push({
           type: NodeType.EVENT,
-          index: this.#target.events.length - 1,
+          id: this.#target.events.length - 1,
           options,
         });
         return;
@@ -267,10 +263,13 @@ export class Parser {
   #insert() {
     const mark = this.#mark();
     if (!this.#match(TokenType.IS)) {
-      this.#stack.push(this.#resolve(mark));
+      this.#target.nodes.push(this.#resolve(mark));
     } else {
       this.#node();
-      this.#bindings.push({ mark, node: this.#stack[this.#stack.length - 1] });
+      this.#bindings.push({
+        mark,
+        node: this.#target.nodes[this.#target.nodes.length - 1],
+      });
     }
   }
 
@@ -307,21 +306,16 @@ export class Parser {
   ) {
     const scope = this.#bindings.length;
     try {
-      const length = this.#stack.length;
+      const node = { type, options, id: 0 }; // can we do something sensible with these ids?
+      this.#target.nodes.push(node);
+      let length = 0;
       while (!this.#match(stop)) {
         this.#node();
+        length++;
       }
-      const slice = this.#stack.slice(length);
-      this.#stack.length = length;
-      const index = this.#target.nodes.length;
-      this.#target.nodes.push(...slice);
-      this.#stack.push({
-        type: NodeType.multiply(type, slice.length),
-        index,
-        options,
-      });
+      node.type = NodeType.multiply(type, length);
     } catch (error) {
-      this.errorNode(error);
+      this.storeError(error);
       this.#panic();
     } finally {
       // bindings go out of scope

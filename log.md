@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2024-09-09
+
+See test coverage with deno:
+
+- `deno test --coverage`
+- `deno coverage --html`
+
 ## 2024-09-08
 
 ### data orientation

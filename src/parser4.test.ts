@@ -6,7 +6,7 @@ import { NodeType, Parser } from "./parser4.ts";
 import { TokenType } from "./scanner3.ts";
 
 Deno.test(function parseRest() {
-  const { main: node } = new Parser("_/4 r").parse();
+  const { target: { nodes: [node] } } = new Parser("_/4 r").parse();
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
@@ -15,7 +15,7 @@ Deno.test(function parseRest() {
 });
 
 Deno.test(function parseSimpleRest() {
-  const { main: node } = new Parser("r").parse();
+  const { target: { nodes: [node] } } = new Parser("r").parse();
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
@@ -24,12 +24,13 @@ Deno.test(function parseSimpleRest() {
 });
 
 Deno.test(function parseNote() {
-  const { main: node, target } = new Parser("_3/4 -7++").parse();
+  const { target } = new Parser("_3/4 -7++").parse();
+  const node = target.nodes[0];
   if (node?.type !== NodeType.NOTE) {
     target.errors.forEach((it) => console.error(it.error));
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = target.notes[node?.index];
+  const note = target.notes[node?.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 2);
   assertEquals(node.options?.duration?.numerator, 3);
@@ -37,11 +38,12 @@ Deno.test(function parseNote() {
 });
 
 Deno.test(function parseSimpleNote() {
-  const { main: node, target } = new Parser("-7").parse();
+  const { target } = new Parser("-7").parse();
+  const node = target.nodes[0];
   if (node?.type !== NodeType.NOTE) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = target.notes[node?.index];
+  const note = target.notes[node?.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 0);
   assertEquals(node.options?.duration?.numerator, undefined);
@@ -49,7 +51,8 @@ Deno.test(function parseSimpleNote() {
 });
 
 Deno.test(function parseSet() {
-  const { main: node } = new Parser("_/4[ _/8 0 1 2 0 _/8 r ]").parse();
+  const { target: { nodes: [node] } } = new Parser("_/4[ _/8 0 1 2 0 _/8 r ]")
+    .parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node.type)}`);
@@ -58,7 +61,7 @@ Deno.test(function parseSet() {
 });
 
 Deno.test(function parsePitchSet() {
-  const { main: node } = new Parser("_5/16[ 0 2 4 ]").parse();
+  const { target: { nodes: [node] } } = new Parser("_5/16[ 0 2 4 ]").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -69,7 +72,7 @@ Deno.test(function parsePitchSet() {
 });
 
 Deno.test(function parseJoin() {
-  const { main: node } = new Parser("_/2{ 0  2-  4 }").parse();
+  const { target: { nodes: [node] } } = new Parser("_/2{ 0  2-  4 }").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.SET) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -78,14 +81,15 @@ Deno.test(function parseJoin() {
 });
 
 Deno.test(function parseResolvedRepeat() {
-  const { main: node, target } = new Parser("[ C = 0 C ]").parse();
+  const { target } = new Parser("[ C = 0 C ]").parse();
+  const node = target.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 2);
-  const node1 = target.nodes[node.index];
-  const node2 = target.nodes[node.index + 1];
+  const node1 = target.nodes[1];
+  const node2 = target.nodes[2];
   assertEquals(node1, node2);
 });
 
@@ -98,9 +102,10 @@ Deno.test(function parseRepeat() {
 });
 
 Deno.test(function parseOperations() {
-  const { main: node, target } = new Parser(
+  const { target } = new Parser(
     "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
   ).parse();
+  const node = target.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node?.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -112,7 +117,7 @@ Deno.test(function parseOperations() {
 });
 
 Deno.test(function parseCombination() {
-  const { main: node, target } = new Parser(
+  const { target } = new Parser(
     "['allegro' 'f' \n" +
       "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
       "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
@@ -120,6 +125,7 @@ Deno.test(function parseCombination() {
       "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
       "$D = [_/8 0 -3 _/2 0 _/8r] $D\n]",
   ).parse();
+  const node = target.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -139,7 +145,8 @@ Deno.test(function parseError() {
 });
 
 Deno.test(function noFalseAccidentals() {
-  const { main: node, target } = new Parser("[_/8 0 -3 _/2 0 _/8 r]").parse();
+  const { target } = new Parser("[_/8 0 -3 _/2 0 _/8 r]").parse();
+  const node = target.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -149,16 +156,15 @@ Deno.test(function noFalseAccidentals() {
 });
 
 Deno.test(function noFalseDurations() {
-  const { main: node, target } = new Parser("[_/8 2 3 _/2 4 _/8 r]").parse();
+  const { target } = new Parser("[_/8 2 3 _/2 4 _/8 r]").parse();
+  const node = target.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const from = node.index;
-  const to = from + NodeType.length(node.type);
-
-  const durations = target.nodes.slice(from, to).map((it) =>
-      it.options?.duration?.numerator &&
+  assertEquals(NodeType.length(node.type),4);
+  const durations = target.nodes.slice(1).map((it) =>
+    it.options?.duration?.numerator &&
       it.options?.duration?.denominator
       ? it.options.duration?.numerator / it.options.duration?.denominator
       : undefined
