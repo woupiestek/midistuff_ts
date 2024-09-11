@@ -6,7 +6,7 @@ import { NodeType, Parser } from "./parser4.ts";
 import { TokenType } from "./scanner3.ts";
 
 Deno.test(function parseRest() {
-  const { target: { nodes: [node] } } = new Parser("_/4 r").parse();
+  const { data: { nodes: [node] } } = new Parser("_/4 r").parse();
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
@@ -15,7 +15,7 @@ Deno.test(function parseRest() {
 });
 
 Deno.test(function parseSimpleRest() {
-  const { target: { nodes: [node] } } = new Parser("r").parse();
+  const { data: { nodes: [node] } } = new Parser("r").parse();
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
@@ -24,13 +24,13 @@ Deno.test(function parseSimpleRest() {
 });
 
 Deno.test(function parseNote() {
-  const { target } = new Parser("_3/4 -7++").parse();
-  const node = target.nodes[0];
+  const { data } = new Parser("_3/4 -7++").parse();
+  const node = data.nodes[0];
   if (node?.type !== NodeType.NOTE) {
-    target.errors.forEach((it) => console.error(it.error));
+    data.errors.forEach((it) => console.error(it.error));
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = target.notes[node?.id];
+  const note = data.notes[node?.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 2);
   assertEquals(node.options?.duration?.numerator, 3);
@@ -38,12 +38,12 @@ Deno.test(function parseNote() {
 });
 
 Deno.test(function parseSimpleNote() {
-  const { target } = new Parser("-7").parse();
-  const node = target.nodes[0];
+  const { data } = new Parser("-7").parse();
+  const node = data.nodes[0];
   if (node?.type !== NodeType.NOTE) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = target.notes[node?.id];
+  const note = data.notes[node?.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 0);
   assertEquals(node.options?.duration?.numerator, undefined);
@@ -51,7 +51,7 @@ Deno.test(function parseSimpleNote() {
 });
 
 Deno.test(function parseSet() {
-  const { target: { nodes: [node] } } = new Parser("_/4[ _/8 0 1 2 0 _/8 r ]")
+  const { data: { nodes: [node] } } = new Parser("_/4[ _/8 0 1 2 0 _/8 r ]")
     .parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
@@ -61,7 +61,7 @@ Deno.test(function parseSet() {
 });
 
 Deno.test(function parsePitchSet() {
-  const { target: { nodes: [node] } } = new Parser("_5/16[ 0 2 4 ]").parse();
+  const { data: { nodes: [node] } } = new Parser("_5/16[ 0 2 4 ]").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -72,7 +72,7 @@ Deno.test(function parsePitchSet() {
 });
 
 Deno.test(function parseJoin() {
-  const { target: { nodes: [node] } } = new Parser("_/2{ 0  2-  4 }").parse();
+  const { data: { nodes: [node] } } = new Parser("_/2{ 0  2-  4 }").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.SET) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
@@ -81,43 +81,41 @@ Deno.test(function parseJoin() {
 });
 
 Deno.test(function parseResolvedRepeat() {
-  const { target } = new Parser("[ C = 0 C ]").parse();
-  const node = target.nodes[0];
+  const { data } = new Parser("[ C = 0 C ]").parse();
+  const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 2);
-  const node1 = target.nodes[1];
-  const node2 = target.nodes[2];
-  assertEquals(node1, node2);
+  assertEquals(data.nodes[1], data.nodes[2]);
 });
 
 Deno.test(function parseRepeat() {
-  const { target } = new Parser("$line_1").parse();
+  const { data } = new Parser("$line_1").parse();
   assertEquals(
-    target.errors[0].error.message,
+    data.errors[0].error.message,
     "Error at [1;8] '…e_1…': Could not resolve '$line_1'",
   );
 });
 
 Deno.test(function parseOperations() {
-  const { target } = new Parser(
+  const { data } = new Parser(
     "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
   ).parse();
-  const node = target.nodes[0];
+  const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node?.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
   assertEquals(node.options?.key, -3);
-  assertEquals(target.events, ["program_64", "vivace", "fff"]);
+  assertEquals(data.events, ["program_64", "vivace", "fff"]);
   assertEquals(node.options?.duration?.numerator, 5);
   assertEquals(node.options?.duration?.denominator, 16);
 });
 
 Deno.test(function parseCombination() {
-  const { target } = new Parser(
+  const { data } = new Parser(
     "['allegro' 'f' \n" +
       "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
       "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
@@ -125,18 +123,18 @@ Deno.test(function parseCombination() {
       "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
       "$D = [_/8 0 -3 _/2 0 _/8r] $D\n]",
   ).parse();
-  const node = target.nodes[0];
+  const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
   assertEquals(node.options?.key, undefined);
-  assertEquals(target.events, ["allegro", "f"]);
+  assertEquals(data.events, ["allegro", "f"]);
 });
 
 Deno.test(function parseError() {
-  const { target } = new Parser("{ 3h 2 4 }").parse();
-  const error = target.errors[0];
+  const { data } = new Parser("{ 3h 2 4 }").parse();
+  const error = data.errors[0];
   assertEquals(error.token.type, TokenType.INTEGER);
   assertEquals(
     error.error.message,
@@ -145,25 +143,25 @@ Deno.test(function parseError() {
 });
 
 Deno.test(function noFalseAccidentals() {
-  const { target } = new Parser("[_/8 0 -3 _/2 0 _/8 r]").parse();
-  const node = target.nodes[0];
+  const { data } = new Parser("[_/8 0 -3 _/2 0 _/8 r]").parse();
+  const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const accidents = target.notes.map((it) => it.accident);
+  const accidents = data.notes.map((it) => it.accident);
   assertEquals(accidents, [0, 0, 0]);
 });
 
 Deno.test(function noFalseDurations() {
-  const { target } = new Parser("[_/8 2 3 _/2 4 _/8 r]").parse();
-  const node = target.nodes[0];
+  const { data } = new Parser("[_/8 2 3 _/2 4 _/8 r]").parse();
+  const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  assertEquals(NodeType.length(node.type),4);
-  const durations = target.nodes.slice(1).map((it) =>
+  assertEquals(NodeType.length(node.type), 4);
+  const durations = data.nodes.slice(1).map((it) =>
     it.options?.duration?.numerator &&
       it.options?.duration?.denominator
       ? it.options.duration?.numerator / it.options.duration?.denominator

@@ -24,8 +24,9 @@ export const NodeType = {
   ARRAY: 1,
   EVENT: 2,
   NOTE: 3,
-  REST: 4,
-  SET: 5,
+  // REPEAT: 4,
+  REST: 5,
+  SET: 6,
   multiply(typ: number, length: number = 1): number {
     return length * 16 + typ;
   },
@@ -51,21 +52,27 @@ export const NodeType = {
   },
 };
 
-// I have to recall what the options are doing again...
-export type Nodes = {
+export type Data = {
   errors: { token: Token; error: Error }[];
   events: string[];
-  notes: Note[];
+  indices: number[];
   nodes: Node[];
+  notes: Note[];
+};
+
+export type ParseResult = {
+  data: Data;
+  metadata?: Dict;
 };
 
 export class Parser {
   #scanner;
   #current;
-  #bindings: { mark: string; node: Node }[] = [];
-  #target: Nodes = {
+  #bindings: { mark: string; index: number }[] = [];
+  #target: Data = {
     errors: [],
     events: [],
+    indices: [],
     notes: [],
     nodes: [],
   };
@@ -92,12 +99,12 @@ export class Parser {
     this.#target.errors.push({ token: this.#current, error });
   }
 
-  parse() {
+  parse(): ParseResult {
     try {
       this.#node();
     } catch (error) {
       this.storeError(error);
-      return { target: this.#target };
+      return { data: this.#target };
     }
     let metadata: Dict = {};
     if (this.#match(TokenType.COMMA) && this.#match(TokenType.LEFT_BRACE)) {
@@ -105,14 +112,14 @@ export class Parser {
         metadata = this.dict();
       } catch (error) {
         this.storeError(error);
-        return { target: this.#target };
+        return { data: this.#target };
       }
     }
     if (!this.#done()) {
       this.storeError(this.#error("input left over"));
-      return { metadata, target: this.#target };
+      return { metadata, data: this.#target };
     }
-    return { metadata, target: this.#target };
+    return { metadata, data: this.#target };
   }
 
   #advance() {
@@ -163,7 +170,10 @@ export class Parser {
 
   #resolve(mark: string): Node {
     for (let i = this.#bindings.length - 1; i >= 0; i--) {
-      if (this.#bindings[i].mark === mark) return this.#bindings[i].node;
+      const binding = this.#bindings[i];
+      if (binding.mark === mark) {
+        return this.#target.nodes[binding.index];
+      }
     }
     throw this.#error(`Could not resolve '${mark}'`);
   }
@@ -201,29 +211,26 @@ export class Parser {
     this.#current = this.#scanner.next();
     const id = this.#target.notes.length;
     this.#target.notes.push({ degree, accident });
-    this.#target.nodes.push({
+    return this.#target.nodes.push({
       type: NodeType.NOTE,
       id,
       options,
-    });
+    }) - 1;
   }
 
-  #node() {
+  #node(): number {
     if (this.#current.type === TokenType.IDENTIFIER) {
-      this.#insert();
-      return;
+      return this.#insert();
     }
     const options: Options | undefined = this.#options();
     switch (this.#current.type) {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
-        this.#set(NodeType.ARRAY, TokenType.RIGHT_BRACKET, options);
-        return;
+        return this.#set(NodeType.ARRAY, TokenType.RIGHT_BRACKET, options);
       }
       case TokenType.LEFT_BRACE: {
         this.#advance();
-        this.#set(NodeType.SET, TokenType.RIGHT_BRACE, options);
-        return;
+        return this.#set(NodeType.SET, TokenType.RIGHT_BRACE, options);
       }
       case TokenType.INTEGER_MINUS:
         return this.#note(-1, options);
@@ -242,18 +249,20 @@ export class Parser {
           }
         }
         this.#advance();
-        this.#target.nodes.push({ type: NodeType.REST, id: 0, options });
-        return;
+        return this.#target.nodes.push({
+          type: NodeType.REST,
+          id: 0,
+          options,
+        }) - 1;
       case TokenType.TEXT: {
         const value = this.#scanner.getText(this.#current.from);
         this.#advance();
         this.#target.events.push(value);
-        this.#target.nodes.push({
+        return this.#target.nodes.push({
           type: NodeType.EVENT,
           id: this.#target.events.length - 1,
           options,
-        });
-        return;
+        }) - 1;
       }
       default:
         throw this.#error(`Expected note, rest or set here`);
@@ -263,13 +272,16 @@ export class Parser {
   #insert() {
     const mark = this.#mark();
     if (!this.#match(TokenType.IS)) {
-      this.#target.nodes.push(this.#resolve(mark));
+      return this.#target.nodes.push(this.#resolve(mark)) - 1;
     } else {
-      this.#node();
+      // How can an interpreter know that we will return here?
+      // e.g. to store local state for reuse.
+      const index = this.#node();
       this.#bindings.push({
         mark,
-        node: this.#target.nodes[this.#target.nodes.length - 1],
+        index,
       });
+      return index;
     }
   }
 
@@ -305,15 +317,18 @@ export class Parser {
     options?: Options,
   ) {
     const scope = this.#bindings.length;
+    const node = { type, options, id: 0 };
+    const index = this.#target.nodes.push(node) - 1;
+    // the interleaving issue again!
+    // when dealing with nested structures, a stack and a bump allocator are needed.
     try {
-      const node = { type, options, id: 0 }; // can we do something sensible with these ids?
-      this.#target.nodes.push(node);
-      let length = 0;
+      const indices = [];
       while (!this.#match(stop)) {
-        this.#node();
-        length++;
+        indices.push(this.#node());
       }
-      node.type = NodeType.multiply(type, length);
+      node.type = NodeType.multiply(type, indices.length);
+      node.id = this.#target.indices.length;
+      this.#target.indices.push(...indices);
     } catch (error) {
       this.storeError(error);
       this.#panic();
@@ -321,6 +336,7 @@ export class Parser {
       // bindings go out of scope
       this.#bindings.length = scope;
     }
+    return index;
   }
 
   #pop(): Token {
