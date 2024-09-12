@@ -20,14 +20,12 @@ class Transformer {
   // perhaps these should be stacks...
   channel = 0;
   velocity = 71;
-  durations: Ratio[] = [new Ratio(1, 4)];
-  keys: number[] = [0];
   programs: number[] = [];
   time = Ratio.ZERO;
   msPerBeat = Ratio.int(2000);
 
   constructor(readonly source: ParseResult, readonly target: MIDI) {
-    const bpm = source.metadata?.bmp;
+    const bpm = source.metadata?.bpm;
     if (typeof bpm === "number") {
       this.msPerBeat = new Ratio(2.4e5, bpm);
     }
@@ -79,14 +77,6 @@ class Transformer {
 
   #node(index: number) {
     const node = this.source.data.nodes[index];
-    if (node.options) {
-      if (node.options.duration) {
-        this.durations.push(node.options.duration);
-      }
-      if (node.options.key !== undefined) {
-        this.keys.push(node.options.key);
-      }
-    }
     switch (NodeType.base(node.type)) {
       case NodeType.ARRAY: {
         const length = NodeType.length(node.type);
@@ -101,7 +91,7 @@ class Transformer {
       case NodeType.NOTE: {
         const tone = this.source.data.notes[node.id];
         const _pitch = pitch(
-          this.keys[this.keys.length - 1],
+          node.key,
           tone.degree,
           tone.accident,
         );
@@ -114,9 +104,7 @@ class Transformer {
             this.velocity,
           ],
         );
-        this.time = this.time.plus(
-          this.durations[this.durations.length - 1],
-        );
+        this.time = this.time.plus(node.duration);
         this.target.push(
           this.#realTime(),
           [
@@ -129,9 +117,7 @@ class Transformer {
         break;
       }
       case NodeType.REST: {
-        this.time = this.time.plus(
-          this.durations[this.durations.length - 1],
-        );
+        this.time = this.time.plus(node.duration);
         break;
       }
       case NodeType.SET: {
@@ -153,29 +139,14 @@ class Transformer {
         break;
       }
     }
-    if (node.options) {
-      if (node.options.duration) {
-        this.durations.pop();
-      }
-      if (node.options.key !== undefined) {
-        this.keys.pop();
-      }
-    }
   }
 }
 
-// todo: transform time
 export class MIDI {
-  data: { time: number; message: number[] }[] = [];
+  messages: { realTime: number; message: number[] }[] = [];
   realTime: number = 0;
-  push(
-    time: number,
-    message: number[],
-  ) {
-    this.data.push({
-      time,
-      message,
-    });
+  push(realTime: number, message: number[]) {
+    this.messages.push({ realTime, message });
   }
   constructor(source: ParseResult) {
     new Transformer(source, this);

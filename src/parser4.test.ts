@@ -10,8 +10,8 @@ Deno.test(function parseRest() {
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  assertEquals(node.options?.duration?.numerator, 1);
-  assertEquals(node.options?.duration?.denominator, 4);
+  assertEquals(node.duration.numerator, 1);
+  assertEquals(node.duration.denominator, 4);
 });
 
 Deno.test(function parseSimpleRest() {
@@ -19,8 +19,8 @@ Deno.test(function parseSimpleRest() {
   if (node?.type !== NodeType.REST) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  assertEquals(node.options?.duration?.numerator, undefined);
-  assertEquals(node.options?.duration?.denominator, undefined);
+  assertEquals(node.duration.numerator, 1);
+  assertEquals(node.duration.denominator, 4);
 });
 
 Deno.test(function parseNote() {
@@ -30,11 +30,11 @@ Deno.test(function parseNote() {
     data.errors.forEach((it) => console.error(it.error));
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = data.notes[node?.id];
+  const note = data.notes[node.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 2);
-  assertEquals(node.options?.duration?.numerator, 3);
-  assertEquals(node.options?.duration?.denominator, 4);
+  assertEquals(node.duration.numerator, 3);
+  assertEquals(node.duration.denominator, 4);
 });
 
 Deno.test(function parseSimpleNote() {
@@ -43,11 +43,11 @@ Deno.test(function parseSimpleNote() {
   if (node?.type !== NodeType.NOTE) {
     fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
   }
-  const note = data.notes[node?.id];
+  const note = data.notes[node.id];
   assertEquals(note.degree, -7);
   assertEquals(note.accident, 0);
-  assertEquals(node.options?.duration?.numerator, undefined);
-  assertEquals(node.options?.duration?.denominator, undefined);
+  assertEquals(node.duration.numerator, 1);
+  assertEquals(node.duration.denominator, 4);
 });
 
 Deno.test(function parseSet() {
@@ -64,18 +64,18 @@ Deno.test(function parsePitchSet() {
   const { data: { nodes: [node] } } = new Parser("_5/16[ 0 2 4 ]").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 3);
-  assertEquals(node.options?.duration?.numerator, 5);
-  assertEquals(node.options?.duration?.denominator, 16);
+  assertEquals(node.duration.numerator, 5);
+  assertEquals(node.duration.denominator, 16);
 });
 
 Deno.test(function parseJoin() {
   const { data: { nodes: [node] } } = new Parser("_/2{ 0  2-  4 }").parse();
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.SET) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 3);
 });
@@ -85,7 +85,7 @@ Deno.test(function parseResolvedRepeat() {
   const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 2);
   assertEquals(data.nodes[1], data.nodes[2]);
@@ -105,13 +105,13 @@ Deno.test(function parseOperations() {
   ).parse();
   const node = data.nodes[0];
   if (!node) fail("missing node");
-  if (NodeType.base(node?.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+  if (NodeType.base(node.type) !== NodeType.ARRAY) {
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
-  assertEquals(node.options?.key, -3);
+  assertEquals(node.key, -3);
   assertEquals(data.events, ["program_64", "vivace", "fff"]);
-  assertEquals(node.options?.duration?.numerator, 5);
-  assertEquals(node.options?.duration?.denominator, 16);
+  assertEquals(node.duration.numerator, 5);
+  assertEquals(node.duration.denominator, 16);
 });
 
 Deno.test(function parseCombination() {
@@ -126,9 +126,9 @@ Deno.test(function parseCombination() {
   const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
-  assertEquals(node.options?.key, undefined);
+  assertEquals(node.key, 0);
   assertEquals(data.events, ["allegro", "f"]);
 });
 
@@ -147,7 +147,7 @@ Deno.test(function noFalseAccidentals() {
   const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
   const accidents = data.notes.map((it) => it.accident);
   assertEquals(accidents, [0, 0, 0]);
@@ -158,16 +158,16 @@ Deno.test(function noFalseDurations() {
   const node = data.nodes[0];
   if (!node) fail("missing node");
   if (NodeType.base(node.type) !== NodeType.ARRAY) {
-    fail(`wrong type ${NodeType.stringify(node?.type ?? 3)}`);
+    fail(`wrong type ${NodeType.stringify(node.type ?? 3)}`);
   }
   assertEquals(NodeType.length(node.type), 4);
   const durations = data.nodes.slice(1).map((it) =>
-    it.options?.duration?.numerator &&
-      it.options?.duration?.denominator
-      ? it.options.duration?.numerator / it.options.duration?.denominator
+    it.duration.numerator &&
+      it.duration.denominator
+      ? it.duration.numerator / it.duration.denominator
       : undefined
   );
-  assertEquals(durations, [0.125, undefined, 0.5, 0.125]);
+  assertEquals(durations, [0.125, 0.25, 0.5, 0.125]);
 });
 
 Deno.test(function addMetaData() {

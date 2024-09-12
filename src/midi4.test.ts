@@ -5,7 +5,7 @@ import { Parser } from "./parser4.ts";
 Deno.test(function simpleMelody() {
   const messages = new MIDI(
     new Parser("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
-  ).data;
+  ).messages;
   assertEquals(messages.length, 8);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
   assertEquals(messages.filter((it) => it.message[0] === 144).length, 4);
@@ -24,7 +24,7 @@ Deno.test(function durations() {
 });
 
 Deno.test(function simpleChord() {
-  const messages = new MIDI(new Parser("_/2{ 0 2- 4 }").parse()).data;
+  const messages = new MIDI(new Parser("_/2{ 0 2- 4 }").parse()).messages;
   assertEquals(messages.length, 6);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 3);
   assertEquals(messages.filter((it) => it.message[0] === 144).length, 3);
@@ -32,7 +32,7 @@ Deno.test(function simpleChord() {
 });
 
 Deno.test(function simpleRepeat() {
-  const messages = new MIDI(new Parser("[$C = _/4 0 $C]").parse()).data;
+  const messages = new MIDI(new Parser("[$C = _/4 0 $C]").parse()).messages;
   assertEquals(messages.length, 4);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 2);
   assertEquals(messages.filter((it) => it.message[0] === 144).length, 2);
@@ -42,7 +42,7 @@ Deno.test(function simpleRepeat() {
 Deno.test(function simpleProgram() {
   const messages = new MIDI(
     new Parser("['program_64' _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
-  ).data;
+  ).messages;
   assertEquals(messages.length, 9);
   assertEquals(messages[0].message[0], 0xc0);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
@@ -53,7 +53,7 @@ Deno.test(function simpleProgram() {
 Deno.test(function otherParamsChange() {
   const messages = new MIDI(
     new Parser("key 3 ['vivace' 'fff' _/8 0 1 2 0 _/8 r ]").parse(),
-  ).data;
+  ).messages;
   assertEquals(messages.length, 8);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 4);
   assertEquals(messages.filter((it) => it.message[0] === 144).length, 4);
@@ -72,7 +72,7 @@ Deno.test(function jacob() {
         "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
         "$D = [_/8 0 -3 _/2 0 _/8 r] $D\n]",
     ).parse(),
-  ).data;
+  ).messages;
   assertEquals(messages.length, 64);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 32);
   assertEquals(messages.filter((it) => it.message[0] === 144).length, 32);

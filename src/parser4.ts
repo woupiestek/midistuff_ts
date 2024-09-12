@@ -1,11 +1,6 @@
 import { Scanner, Token, TokenType } from "./scanner3.ts";
 import { Ratio } from "./util.ts";
 
-export type Options = {
-  duration?: Ratio;
-  key?: number;
-};
-
 export type Dict = { [_: string]: Value };
 export type Value = Dict | number | string | Value[];
 
@@ -17,16 +12,16 @@ export type Note = {
 export type Node = {
   type: number;
   id: number;
-  options?: Options;
+  duration: Ratio;
+  key: number;
 };
 
 export const NodeType = {
   ARRAY: 1,
   EVENT: 2,
   NOTE: 3,
-  // REPEAT: 4,
-  REST: 5,
-  SET: 6,
+  REST: 4,
+  SET: 5,
   multiply(typ: number, length: number = 1): number {
     return length * 16 + typ;
   },
@@ -101,7 +96,7 @@ export class Parser {
 
   parse(): ParseResult {
     try {
-      this.#node();
+      this.#node(0, new Ratio(1, 4));
     } catch (error) {
       this.storeError(error);
       return { data: this.#target };
@@ -178,32 +173,36 @@ export class Parser {
     throw this.#error(`Could not resolve '${mark}'`);
   }
 
-  #options(): Options | undefined {
-    const options: Options = {};
+  #options(): { key?: number; duration?: Ratio } {
+    let key, duration;
     a: for (;;) {
       switch (this.#current.type) {
         case TokenType.KEY:
-          if (options.key !== undefined) {
+          if (key !== undefined) {
             throw this.#error("Double key");
           }
           this.#advance();
-          options.key = this.#integer(-7, 7);
+          key = this.#integer(-7, 7);
           continue;
         case TokenType.DURATION:
-          options.duration = this.#scanner.getRatio(this.#current.from);
+          if (duration !== undefined) {
+            throw this.#error("Double duration");
+          }
+          duration = this.#scanner.getRatio(this.#current.from);
           this.#advance();
           continue;
         default:
           break a;
       }
     }
-    if (Object.values(options).every((it) => it === undefined)) {
-      return undefined;
-    }
-    return options;
+    return { key, duration };
   }
 
-  #note(accident: -2 | -1 | 0 | 1 | 2, options?: Options) {
+  #push(type: number, id: number, key: number, duration: Ratio): number {
+    return this.#target.nodes.push({ type, id, key, duration }) - 1;
+  }
+
+  #note(accident: -2 | -1 | 0 | 1 | 2, key: number, duration: Ratio) {
     const degree = this.#scanner.getIntegerValue(this.#current.from);
     if (degree < -34 || 38 < degree) {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
@@ -211,78 +210,89 @@ export class Parser {
     this.#current = this.#scanner.next();
     const id = this.#target.notes.length;
     this.#target.notes.push({ degree, accident });
-    return this.#target.nodes.push({
-      type: NodeType.NOTE,
-      id,
-      options,
-    }) - 1;
+    return this.#push(NodeType.NOTE, id, key, duration);
   }
 
-  #node(): number {
-    if (this.#current.type === TokenType.IDENTIFIER) {
-      return this.#insert();
-    }
-    const options: Options | undefined = this.#options();
+  #node(key: number, duration: Ratio): number {
+    const options = this.#options();
+    key = options.key ?? key;
+    duration = options.duration ?? duration;
+    if (key === undefined) console.log("key", key);
     switch (this.#current.type) {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
-        return this.#set(NodeType.ARRAY, TokenType.RIGHT_BRACKET, options);
+        return this.#set(
+          NodeType.ARRAY,
+          TokenType.RIGHT_BRACKET,
+          key,
+          duration,
+        );
       }
       case TokenType.LEFT_BRACE: {
         this.#advance();
-        return this.#set(NodeType.SET, TokenType.RIGHT_BRACE, options);
+        return this.#set(
+          NodeType.SET,
+          TokenType.RIGHT_BRACE,
+          key,
+          duration,
+        );
+      }
+      case TokenType.IDENTIFIER: {
+        if (options.key !== undefined || options.duration !== undefined) {
+          throw this.#error(
+            "Key signatures and durartion are not allowed on marks",
+          );
+        }
+
+        return this.#insert(key, duration);
       }
       case TokenType.INTEGER_MINUS:
-        return this.#note(-1, options);
+        return this.#note(-1, key, duration);
       case TokenType.INTEGER_MINUS_MINUS:
-        return this.#note(-2, options);
+        return this.#note(-2, key, duration);
       case TokenType.INTEGER_PLUS:
-        return this.#note(1, options);
+        return this.#note(1, key, duration);
       case TokenType.INTEGER_PLUS_PLUS:
-        return this.#note(2, options);
+        return this.#note(2, key, duration);
       case TokenType.INTEGER:
-        return this.#note(0, options);
+        return this.#note(0, key, duration);
       case TokenType.REST:
-        if (options) {
-          if (options.key !== undefined) {
-            throw this.#error("Key signatures are not allowed rests");
-          }
+        if (options.key !== undefined) {
+          throw this.#error("Key signatures are not allowed on rests");
         }
         this.#advance();
-        return this.#target.nodes.push({
-          type: NodeType.REST,
-          id: 0,
-          options,
-        }) - 1;
+        return this.#push(
+          NodeType.REST,
+          0,
+          key,
+          duration,
+        );
       case TokenType.TEXT: {
         const value = this.#scanner.getText(this.#current.from);
         this.#advance();
-        this.#target.events.push(value);
-        return this.#target.nodes.push({
-          type: NodeType.EVENT,
-          id: this.#target.events.length - 1,
-          options,
-        }) - 1;
+        return this.#push(
+          NodeType.EVENT,
+          this.#target.events.push(value) - 1,
+          key,
+          duration,
+        );
       }
       default:
         throw this.#error(`Expected note, rest or set here`);
     }
   }
 
-  #insert() {
+  #insert(key: number, duration: Ratio) {
     const mark = this.#mark();
     if (!this.#match(TokenType.IS)) {
       return this.#target.nodes.push(this.#resolve(mark)) - 1;
-    } else {
-      // How can an interpreter know that we will return here?
-      // e.g. to store local state for reuse.
-      const index = this.#node();
-      this.#bindings.push({
-        mark,
-        index,
-      });
-      return index;
     }
+    const index = this.#node(key, duration);
+    this.#bindings.push({
+      mark,
+      index,
+    });
+    return index;
   }
 
   #panic() {
@@ -314,17 +324,18 @@ export class Parser {
   #set(
     type: number,
     stop: TokenType,
-    options?: Options,
+    key: number,
+    duration: Ratio,
   ) {
     const scope = this.#bindings.length;
-    const node = { type, options, id: 0 };
+    const node = { type, key, duration, id: 0 };
     const index = this.#target.nodes.push(node) - 1;
     // the interleaving issue again!
     // when dealing with nested structures, a stack and a bump allocator are needed.
     try {
       const indices = [];
       while (!this.#match(stop)) {
-        indices.push(this.#node());
+        indices.push(this.#node(key, duration));
       }
       node.type = NodeType.multiply(type, indices.length);
       node.id = this.#target.indices.length;
