@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2024-09-12
+
+Rethinking this project as a way to get nwc into musescore or lilypond. In
+combination with data oriented ideas. Maybe there are nicer ways to represent
+musicxml data, like a list of nodes with a tag, an for each tag, data
+containers. Yeah. A format intermediate between nwc and musicxml...
+
 ## 2024-09-09
 
 See test coverage with deno:

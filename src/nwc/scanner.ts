@@ -17,15 +17,12 @@ export enum TokenType {
 
 export type Token = {
   from: number;
-  line: number;
-  to: number;
   type: TokenType;
 };
 
 export class Scanner {
   #current = 0;
   #from = 0;
-  #line = 1;
   constructor(private readonly source: string) {}
 
   done() {
@@ -39,7 +36,6 @@ export class Scanner {
 
   #bang() {
     while (this.#pop() !== "\n");
-    this.#line++;
   }
 
   #letter() {
@@ -71,6 +67,20 @@ export class Scanner {
       }
     }
   }
+  getString(from: number): string {
+    let to = from;
+    for (;;) {
+      switch (this.source[++to]) {
+        case undefined:
+          throw new Error("not a string");
+        case "\\":
+          to++;
+          continue;
+        case '"':
+          return this.source.slice(from, to);
+      }
+    }
+  }
 
   #value(): Token {
     for (;;) {
@@ -87,8 +97,23 @@ export class Scanner {
     }
   }
 
+  getOther(from: number): string {
+    let to = from;
+    for (;;) {
+      switch (this.source[++to]) {
+        case undefined:
+        case ",":
+        case ":":
+        case "=":
+        case "|":
+        case "\r":
+          return this.source.slice(from, to);
+      }
+    }
+  }
+
   #token(type: TokenType): Token {
-    return { type, from: this.#from, to: this.#current, line: this.#line };
+    return { type, from: this.#from };
   }
 
   next(): Token {
@@ -111,7 +136,6 @@ export class Scanner {
       case "=":
         return this.#token(TokenType.IS);
       case "\n":
-        this.#line++;
         return this.#token(TokenType.LINE);
       default:
         return this.#value();
@@ -125,5 +149,15 @@ export class Scanner {
     ) {
       this.#current++;
     }
+  }
+
+  line(index: number) {
+    let line = 1;
+    for (let i = 0, l = this.source.length; i < index; i++) {
+      if (this.source[i] === "\n") {
+        line++;
+      }
+    }
+    return line;
   }
 }

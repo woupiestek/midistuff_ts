@@ -22,9 +22,9 @@ export class Parser {
 
   #error(msg: string) {
     return new Error(
-      `Failed to parse ${
-        TokenType[this.#current.type]
-      } '${this.#lexeme()}' at line ${this.#current.line}: ${msg}`,
+      `Failed to parse ${TokenType[this.#current.type]} '\u2026${
+        this.source.slice(this.#current.from - 3, this.#current.from + 3)
+      }\u2026' at line ${this.#scanner.line(this.#current.from)}: ${msg}`,
     );
   }
 
@@ -45,20 +45,16 @@ export class Parser {
     if (this.#current.type !== TokenType.OTHER) {
       throw this.#error(`Expected key, got ${TokenType[this.#current.type]}`);
     }
-    const key = this.#lexeme();
+    const key = this.#scanner.getOther(this.#current.from);
     this.#advance();
     return key;
-  }
-
-  #lexeme() {
-    return this.source.slice(this.#current.from, this.#current.to);
   }
 
   #value() {
     switch (this.#current.type) {
       case TokenType.OTHER:
       case TokenType.STRING: {
-        const a = this.#lexeme();
+        const a = this.#scanner.getString(this.#current.from);
         this.#advance();
         return a;
       }
@@ -83,7 +79,7 @@ export class Parser {
             break;
           }
           case TokenType.STRING:
-            values.push(this.#lexeme());
+            values.push(this.#scanner.getString(this.#current.from));
             this.#advance();
             break;
         }
