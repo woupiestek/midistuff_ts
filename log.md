@@ -1,5 +1,9 @@
 # Midistuff logs
 
+## 2024-09-20
+
+simplistic xml spec: element ()
+
 ## 2024-09-12
 
 Rethinking this project as a way to get nwc into musescore or lilypond. In

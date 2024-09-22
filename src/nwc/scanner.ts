@@ -126,6 +126,7 @@ export class Scanner {
         this.#bang();
         return this.#token(TokenType.BANG);
       case "|":
+        this.#key();
         return this.#token(TokenType.PIPE);
       case '"':
         return this.#string();
@@ -153,7 +154,7 @@ export class Scanner {
 
   line(index: number) {
     let line = 1;
-    for (let i = 0, l = this.source.length; i < index; i++) {
+    for (let i = 0; i < index; i++) {
       if (this.source[i] === "\n") {
         line++;
       }
