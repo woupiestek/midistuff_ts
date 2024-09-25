@@ -47,7 +47,6 @@ export class Parser {
   #nwc(): NWC {
     const begin = this.#consume(TokenType.BANG, "Missing begin");
     const middle = [];
-    console.log("what!?", TokenType[this.next.type]);
     while (this.#match(TokenType.LINE)) {
       if (this.next.type === TokenType.PIPE) {
         middle.push(this.#line());

@@ -70,15 +70,33 @@ export class Scanner {
     return this.#token(TokenType.END);
   }
 
-  //   getBang(from: number): string {
-  //     let to = from;
-  //     while (this.source[to++] !== "\n");
-  //     return this.source.slice(from, to);
-  //   }
+  getName(from: number): string {
+    let to = from;
+    while (/\w/.test(this.source[to++]));
+    return this.source.slice(from, to - 1);
+  }
 
-  //   getName(from: number): string {
-  //     let to = from;
-  //     while (/\w/.test(this.source[to++]));
-  //     return this.source.slice(from, to);
-  //   }
+  getPos(from: number): string {
+    let to = from;
+    while (/[-0-9#bnvx]/.test(this.source[to++]));
+    return this.source.slice(from, to - 1);
+  }
+
+  getString(from: number): string {
+    let to = from;
+    while (to < this.source.length) {
+      switch (this.source[to++]) {
+        case '"':
+          return this.source.slice(from, to - 1);
+        case "\n":
+          throw new Error("unterminated string");
+        case "\\":
+          to++;
+          // fall through
+        default:
+          continue;
+      }
+    }
+    throw new Error("unterminated string");
+  }
 }

@@ -1,5 +1,31 @@
 # Midistuff logs
 
+## 2024-09-25
+
+Let's make a todo list. These are the tags in the sample file:
+
+- ~~Editor~~
+- SongInfo
+- ~~PgSetup~~
+- ~~Font~~
+- ~~PgMargins~~
+- AddStaff
+- StaffProperties
+- StaffInstrument
+- Clef
+- Key
+- TimeSig
+- Tempo
+- Dynamic
+- Rest
+- Chord
+- Bar
+- Note
+- SustainPedal
+
+The target list is harder, musicxml is not nice! What if we went the other way
+around somehow? Writers block.
+
 ## 2024-09-20
 
 simplistic xml spec: element ()
