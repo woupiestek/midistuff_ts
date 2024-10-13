@@ -1,5 +1,21 @@
 # Midistuff logs
 
+## 2024-10-13
+
+### data orientation
+
+Consider the advantages of being able to add a property to all objects of a type
+dynamically, like adding a column to a table... Maybe that is what databases
+already tend to do.
+
+During development it is the same as adding a method to a class, but possibly
+cleaner.
+
+This is beyond the scope of this project, but nearly each field on a class could
+be an 'extension field', with its own logic for initialisation. It is
+acknowledged that handles are just object ids, and that each field of an object
+is stored in an array for all objects of a class.
+
 ## 2024-09-25
 
 Let's make a todo list. These are the tags in the sample file:
@@ -9,18 +25,18 @@ Let's make a todo list. These are the tags in the sample file:
 - ~~PgSetup~~
 - ~~Font~~
 - ~~PgMargins~~
-- AddStaff
+- ~~AddStaff~~
 - StaffProperties
 - StaffInstrument
-- Clef
-- Key
+- ~~Clef~~
+- ~~Key~~
 - TimeSig
 - Tempo
 - Dynamic
-- Rest
-- Chord
-- Bar
-- Note
+- ~~Rest~~
+- ~~Chord~~
+- ~~Bar~~
+- ~~Note~~
 - SustainPedal
 
 The target list is harder, musicxml is not nice! What if we went the other way
