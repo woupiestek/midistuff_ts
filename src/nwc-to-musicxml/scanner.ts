@@ -84,7 +84,7 @@ export class Scanner {
 
   getPos(from: number): string {
     let to = from;
-    while (/[-0-9#bnvx]/.test(this.source[to++]));
+    while (/[-0-9#bnvx^]/.test(this.source[to++]));
     return this.source.slice(from, to - 1);
   }
 
