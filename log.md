@@ -1,12 +1,5 @@
 # Midistuff logs
 
-!NoteWorthyComposerClip(2.751,Single)
-|Chord|Dur:8th|Pos:-2|Opts:Stem=Down|Dur2:4th|Pos2:2
-|Note|Dur:8th|Pos:-1|Opts:Stem=Down
-!NoteWorthyComposerClip-End
-
-
-
 ## 2024-10-13
 
 ### data orientation

@@ -1,11 +1,31 @@
-type Element = {
-  tag: string;
-  attributes: Map<string, string>;
-  texts: string[];
-  elements: Element[];
-};
+type Element = number & { readonly __tag: unique symbol };
 
 export class Elements {
+  #next = 0;
+  #tag: string[] = [];
+  #attribute: (Map<string, string> | undefined)[] = [];
+  #text: string[][] = [];
+  #element: Element[][] = [];
+
+  create(
+    tag: string,
+    attributes: Map<string, string> | undefined,
+    ...content: (string | Element)[]
+  ) {
+    this.#tag[this.#next] = tag;
+    this.#attribute[this.#next] = attributes;
+    this.#text[this.#next] = [];
+    this.#element[this.#next] = [];
+    for (let i = 0, l = content.length; i < l; i++) {
+      let text = "";
+      while (typeof content[i] === "string") {
+        text += content[i++];
+      }
+      this.#text[this.#next].push(text);
+      if (i < l) this.#element[this.#next].push(content[i] as Element);
+    }
+  }
+
   escapeXml(unsafe: string) {
     return unsafe.replace(/[<>&'"]/g, (c) => {
       switch (c) {
@@ -25,18 +45,26 @@ export class Elements {
   }
   stringify(element: Element): string {
     let attributes = "";
-    for (const [k, v] of Object.entries(element.attributes)) {
-      attributes += ` ${k}="${this.escapeXml(v)}"`;
+    if (this.#attribute[element]) {
+      for (const [k, v] of this.#attribute[element]?.entries()) {
+        attributes += ` ${k}="${this.escapeXml(v)}"`;
+      }
     }
     let content = "";
     for (
       let i = 0;
-      i < element.elements.length || i < element.texts.length;
+      i < this.#element[element].length || i < this.#text[element].length;
       i++
     ) {
-      if (element.texts[i]) content += this.escapeXml(element.texts[i]);
-      if (element.elements[i]) content += this.stringify(element.elements[i]);
+      if (this.#text[element][i]) {
+        content += this.escapeXml(this.#text[element][i]);
+      }
+      if (this.#element[element][i]) {
+        content += this.stringify(this.#element[element][i]);
+      }
     }
-    return `<${element.tag}${attributes}>${content}</${element.tag}>`;
+    return `<${this.#tag[element]}${attributes}>${content}</${
+      this.#tag[element]
+    }>`;
   }
 }

@@ -27,13 +27,16 @@ export class Transformed {
     v: -2,
   };
 
+  pitches: {
+    [_: string]: { octave: number; step: string; alter: number };
+  } = {};
+
   #pitch(pos: string) {
-  const tied = pos[pos.length - 1] === '^';
-    if(tied) { 
-      pos = pos.substring(0,pos.length-1);
+    const tied = pos[pos.length - 1] === "^";
+    if (tied) {
+      pos = pos.substring(0, pos.length - 1);
     }
     let alter = Transformed.#alters[pos[0]];
-
     const offset = this.#offset +
       +(alter === undefined ? pos : pos.substring(1));
     if (alter === undefined) {
@@ -41,8 +44,14 @@ export class Transformed {
     } else {
       this.#alterations[offset % 7] = alter;
     }
+    const key = offset + ["bb", "b", "", "#", "x"][alter + 2];
     // ouch! boolean field tied
-    return { octave: (offset / 7) | 0, step: "CDEFGAB"[offset % 7], alter, tied };
+    this.pitches[key] ||= {
+      octave: (offset / 7) | 0,
+      step: "CDEFGAB"[offset % 7],
+      alter,
+    };
+    return { pitch: key, tied };
   }
 
   constructor(source: string) {
