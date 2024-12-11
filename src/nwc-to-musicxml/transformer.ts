@@ -1,4 +1,3 @@
-import { Parser } from "./parser.ts";
 import { Scanner } from "./scanner.ts";
 
 export class Transformed {
@@ -44,7 +43,7 @@ export class Transformed {
     } else {
       this.#alterations[offset % 7] = alter;
     }
-    const key = offset + ["bb", "b", "", "#", "x"][alter + 2];
+    const key = ["bb", "b", "n", "#", "x"][alter + 2] + offset;
     // ouch! boolean field tied
     this.pitches[key] ||= {
       octave: (offset / 7) | 0,
@@ -56,20 +55,18 @@ export class Transformed {
 
   constructor(source: string) {
     const scanner = new Scanner(source);
-    const nwc = new Parser(scanner).result();
-
-    for (const line of nwc.middle) {
-      const typ = scanner.getName(line.tag.from + 1);
+    for (const line of scanner.lines()) {
+      const typ = scanner.getName(scanner.getLineTag(line) + 1);
       switch (typ) {
         // case "SongInfo":
         case "AddStaff": {
           this.#signature = [0, 0, 0, 0, 0, 0, 0];
           this.#alterations = [0, 0, 0, 0, 0, 0, 0];
           let name = "";
-          for (const column of line.columns) {
-            switch (scanner.getName(column.tag.from + 1)) {
+          for (const column of scanner.getColumns(line)) {
+            switch (scanner.getName(scanner.getColumnTag(column) + 1)) {
               case "Name":
-                name = scanner.getString(column.values[0].from + 2);
+                name = scanner.getString(scanner.getValues(column)[0] + 2);
             }
           }
           this.partNames.push(name);
@@ -79,18 +76,24 @@ export class Transformed {
         // case "StaffProperties":
         // case "StaffInstrument":
         case "Clef": {
-          const sign = scanner.getName(line.columns[0].values[0].from + 1);
-          const shift = line.columns[1] &&
-            scanner.getName(line.columns[1].values[0].from + 1);
+          const cols = [...scanner.getColumns(line)];
+          const sign = scanner.getName(
+            scanner.getValues(cols[0])[0] + 1,
+          );
+          const shift = cols[1] &&
+            scanner.getName(
+              scanner.getValues(cols[1])[0] + 1,
+            );
           this.types.push(typ);
           this.#offset = Transformed.#clefStep[sign] ?? 34;
           this.data.push({ sign, shift });
           continue;
         }
         case "Key": {
-          const signature = line.columns[0].values.map((it) =>
-            scanner.getKeyPart(it.from + 1)
-          );
+          const cols = [...scanner.getColumns(line)];
+          const signature = scanner.getValues(cols[0]).map((
+            from,
+          ) => scanner.getKeyPart(from + 1));
 
           this.#signature = [0, 0, 0, 0, 0, 0, 0];
           for (const x of signature) {
@@ -98,9 +101,10 @@ export class Transformed {
               { "#": 1, "b": -1 }[x[1]] ?? 0;
           }
           this.#alterations = [...this.#signature];
-
-          const tonic = line.columns[1] &&
-            scanner.getKeyPart(line.columns[1].values[0].from + 1);
+          const tonic = cols[1] &&
+            scanner.getKeyPart(
+              scanner.getValues(cols[1])[0] + 1,
+            );
           this.types.push(typ);
           this.data.push({ signature, tonic });
           continue;
@@ -110,10 +114,12 @@ export class Transformed {
         // case "Dynamic":
         case "Rest": {
           let dur: string[] = [];
-          for (const column of line.columns) {
-            switch (scanner.getName(column.tag.from + 1)) {
+          for (const column of scanner.getColumns(line)) {
+            switch (scanner.getName(scanner.getColumnTag(column) + 1)) {
               case "Dur":
-                dur = column.values.map((it) => scanner.getName(it.from + 1));
+                dur = scanner.getValues(column).map((from) =>
+                  scanner.getName(from + 1)
+                );
             }
           }
           this.types.push(typ);
@@ -123,13 +129,17 @@ export class Transformed {
         case "Chord": {
           let dur: string[] = [];
           let pos: string[] = [];
-          for (const column of line.columns) {
-            switch (scanner.getName(column.tag.from + 1)) {
+          for (const column of scanner.getColumns(line)) {
+            switch (scanner.getName(scanner.getColumnTag(column) + 1)) {
               case "Dur":
-                dur = column.values.map((it) => scanner.getName(it.from + 1));
+                dur = scanner.getValues(column).map((from) =>
+                  scanner.getName(from + 1)
+                );
                 break;
               case "Pos":
-                pos = column.values.map((it) => scanner.getPos(it.from + 1));
+                pos = scanner.getValues(column).map((from) =>
+                  scanner.getPos(from + 1)
+                );
                 break;
             }
           }
@@ -145,13 +155,15 @@ export class Transformed {
         case "Note": {
           let dur: string[] = [];
           let pos = "";
-          for (const column of line.columns) {
-            switch (scanner.getName(column.tag.from + 1)) {
+          for (const column of scanner.getColumns(line)) {
+            switch (scanner.getName(scanner.getColumnTag(column) + 1)) {
               case "Dur":
-                dur = column.values.map((it) => scanner.getName(it.from + 1));
+                dur = scanner.getValues(column).map((from) =>
+                  scanner.getName(from + 1)
+                );
                 break;
               case "Pos":
-                pos = scanner.getPos(column.values[0].from + 1);
+                pos = scanner.getPos(scanner.getValues(column)[0] + 1);
                 break;
             }
           }

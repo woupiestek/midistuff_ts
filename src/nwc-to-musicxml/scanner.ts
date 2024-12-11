@@ -1,78 +1,57 @@
-export enum TokenType {
-  BANG,
-  COLON,
-  COMMA,
-  END,
-  ERROR,
-  IS,
-  LINE,
-  PIPE,
-  STRING,
-}
-
-export type Token = {
-  from: number;
-  type: TokenType;
-};
-
 export class Scanner {
-  #current = 0;
-  constructor(private readonly source: string) {}
-
-  hasNext() {
-    return this.#current < this.source.length;
-  }
-
-  #token(typ: TokenType): Token {
-    return { type: typ, from: this.#current - 1 };
-  }
-
-  #string() {
-    while (this.hasNext()) {
-      switch (this.source[this.#current++]) {
-        case '"':
-          return;
-        case "\n":
-          return this.#token(TokenType.ERROR);
-        case "\\":
-          this.#current++;
-          // fall through
-        default:
-          continue;
+  #indices: number[] = [];
+  #column: number[] = [];
+  #line: number[] = [];
+  constructor(private readonly source: string) {
+    let isString = false;
+    for (let i = 0, l = this.source.length; i < l; i++) {
+      if ('"' === this.source[i]) {
+        isString = !isString;
+        if (isString) this.#indices.push(i);
+      }
+      if (isString) continue;
+      if ("\:,=!".includes(this.source[i])) {
+        this.#indices.push(i);
+      }
+      if ("|" === this.source[i]) {
+        this.#column.push(this.#indices.length);
+        this.#indices.push(i);
+      }
+      if ("\n" === this.source[i]) {
+        this.#line.push(this.#column.length);
       }
     }
-    return this.#token(TokenType.ERROR);
+    this.#line.push(this.#column.length);
   }
-
-  next() {
-    while (this.hasNext()) {
-      switch (this.source[this.#current++]) {
-        case "|":
-          return this.#token(TokenType.PIPE);
-        case ":":
-          return this.#token(TokenType.COLON);
-        case ",":
-          return this.#token(TokenType.COMMA);
-        case "=":
-          return this.#token(TokenType.IS);
-        case "\n":
-          return this.#token(TokenType.LINE);
-        case "!":
-          return this.#token(TokenType.BANG);
-        case '"': {
-          const token = this.#token(TokenType.STRING);
-          return this.#string() || token;
-        }
-        default:
-          continue;
-      }
+  lines() {
+    return this.#line.map((_, i) => i).slice(1);
+  }
+  getLineTag(line: number) {
+    return this.#indices[this.#column[this.#line[line]]];
+  }
+  *getColumns(line: number) {
+    for (
+      let i = this.#line[line] + 1,
+        l = this.#line[line + 1] ?? this.#column.length;
+      i < l;
+      i++
+    ) {
+      yield i;
     }
-    return this.#token(TokenType.END);
+  }
+  getColumnTag(column: number) {
+    return this.#indices[this.#column[column]];
+  }
+  getValues(column: number) {
+    return this.#indices.slice(
+      this.#column[column] + 1,
+      this.#column[column + 1],
+    );
   }
 
   getName(from: number): string {
     let to = from;
-    while (/\w/.test(this.source[to++]));
+    while (to < this.source.length && /\w/.test(this.source[to++]));
     return this.source.slice(from, to - 1);
   }
 

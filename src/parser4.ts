@@ -98,7 +98,7 @@ export class Parser {
     try {
       this.#node(0, new Ratio(1, 4));
     } catch (error) {
-      this.storeError(error);
+      this.storeError(error as Error);
       return { data: this.#target };
     }
     let metadata: Dict = {};
@@ -106,7 +106,7 @@ export class Parser {
       try {
         metadata = this.dict();
       } catch (error) {
-        this.storeError(error);
+        this.storeError(error as Error);
         return { data: this.#target };
       }
     }
@@ -341,7 +341,7 @@ export class Parser {
       node.id = this.#target.indices.length;
       this.#target.indices.push(...indices);
     } catch (error) {
-      this.storeError(error);
+      this.storeError(error as Error);
       this.#panic();
     } finally {
       // bindings go out of scope

@@ -109,7 +109,7 @@ export class Parser {
     try {
       main = this.#node();
     } catch (error) {
-      main = Node.error(this.#current, error);
+      main = Node.error(this.#current, error as Error);
       return { metadata: {}, main, sections: [] };
     }
     let metadata: Dict = {};
@@ -117,7 +117,7 @@ export class Parser {
       try {
         metadata = this.dict();
       } catch (error) {
-        main = Node.error(this.#current, error);
+        main = Node.error(this.#current, error as Error);
         return {
           metadata: {},
           main: Node.error(
@@ -334,7 +334,7 @@ export class Parser {
     } catch (error) {
       const token = this.#current;
       this.#panic();
-      return Node.error(token, error);
+      return Node.error(token, error as Error);
     }
   }
 
