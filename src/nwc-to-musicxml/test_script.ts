@@ -17,7 +17,7 @@ try {
       dur ? (dur instanceof Array ? dur : [dur]) : []
     ),
   );
-  console.log(dur);
+  //console.log(dur);
   console.log(transformed);
 } catch (e) {
   console.error("Something went wrong", e);

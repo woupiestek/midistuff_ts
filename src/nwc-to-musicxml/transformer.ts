@@ -53,6 +53,56 @@ export class Transformed {
     return { pitch: key, tied };
   }
 
+  #fractions(dur: string[]): number {
+    let d = 192;
+    for (const s of dur) {
+      switch (s) {
+        case "16th":
+          d /= 16;
+          break;
+        case "32nd":
+          d /= 32;
+          break;
+        case "64th":
+          d /= 64;
+          break;
+        case "8th":
+          d /= 8;
+          break;
+        case "4th":
+          d /= 4;
+          break;
+        case "Dotted":
+          d *= 3 / 2;
+          break;
+        case "DblDotted":
+          d *= 7 / 4;
+          break;
+        case "Triplet":
+          d *= 2 / 3;
+          break;
+        case "First":
+          break;
+        case "End":
+          break;
+        case "Staccato":
+          break;
+        case "Tenuto":
+          break;
+        case "Accent":
+          break;
+        case "Whole":
+          break;
+        case "Half":
+          d /= 2;
+          break;
+        default:
+          break;
+      }
+    }
+    return d;
+  }
+
   constructor(source: string) {
     const scanner = new Scanner(source);
     for (const line of scanner.lines()) {
@@ -123,7 +173,7 @@ export class Transformed {
             }
           }
           this.types.push(typ);
-          this.data.push({ dur });
+          this.data.push({ dur, fractions: this.#fractions(dur) });
           break;
         }
         case "Chord": {
@@ -144,7 +194,12 @@ export class Transformed {
             }
           }
           this.types.push(typ);
-          this.data.push({ dur, pos, pitch: pos.map((p) => this.#pitch(p)) });
+          this.data.push({
+            dur,
+            pos,
+            pitch: pos.map((p) => this.#pitch(p)),
+            fractions: this.#fractions(dur),
+          });
           break;
         }
         case "Bar": {
@@ -172,6 +227,7 @@ export class Transformed {
             dur,
             pos,
             pitch: this.#pitch(pos),
+            fractions: this.#fractions(dur),
           });
           break;
         }
