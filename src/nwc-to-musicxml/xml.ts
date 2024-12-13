@@ -1,17 +1,17 @@
-type Element = number & { readonly __tag: unique symbol };
+export type Element = number & { readonly __tag: unique symbol };
 
 export class Elements {
   #next = 0;
   #tag: string[] = [];
-  #attribute: (Map<string, string> | undefined)[] = [];
+  #attribute: ({ [_: string]: string } | undefined)[] = [];
   #text: string[][] = [];
   #element: Element[][] = [];
 
   create(
     tag: string,
-    attributes: Map<string, string> | undefined,
+    attributes: { [_: string]: string } | undefined = undefined,
     ...content: (string | Element)[]
-  ) {
+  ): Element {
     this.#tag[this.#next] = tag;
     this.#attribute[this.#next] = attributes;
     this.#text[this.#next] = [];
@@ -24,6 +24,7 @@ export class Elements {
       this.#text[this.#next].push(text);
       if (i < l) this.#element[this.#next].push(content[i] as Element);
     }
+    return this.#next++ as Element;
   }
 
   escapeXml(unsafe: string) {
@@ -46,7 +47,7 @@ export class Elements {
   stringify(element: Element): string {
     let attributes = "";
     if (this.#attribute[element]) {
-      for (const [k, v] of this.#attribute[element]?.entries()) {
+      for (const [k, v] of Object.entries(this.#attribute[element])) {
         attributes += ` ${k}="${this.escapeXml(v)}"`;
       }
     }
@@ -62,6 +63,9 @@ export class Elements {
       if (this.#element[element][i]) {
         content += this.stringify(this.#element[element][i]);
       }
+    }
+    if (content === "") {
+      return `<${this.#tag[element]}${attributes}/>`;
     }
     return `<${this.#tag[element]}${attributes}>${content}</${
       this.#tag[element]

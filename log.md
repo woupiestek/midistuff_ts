@@ -1,5 +1,11 @@
 # Midistuff logs
 
+## 2024-12-13
+
+So many moving parts... what next? !NoteWorthyComposerClip(2.751,Single)
+|TimeSig|Signature:Common |TimeSig|Signature:AllaBreve
+!NoteWorthyComposerClip-End
+
 ## 2024-10-13
 
 ### data orientation

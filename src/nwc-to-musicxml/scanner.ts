@@ -61,6 +61,12 @@ export class Scanner {
     return this.source.slice(from, to - 1);
   }
 
+  getSignature(from: number): string {
+    let to = from;
+    while (/[\w/]/.test(this.source[to++]));
+    return this.source.slice(from, to - 1);
+  }
+
   getPos(from: number): string {
     let to = from;
     while (/[-0-9#bnvx^]/.test(this.source[to++]));

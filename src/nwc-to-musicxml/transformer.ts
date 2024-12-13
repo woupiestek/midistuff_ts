@@ -1,10 +1,25 @@
 import { Scanner } from "./scanner.ts";
+import { Element, Elements } from "./xml.ts";
+
+// expected smallest subdivison in NWC
+const FRACTION = 768;
+
+function gcd(a: number, b: number): number {
+  for (;;) {
+    if (!b) return a;
+    a = a % b;
+    if (!a) return b;
+    b = b % a;
+  }
+}
 
 export class Transformed {
   partOffset: number[] = [];
   partNames: string[] = [];
   measures: number[] = [];
   types: string[] = [];
+  durations: number[] = [];
+  attributes: object[] = [];
   data: object[] = [];
 
   #offset = 34;
@@ -26,8 +41,8 @@ export class Transformed {
     v: -2,
   };
 
-  pitches: {
-    [_: string]: { octave: number; step: string; alter: number };
+  #pitches: {
+    [_: string]: Element;
   } = {};
 
   #pitch(pos: string) {
@@ -44,17 +59,23 @@ export class Transformed {
       this.#alterations[offset % 7] = alter;
     }
     const key = ["bb", "b", "n", "#", "x"][alter + 2] + offset;
+    const octave = (offset / 7) | 0;
+    const step = "CDEFGAB"[offset % 7];
     // ouch! boolean field tied
-    this.pitches[key] ||= {
-      octave: (offset / 7) | 0,
-      step: "CDEFGAB"[offset % 7],
-      alter,
-    };
+    this.#pitches[key] ||= this.#xml.create(
+      "pitch",
+      undefined,
+      this.#xml.create("alter", undefined, alter.toString()),
+      this.#xml.create("octave", undefined, octave.toString()),
+      this.#xml.create("step", undefined, step),
+    );
     return { pitch: key, tied };
   }
 
+  #gcd = Number.MAX_VALUE;
+
   #fractions(dur: string[]): number {
-    let d = 192;
+    let d = FRACTION;
     for (const s of dur) {
       switch (s) {
         case "16th":
@@ -100,6 +121,9 @@ export class Transformed {
           break;
       }
     }
+    if (this.#gcd > d) {
+      this.#gcd = gcd(this.#gcd, d);
+    }
     return d;
   }
 
@@ -134,9 +158,13 @@ export class Transformed {
             scanner.getName(
               scanner.getValues(cols[1])[0] + 1,
             );
-          this.types.push(typ);
+          this.attributes.push({
+            type: typ,
+            measure: this.measures.length,
+            sign,
+            shift,
+          });
           this.#offset = Transformed.#clefStep[sign] ?? 34;
-          this.data.push({ sign, shift });
           continue;
         }
         case "Key": {
@@ -155,11 +183,24 @@ export class Transformed {
             scanner.getKeyPart(
               scanner.getValues(cols[1])[0] + 1,
             );
-          this.types.push(typ);
-          this.data.push({ signature, tonic });
+          this.attributes.push({
+            type: typ,
+            measure: this.measures.length,
+            signature,
+            tonic,
+          });
           continue;
         }
-        // case "TimeSig":
+        case "TimeSig": {
+          const col = scanner.getColumns(line).next().value ?? -1;
+          const time = scanner.getSignature(scanner.getValues(col)[0] + 1);
+          this.attributes.push({
+            type: typ,
+            measure: this.measures.length,
+            time,
+          });
+          continue;
+        }
         // case "Tempo":
         // case "Dynamic":
         case "Rest": {
@@ -173,7 +214,8 @@ export class Transformed {
             }
           }
           this.types.push(typ);
-          this.data.push({ dur, fractions: this.#fractions(dur) });
+          this.durations.push(this.#fractions(dur));
+          this.data.push({ dur });
           break;
         }
         case "Chord": {
@@ -194,11 +236,11 @@ export class Transformed {
             }
           }
           this.types.push(typ);
+          this.durations.push(this.#fractions(dur));
           this.data.push({
             dur,
             pos,
             pitch: pos.map((p) => this.#pitch(p)),
-            fractions: this.#fractions(dur),
           });
           break;
         }
@@ -223,17 +265,73 @@ export class Transformed {
             }
           }
           this.types.push(typ);
+          this.durations.push(this.#fractions(dur));
           this.data.push({
             dur,
             pos,
             pitch: this.#pitch(pos),
-            fractions: this.#fractions(dur),
           });
           break;
         }
         // case "SustainPedal":
         default:
           continue;
+      }
+    }
+    console.log(this.#gcd);
+  }
+
+  #xml = new Elements();
+  toXML() {
+    return this.#xml.stringify(this.#xml.create(
+      "score-partwise",
+      { version: "4.0" },
+      this.#xml.create(
+        "part-list",
+        undefined,
+        ...this.partNames.map((name, i) =>
+          this.#xml.create(
+            "score-part",
+            { id: `P${i + 1}` },
+            this.#xml.create("part-name", undefined, name),
+          )
+        ),
+      ),
+      ...this.partNames.map((_, i) =>
+        this.#xml.create(
+          "part",
+          { id: `P${i + 1}` },
+          ...this.measures.slice(this.partOffset[i], this.partOffset[i + 1])
+            .map((_, j) =>
+              this.#xml.create("measure", { number: (j + 1).toString() })
+            ),
+        )
+      ),
+    ));
+  }
+
+  // todo
+  #notes(measure: number) {
+    const from = this.measures[measure];
+    const to = this.measures[measure + 1] ?? this.types.length;
+    const notes = [];
+    for (let i = from; i < to; i++) {
+      switch (this.types[i]) {
+        case "Rest":
+          notes.push(
+            this.#xml.create(
+              "note",
+              undefined,
+              this.#xml.create("rest"),
+              this.#xml.create(
+                "duration",
+                undefined,
+                (this.durations[i] / this.#gcd).toString(),
+              ),
+              // collect the right data and map it...
+              // this.#xml.create("type", )
+            ),
+          );
       }
     }
   }
