@@ -4,6 +4,10 @@ import { Element, Elements } from "./xml.ts";
 // expected smallest subdivison in NWC
 const FRACTION = 768;
 
+function range(from: number, to: number) {
+  return Array.from({ length: to - from }).map((_, i) => i + from);
+}
+
 function gcd(a: number, b: number): number {
   for (;;) {
     if (!b) return a;
@@ -44,6 +48,12 @@ export class Transformed {
   #pitches: {
     [_: string]: Element;
   } = {};
+
+  readonly #REST: Element;
+
+  readonly #CHORD: Element;
+
+  readonly #TYPES: { [_: string]: Element };
 
   #pitch(pos: string) {
     const tied = pos[pos.length - 1] === "^";
@@ -278,7 +288,26 @@ export class Transformed {
           continue;
       }
     }
-    console.log(this.#gcd);
+    this.#CHORD = this.#xml.create("chord");
+    this.#REST = this.#xml.create("rest");
+    this.#TYPES = Object.fromEntries(
+      Object.entries({
+        "16th": "16th",
+        "32nd": "32nd",
+        "4th": "quaver",
+        "64th": "64th",
+        "8th": "eighth",
+        "Half": "half",
+        "Whole": "whole",
+      }).map(([k, v]) => [
+        k,
+        this.#xml.create(
+          "type",
+          undefined,
+          v,
+        ),
+      ]),
+    );
   }
 
   #xml = new Elements();
@@ -301,38 +330,92 @@ export class Transformed {
         this.#xml.create(
           "part",
           { id: `P${i + 1}` },
-          ...this.measures.slice(this.partOffset[i], this.partOffset[i + 1])
-            .map((_, j) =>
-              this.#xml.create("measure", { number: (j + 1).toString() })
+          ...range(
+            this.partOffset[i],
+            this.partOffset[i + 1] ?? this.measures.length,
+          )
+            .map((n, j) =>
+              this.#xml.create(
+                "measure",
+                { number: (j + 1).toString() },
+                ...this.#notes(n),
+              )
             ),
         )
       ),
     ));
   }
 
-  // todo
+  #type(dur: string[]): Element {
+    for (const d of dur) {
+      const t: Element | undefined = this.#TYPES[d];
+      if (t !== undefined) return t;
+    }
+    throw new Error("no type of note found");
+  }
+
+  #DURATION: { [_: number]: Element } = {};
+
+  // todo: any decorations of the notes...
   #notes(measure: number) {
-    const from = this.measures[measure];
-    const to = this.measures[measure + 1] ?? this.types.length;
+    const from = measure && this.measures[measure - 1];
+    const to = this.measures[measure];
     const notes = [];
     for (let i = from; i < to; i++) {
+      const duration = (this.#DURATION[i] ||= this.#xml.create(
+        "duration",
+        undefined,
+        (this.durations[i] / this.#gcd).toString(),
+      ));
+      const _type = this.#type(this.data[i].dur);
       switch (this.types[i]) {
         case "Rest":
           notes.push(
             this.#xml.create(
               "note",
               undefined,
-              this.#xml.create("rest"),
-              this.#xml.create(
-                "duration",
-                undefined,
-                (this.durations[i] / this.#gcd).toString(),
-              ),
-              // collect the right data and map it...
-              // this.#xml.create("type", )
+              this.#REST,
+              duration,
+              _type,
             ),
           );
+          break;
+        case "Note":
+          notes.push(
+            this.#xml.create(
+              "note",
+              undefined,
+              this.#pitches[this.data[i].pitch],
+              duration,
+              _type,
+            ),
+          );
+          break;
+        case "Chord": {
+          const [h, ...t] = this.data[i].pitch;
+          notes.push(
+            this.#xml.create(
+              "note",
+              undefined,
+              this.#pitches[h],
+              duration,
+              _type,
+            ),
+            ...t.map((i: string) =>
+              this.#xml.create(
+                "note",
+                undefined,
+                this.#pitches[i],
+                this.#CHORD,
+                duration,
+                _type,
+              )
+            ),
+          );
+          break;
+        }
       }
     }
+    return notes;
   }
 }

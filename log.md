@@ -2,9 +2,7 @@
 
 ## 2024-12-13
 
-So many moving parts... what next? !NoteWorthyComposerClip(2.751,Single)
-|TimeSig|Signature:Common |TimeSig|Signature:AllaBreve
-!NoteWorthyComposerClip-End
+So many moving parts... what next?
 
 ## 2024-10-13
 
