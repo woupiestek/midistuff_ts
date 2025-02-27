@@ -294,7 +294,7 @@ export class Transformed {
       Object.entries({
         "16th": "16th",
         "32nd": "32nd",
-        "4th": "quaver",
+        "4th": "quarter",
         "64th": "64th",
         "8th": "eighth",
         "Half": "half",
@@ -357,6 +357,7 @@ export class Transformed {
   #DURATION: { [_: number]: Element } = {};
 
   // todo: any decorations of the notes...
+  // fixme: where are the pitches?
   #notes(measure: number) {
     const from = measure && this.measures[measure - 1];
     const to = this.measures[measure];
@@ -385,7 +386,7 @@ export class Transformed {
             this.#xml.create(
               "note",
               undefined,
-              this.#pitches[this.data[i].pitch],
+              this.#pitches[this.data[i].pitch.pitch],
               duration,
               _type,
             ),
@@ -397,7 +398,7 @@ export class Transformed {
             this.#xml.create(
               "note",
               undefined,
-              this.#pitches[h],
+              this.#pitches[h.pitch],
               duration,
               _type,
             ),
@@ -405,7 +406,7 @@ export class Transformed {
               this.#xml.create(
                 "note",
                 undefined,
-                this.#pitches[i],
+                this.#pitches[i.pitch],
                 this.#CHORD,
                 duration,
                 _type,
