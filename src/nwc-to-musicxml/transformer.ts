@@ -17,12 +17,34 @@ function gcd(a: number, b: number): number {
   }
 }
 
+class Parts {
+  offsets: number[] = [];
+  names: string[] = [];
+  push(name: string, offset: number) {
+    this.names.push(name);
+    this.offsets.push(offset);
+  }
+  partList(xml: Elements) {
+    return xml.create(
+      "part-list",
+      undefined,
+      ...this.names.map((name, i) =>
+        xml.create(
+          "score-part",
+          { id: `P${i + 1}` },
+          xml.create("part-name", undefined, name),
+        )
+      ),
+    );
+  }
+}
+
 export class Transformed {
-  partOffset: number[] = [];
-  partNames: string[] = [];
+  parts: Parts = new Parts();
   measures: number[] = [];
   types: string[] = [];
   durations: number[] = [];
+  // not used yet
   attributes: object[] = [];
   data: object[] = [];
 
@@ -153,8 +175,7 @@ export class Transformed {
                 name = scanner.getString(scanner.getValues(column)[0] + 2);
             }
           }
-          this.partNames.push(name);
-          this.partOffset.push(this.measures.length);
+          this.parts.push(name, this.measures.length);
           continue;
         }
         // case "StaffProperties":
@@ -315,24 +336,14 @@ export class Transformed {
     return this.#xml.stringify(this.#xml.create(
       "score-partwise",
       { version: "4.0" },
-      this.#xml.create(
-        "part-list",
-        undefined,
-        ...this.partNames.map((name, i) =>
-          this.#xml.create(
-            "score-part",
-            { id: `P${i + 1}` },
-            this.#xml.create("part-name", undefined, name),
-          )
-        ),
-      ),
-      ...this.partNames.map((_, i) =>
+      this.parts.partList(this.#xml),
+      ...this.parts.offsets.map((offset, i) =>
         this.#xml.create(
           "part",
           { id: `P${i + 1}` },
           ...range(
-            this.partOffset[i],
-            this.partOffset[i + 1] ?? this.measures.length,
+            offset,
+            this.parts.offsets[i + 1] ?? this.measures.length,
           )
             .map((n, j) =>
               this.#xml.create(

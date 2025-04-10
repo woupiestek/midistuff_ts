@@ -1,5 +1,26 @@
 # Midistuff logs
 
+## 2025-04-10
+
+### detat representation
+
+This is how Noteworthy handles multiple voices:
+
+!NoteWorthyComposerClip(2.751,Single)
+|Chord|Dur:8th|Pos:1|Opts:Stem=Up|Dur2:Half|Pos2:-3
+|Note|Dur:8th|Pos:0|Opts:Stem=Up |Note|Dur:8th|Pos:-1|Opts:Stem=Up
+|Note|Dur:8th|Pos:0|Opts:Stem=Up !NoteWorthyComposerClip-End
+
+Choice is limited to two durations, with the shorter one leading.
+
+Musicxml allows more durations, but the durations must be shorter than the first
+note: the longest during is leading.
+
+## 2025-03-11
+
+What about breaking up by lens: for each source path, select a target path and
+converter, as a way to make converters modular.
+
 ## 2024-12-13
 
 So many moving parts... what next?
