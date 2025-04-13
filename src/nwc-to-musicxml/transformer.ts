@@ -368,7 +368,6 @@ export class Transformed {
   #DURATION: { [_: number]: Element } = {};
 
   // todo: any decorations of the notes...
-  // fixme: where are the pitches?
   #notes(measure: number) {
     const from = measure && this.measures[measure - 1];
     const to = this.measures[measure];

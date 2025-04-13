@@ -1,5 +1,102 @@
 # Midistuff logs
 
+## 2025-04-15
+
+### line numbers
+
+Instead of counting particular lines, identify objects by their (adjusted) line number in the nwc file!
+
+
+!NoteWorthyComposerClip(2.751,Single)
+|Clef|Type:Treble|OctaveShift:Octave Up
+!NoteWorthyComposerClip-End
+!NoteWorthyComposerClip(2.751,Single)
+|Clef|Type:Treble|OctaveShift:Octave Down
+!NoteWorthyComposerClip-End
+
+
+## 2025-04-13
+
+### positions versus durations
+
+!NoteWorthyComposerClip(2.751,Single)
+|Note|Dur:4th,DblDotted,Tenuto,Slur,Accent|Pos:1^ |Note|Dur:4th|Pos:1
+!NoteWorthyComposerClip-End
+
+### grace, slur, beam
+
+!NoteWorthyComposerClip(2.751,Single) |Note|Dur:8th,Grace,Slur|Pos:2
+|Note|Dur:8th|Pos:1|Opts:Stem=Down,Beam=First
+|Note|Dur:8th|Pos:2|Opts:Stem=Down,Beam |Note|Dur:8th|Pos:3|Opts:Stem=Down,Beam
+|Note|Dur:8th|Pos:1|Opts:Stem=Down,Beam=End !NoteWorthyComposerClip-End
+
+NWC seems to only support beams on the shortest durations if multiple are
+defined.
+
+### beams
+
+!NoteWorthyComposerClip(2.751,Single)
+|Note|Dur:8th,DblDotted|Pos:1|Opts:Stem=Down,Beam=First
+|Note|Dur:32nd|Pos:1|Opts:Stem=Down,Beam=End !NoteWorthyComposerClip-End
+
+### Design
+
+Pretty much go linearly though the NWC file, but allow each component to react
+it is own way.
+
+So we can either think of producing results in response to the 'commands', or of
+representing details in the input efficiently.
+
+Start over?
+
+## 2025-04-12
+
+How to continue now? I've been wanting to combine data orientation with a break
+up by optic: each property gets its own class that maintains a collection
+(preferrably an array) of elements.
+
+There are two models of sheet music to be handled here.
+
+Idea: ways to organize notes... like a group of pitched by duration. rests,
+notes and chords, but here is the issue: NWC allows chords to contain two groups
+of notes of different pitch MusicXML doesn't impose this limit. NWC has rest
+type element MusicXML treat rest as a special pitch.
+
+List of notes, with durations added to groups of them. Some things belong to
+pitches, like ties and dots.
+
+### accidentals in noteworthy:
+
+!NoteWorthyComposerClip(2.751,Single) |Note|Dur:4th|Pos:b0 |Note|Dur:4th|Pos:0
+|Note|Dur:4th|Pos:0 |Note|Dur:4th|Pos:0 !NoteWorthyComposerClip-End
+
+'b' is not a position, but an acccidental symbol, that applies to the remaining
+notes.
+
+### polyphonic chords:
+
+!NoteWorthyComposerClip(2.751,Single)
+|Chord|Dur:8th|Pos:-2,1|Opts:Stem=Up|Dur2:Half|Pos2:-5,-4
+|Chord|Dur:8th|Pos:-2,2|Opts:Stem=Up |Chord|Dur:8th|Pos:-1,1|Opts:Stem=Up
+|Chord|Dur:8th|Pos:-2,0|Opts:Stem=Up !NoteWorthyComposerClip-End
+
+### tied example.
+
+!NoteWorthyComposerClip(2.751,Single) |Chord|Dur:8th|Pos:-4,-2^
+|Chord|Dur:8th|Pos:-5,-2 !NoteWorthyComposerClip-End
+
+### so...
+
+Core data structure to record lists of pitches and belong decorations, However,
+record both the position on the bar and the actual pitch
+
+Then group this by duration. Rests can be indicated by empty durations, While
+chords by durations with extra notes. The polyphonic option needs some special
+care here, cause otherwise the assumption is that each duration comes after the
+other.
+
+Durations are grouped by measures, and those by parts.
+
 ## 2025-04-10
 
 ### detat representation

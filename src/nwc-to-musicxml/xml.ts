@@ -44,7 +44,12 @@ export class Elements {
       return c;
     });
   }
+  #strings: string[] = [];
   stringify(element: Element): string {
+    this.#strings[element] ||= this.#stringify(element);
+    return this.#strings[element];
+  }
+  #stringify(element: Element): string {
     let attributes = "";
     if (this.#attribute[element]) {
       for (const [k, v] of Object.entries(this.#attribute[element])) {
