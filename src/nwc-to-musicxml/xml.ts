@@ -46,8 +46,7 @@ export class Elements {
   }
   #strings: string[] = [];
   stringify(element: Element): string {
-    this.#strings[element] ||= this.#stringify(element);
-    return this.#strings[element];
+    return this.#strings[element] ||= this.#stringify(element);
   }
   #stringify(element: Element): string {
     let attributes = "";
@@ -57,17 +56,13 @@ export class Elements {
       }
     }
     let content = "";
-    for (
-      let i = 0;
-      i < this.#element[element].length || i < this.#text[element].length;
-      i++
-    ) {
-      if (this.#text[element][i]) {
-        content += this.escapeXml(this.#text[element][i]);
-      }
-      if (this.#element[element][i]) {
-        content += this.stringify(this.#element[element][i]);
-      }
+    const l = this.#element[element].length;
+    for (let i = 0; i < l; i++) {
+      content += this.escapeXml(this.#text[element][i]);
+      content += this.stringify(this.#element[element][i]);
+    }
+    if (l < this.#text[element].length) {
+      content += this.escapeXml(this.#text[element][l]);
     }
     if (content === "") {
       return `<${this.#tag[element]}${attributes}/>`;

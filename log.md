@@ -4,16 +4,18 @@
 
 ### line numbers
 
-Instead of counting particular lines, identify objects by their (adjusted) line number in the nwc file!
+Instead of counting particular lines, identify objects by their (adjusted) line
+number in the nwc file!
 
+### noteworthy cuts
 
-!NoteWorthyComposerClip(2.751,Single)
-|Clef|Type:Treble|OctaveShift:Octave Up
-!NoteWorthyComposerClip-End
-!NoteWorthyComposerClip(2.751,Single)
-|Clef|Type:Treble|OctaveShift:Octave Down
-!NoteWorthyComposerClip-End
+!NoteWorthyComposerClip(2.751,Single) |Clef|Type:Treble|OctaveShift:Octave Up
+!NoteWorthyComposerClip-End !NoteWorthyComposerClip(2.751,Single)
+|Clef|Type:Treble|OctaveShift:Octave Down !NoteWorthyComposerClip-End
 
+### strategy
+
+Want notes grouped by measure, measures by staff
 
 ## 2025-04-13
 

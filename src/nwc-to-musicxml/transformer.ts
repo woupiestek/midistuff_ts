@@ -94,13 +94,22 @@ export class Transformed {
     const octave = (offset / 7) | 0;
     const step = "CDEFGAB"[offset % 7];
     // ouch! boolean field tied
-    this.#pitches[key] ||= this.#xml.create(
-      "pitch",
-      undefined,
-      this.#xml.create("alter", undefined, alter.toString()),
-      this.#xml.create("octave", undefined, octave.toString()),
-      this.#xml.create("step", undefined, step),
-    );
+    if (alter) {
+      this.#pitches[key] ||= this.#xml.create(
+        "pitch",
+        undefined,
+        this.#xml.create("step", undefined, step),
+        this.#xml.create("alter", undefined, alter.toString()),
+        this.#xml.create("octave", undefined, octave.toString()),
+      );
+    } else {
+      this.#pitches[key] ||= this.#xml.create(
+        "pitch",
+        undefined,
+        this.#xml.create("step", undefined, step),
+        this.#xml.create("octave", undefined, octave.toString()),
+      );
+    }
     return { pitch: key, tied };
   }
 
