@@ -1,5 +1,15 @@
 # Midistuff logs
 
+## 2025-04-18
+
+### time signatures
+
+!NoteWorthyComposerClip(2.751,Single) |TimeSig|Signature:4/4
+|TimeSig|Signature:2/2 |TimeSig|Signature:3/4 |TimeSig|Signature:2/4
+|TimeSig|Signature:Common |TimeSig|Signature:AllaBreve |TimeSig|Signature:3/2
+|TimeSig|Signature:3/8 |TimeSig|Signature:6/8 |TimeSig|Signature:9/8
+|TimeSig|Signature:12/8 !NoteWorthyComposerClip-End
+
 ## 2025-04-15
 
 ### line numbers

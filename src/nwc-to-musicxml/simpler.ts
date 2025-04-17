@@ -29,47 +29,68 @@ export function scan(source: string): NWCLine[] {
 }
 
 const ALTSTR = "vbn#x";
+const HEADER = '<?xml version="1.0" encoding="UTF-8"?>'; //<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "https://raw.githubusercontent.com/w3c/musicxml/refs/tags/v4.0/schema/partwise.dtd">';
 
 class MusicXML {
   readonly chord: Element;
   readonly rest: Element;
+  readonly clefs: Record<string, Element>;
+  //readonly keys: Element[];
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
     this.rest = xml.create("rest");
+    const c = xml.create("sign", undefined, "C");
+    this.clefs = {
+      Bass: xml.create("clef", undefined, xml.create("sign", undefined, "F")),
+      Alto: xml.create("clef", undefined, c),
+      Tenor: xml.create(
+        "clef",
+        undefined,
+        c,
+        xml.create("line", undefined, "4"),
+      ),
+      Treble: xml.create("clef", undefined, xml.create("sign", undefined, "G")),
+    };
   }
 
-  #pitchElements: Record<string, Element> = {};
-
-  pitch(tone: number, alter: string): Element {
-    const key = alter + tone;
-    const octave = ((tone / 7) | 0).toString();
-    const step = "CDEFGAB"[tone % 7];
-    const a = ALTSTR.indexOf(alter) - 2;
-    if (a) {
-      return this.#pitchElements[key] ||= this.xml.create(
-        "pitch",
-        undefined,
-        this.xml.create("step", undefined, step),
-        this.xml.create("alter", undefined, a.toString()),
-        this.xml.create("octave", undefined, octave),
-      );
-    }
-    return this.#pitchElements[key] ||= this.xml.create(
-      "pitch",
+  key(fifths: number): Element {
+    return this.#cache["K" + fifths] ||= this.xml.create(
+      "key",
       undefined,
-      this.xml.create("step", undefined, step),
-      this.xml.create("octave", undefined, octave),
+      this.xml.create("fifths", undefined, fifths.toString()),
     );
   }
 
-  #typeMap: Record<string, Element> = {};
-  type(dur: string): Element {
-    return this.#typeMap[dur] ||= this.xml.create("type", undefined, dur);
+  #steps = [..."CDEFGAB"].map((step) =>
+    this.xml.create("step", undefined, step)
+  );
+  #octaves = [..."0123456789"].map((octave) =>
+    this.xml.create("octave", undefined, octave)
+  );
+  #alters = Object.fromEntries(
+    [...ALTSTR].map((
+      alter,
+      i,
+    ) => [alter, this.xml.create("alter", undefined, (i - 2).toString())]),
+  );
+
+  pitch(tone: number, alter: string): Element {
+    return this.#cache[alter + tone] ||= this.create(
+      "pitch",
+      undefined,
+      this.#steps[tone % 7],
+      alter === "n" ? null : this.#alters[alter],
+      this.#octaves[(tone / 7) | 0],
+    );
   }
 
-  note(...Elements: Element[]): Element {
-    return this.xml.create("note", undefined, ...Elements);
+  type(dur: string): Element {
+    return this.#cache["T" + dur] ||= this.xml.create("type", undefined, dur);
+  }
+
+  note(...Elements: (Element | null)[]): Element {
+    return this.create("note", undefined, ...Elements);
   }
 
   measure(
@@ -83,16 +104,30 @@ class MusicXML {
     );
   }
 
+  #cache: Record<string, Element> = {};
+
+  duration(duration: string): Element {
+    return this.#cache["D" + duration] ||= this.xml.create(
+      "duration",
+      undefined,
+      duration,
+    );
+  }
+
   create(
     name: string,
     attributes?: Record<string, string>,
-    ...Elements: (Element | string)[]
+    ...Elements: (Element | string | null)[]
   ): Element {
-    return this.xml.create(name, attributes, ...Elements);
+    return this.xml.create(
+      name,
+      attributes,
+      ...Elements.filter((x) => x !== null),
+    );
   }
 
   stringify(element: Element): string {
-    return this.xml.stringify(element);
+    return HEADER + this.xml.stringify(element);
   }
 }
 
@@ -231,30 +266,65 @@ function gcd(a: number, b: number): number {
 const FRACTION = 768;
 
 class Durations {
-  #bar: number[] = [];
+  #measure: number[] = [];
   #durations: number[] = [];
   #types: string[] = [];
   #lines: number[] = [];
   #poly: Set<number> = new Set();
 
+  #parts: Set<number> = new Set();
+  #clefs: Map<number, string> = new Map();
+  #keys: Map<number, number> = new Map();
+  #times: Map<number, string> = new Map();
+
   visit(line: NWCLine) {
     switch (line.tag) {
       case "AddStaff":
+        this.#measure.push(this.#durations.length);
+        this.#parts.add(this.#durations.length);
+        break;
       case "Bar":
-        this.#bar.push(this.#durations.length);
+        this.#measure.push(this.#durations.length);
         break;
       case "Note":
       case "Rest":
         this.#lines.push(line.number);
-        this.#duration(line.number, line.values.Dur);
+        this.#duration(line.values.Dur);
         break;
       case "Chord":
         this.#lines.push(line.number);
         if (line.values.Dur2) {
-          this.#duration(line.number, line.values.Dur2);
+          this.#duration(line.values.Dur2);
           this.#poly.add(this.#durations.length);
         }
-        this.#duration(line.number, line.values.Dur);
+        this.#duration(line.values.Dur);
+        break;
+      case "Clef":
+        this.#clefs.set(
+          this.#durations.length,
+          line.values.Type[0],
+        );
+        break;
+      case "Key": {
+        let fifths = 0;
+        for (const x of line.values.Signature) {
+          if (x[1] === "#") {
+            fifths++;
+          } else {
+            fifths--;
+          }
+        }
+        this.#keys.set(
+          this.#durations.length,
+          fifths,
+        );
+        break;
+      }
+      case "TimeSig":
+        this.#times.set(
+          this.#durations.length,
+          line.values.Signature[0],
+        );
         break;
       default:
         break;
@@ -270,7 +340,8 @@ class Durations {
   #gcd = FRACTION;
   #dots: Map<number, number> = new Map();
 
-  #duration(index: number, dur: string[]) {
+  #duration(dur: string[]) {
+    const index = this.#durations.length;
     let duration = FRACTION;
     for (const s of dur) {
       switch (s) {
@@ -345,11 +416,73 @@ class Durations {
     assert(this.#types.length === this.#durations.length);
   }
 
-  // todo: process all the other collected data
-  notes(bar: number, positions: Positions, xml: MusicXML): Element[] {
-    const result: Element[] = [];
-    const to = this.#bar[bar + 1] ?? this.#durations.length;
-    for (let i = this.#bar[bar]; i < to; i++) {
+  #attributes(i: number, xml: MusicXML) {
+    const content: (Element)[] = [];
+    if (this.#parts.has(i)) {
+      content.push(
+        xml.create(
+          "divisions",
+          undefined,
+          (FRACTION / 4 / this.#gcd).toString(),
+        ),
+      );
+    }
+    const key = this.#keys.get(i);
+    if (key !== undefined) {
+      content.push(xml.key(key));
+    }
+    const time = this.#times.get(i);
+    if (time === "Common") {
+      content.push(
+        xml.create(
+          "time",
+          undefined,
+          xml.create("beats", undefined, "4"),
+          xml.create("beat-type", undefined, "4"),
+        ),
+      );
+    } else if (time === "AllaBreve") {
+      content.push(
+        xml.create(
+          "time",
+          undefined,
+          xml.create("beats", undefined, "2"),
+          xml.create("beat-type", undefined, "2"),
+        ),
+      );
+    } else if (time) {
+      const [beats, beatType] = time.split("/");
+      content.push(
+        xml.create(
+          "time",
+          undefined,
+          xml.create("beats", undefined, beats),
+          xml.create("beat-type", undefined, beatType),
+        ),
+      );
+    }
+    const clef = this.#clefs.get(i);
+    if (clef) {
+      content.push(xml.clefs[clef]);
+    }
+    if (content.length === 0) return null;
+    return xml.create(
+      "attributes",
+      undefined,
+      ...content,
+    );
+  }
+
+  notes(
+    measure: number,
+    positions: Positions,
+    xml: MusicXML,
+  ): (Element | null)[] {
+    const result: (Element | null)[] = [];
+    const to = this.#measure[measure + 1] ?? this.#durations.length;
+    for (let i = this.#measure[measure]; i < to; i++) {
+      // wtf!?
+      result.push(this.#attributes(i, xml));
       const duration = xml.create(
         "duration",
         undefined,
@@ -367,29 +500,19 @@ class Durations {
         );
         continue;
       }
-      if (this.#poly.has(i)) {
-        result.push(xml.note(
-          pitches[0],
-          xml.chord, // indicate that this is part of the previous chord
-          duration,
-          type,
-        ));
-      } else {
-        result.push(xml.note(
-          pitches[0],
-          duration, // start new chord
-          type,
-        ));
-      }
+      result.push(xml.note(
+        pitches[0],
+        this.#poly.has(i) ? xml.chord : null,
+        duration,
+        type,
+      ));
       for (let j = 1; j < pitches.length; j++) {
-        const chorded = xml.note(
+        result.push(xml.note(
           pitches[j],
           xml.chord,
           duration,
           type,
-        );
-        result.push(chorded);
-        console.info("chorded", xml.stringify(chorded));
+        ));
       }
     }
     return result;
@@ -431,18 +554,19 @@ class Options {
 
 class Bars {
   #lines: number[] = [];
-  #staff: number[] = [];
-  #count = 0;
+  #staves: number[] = [];
+  #measures = -1;
+
   visit(line: NWCLine) {
     switch (line.tag) {
       case "AddStaff":
         this.#lines.push(line.number);
-        this.#staff.push(this.#count);
-        this.#count++;
+        this.#measures++;
+        this.#staves.push(this.#measures);
         break;
       case "Bar":
         this.#lines.push(line.number);
-        this.#count++;
+        this.#measures++;
         break;
       default:
         break;
@@ -456,8 +580,8 @@ class Bars {
     xml: MusicXML,
   ): Element[] {
     const result: Element[] = [];
-    const from = this.#staff[staff];
-    const to = this.#staff[staff + 1] ?? this.#count;
+    const from = this.#staves[staff];
+    const to = this.#staves[staff + 1] ?? this.#measures;
     for (let i = from; i < to; i++) {
       result.push(
         xml.create(
