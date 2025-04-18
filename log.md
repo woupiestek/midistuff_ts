@@ -10,6 +10,18 @@
 |TimeSig|Signature:3/8 |TimeSig|Signature:6/8 |TimeSig|Signature:9/8
 |TimeSig|Signature:12/8 !NoteWorthyComposerClip-End
 
+### bar line issues
+
+This:
+
+|Bar|Style:MasterRepeatClose |Bar|Style:MasterRepeatOpen
+
+Must not produce an empty measure
+
+- a bar line element must be emitted
+- when paired, the measure must not be emited. this suggests that every bar
+  listener must watch the style.
+
 ## 2025-04-15
 
 ### line numbers

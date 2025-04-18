@@ -1,5 +1,6 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Element, Elements } from "./xml.ts";
+import { XMLPrinter } from "../musicxml/xmlPrinter.ts";
 
 type NWCLine = {
   number: number;
@@ -35,7 +36,10 @@ class MusicXML {
   readonly chord: Element;
   readonly rest: Element;
   readonly clefs: Record<string, Element>;
-  //readonly keys: Element[];
+  readonly timeMod: Element;
+  readonly startTie: Element;
+  readonly stopTie: Element;
+  readonly dot: Element;
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
@@ -52,6 +56,15 @@ class MusicXML {
       ),
       Treble: xml.create("clef", undefined, xml.create("sign", undefined, "G")),
     };
+    this.timeMod = xml.create(
+      "time-modification",
+      undefined,
+      xml.create("actual-notes", undefined, "3"),
+      xml.create("normal-notes", undefined, "2"),
+    );
+    this.startTie = xml.create("tie", { type: "start" });
+    this.stopTie = xml.create("tie", { type: "stop" });
+    this.dot = xml.create("dot");
   }
 
   key(fifths: number): Element {
@@ -214,33 +227,39 @@ class Positions {
     }
   }
 
-  #open: Set<number> = new Set();
-  #tieStart: Set<number> = new Set();
-  #tieEnd: Set<number> = new Set();
+  #open: Map<number, string> = new Map();
+  #startTie: Set<number> = new Set();
+  #stopTie: Set<number> = new Set();
 
+  // this is what musicians must do in their heads while reading sheet music
   #pitch(pos: string) {
     const altered = ALTSTR.includes(pos[0]);
-    const tied = pos[pos.length - 1] === "^";
-    const tone = +pos.substring(+altered, pos.length - +tied) +
+    const startTie = pos[pos.length - 1] === "^";
+    const tone = +pos.substring(+altered, pos.length - +startTie) +
       this.#tone;
-
     const index = this.#tones.length;
-    if (this.#open.has(tone)) {
-      this.#tieEnd.add(index);
-    }
-    if (tied) {
-      this.#open.add(tone);
-      this.#tieStart.add(index);
-    } else {
-      this.#open.delete(tone);
+    const stopTie = this.#open.get(tone);
+
+    if (stopTie) {
+      this.#stopTie.add(index);
     }
 
     if (altered) {
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
+    } else if (stopTie) {
+      this.#alters.push(stopTie);
     } else {
       this.#alters.push(this.#altersByTone[tone % 7]);
     }
+
+    if (startTie) {
+      this.#open.set(tone, this.#alters[index]);
+      this.#startTie.add(index);
+    } else {
+      this.#open.delete(tone);
+    }
+
     this.#tones.push(tone);
   }
 
@@ -251,6 +270,26 @@ class Positions {
       pitches.push(xml.pitch(this.#tones[i], this.#alters[i]));
     }
     return pitches;
+  }
+
+  startTie(group: number): Set<number> {
+    const from = group && this.#groups[group - 1];
+    const to = this.#groups[group];
+    return new Set(
+      Array.from({ length: to - from }).map((_, i) => i).filter((i) =>
+        this.#startTie.has(i + from)
+      ),
+    );
+  }
+
+  stopTie(group: number): Set<number> {
+    const from = group && this.#groups[group - 1];
+    const to = this.#groups[group];
+    return new Set(
+      Array.from({ length: to - from }).map((_, i) => i).filter((i) =>
+        this.#stopTie.has(i + from)
+      ),
+    );
   }
 }
 
@@ -481,7 +520,6 @@ class Durations {
     const result: (Element | null)[] = [];
     const to = this.#measure[measure + 1] ?? this.#durations.length;
     for (let i = this.#measure[measure]; i < to; i++) {
-      // wtf!?
       result.push(this.#attributes(i, xml));
       const duration = xml.create(
         "duration",
@@ -489,29 +527,46 @@ class Durations {
         (this.#durations[i] / this.#gcd).toString(),
       );
       const type = xml.type(this.#types[i]);
+      const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
       const pitches = positions.pitches(i, xml);
+      const dots = this.#dots.get(i) ?? 0;
       if (pitches.length === 0) {
         result.push(
           xml.note(
             xml.rest,
             duration,
             type,
+            dots < 1 ? null : xml.dot,
+            dots < 2 ? null : xml.dot,
+            timeMod,
           ),
         );
         continue;
       }
+      const startTie = positions.startTie(i);
+      const stopTie = positions.stopTie(i);
       result.push(xml.note(
         pitches[0],
         this.#poly.has(i) ? xml.chord : null,
         duration,
+        startTie.has(0) ? xml.startTie : null,
+        stopTie.has(0) ? xml.stopTie : null,
         type,
+        dots < 1 ? null : xml.dot,
+        dots < 2 ? null : xml.dot,
+        timeMod,
       ));
       for (let j = 1; j < pitches.length; j++) {
         result.push(xml.note(
           pitches[j],
           xml.chord,
           duration,
+          startTie.has(j) ? xml.startTie : null,
+          stopTie.has(j) ? xml.stopTie : null,
           type,
+          dots < 1 ? null : xml.dot,
+          dots < 2 ? null : xml.dot,
+          timeMod,
         ));
       }
     }
@@ -581,7 +636,7 @@ class Bars {
   ): Element[] {
     const result: Element[] = [];
     const from = this.#staves[staff];
-    const to = this.#staves[staff + 1] ?? this.#measures;
+    const to = this.#staves[staff + 1] ?? this.#measures + 1;
     for (let i = from; i < to; i++) {
       result.push(
         xml.create(
