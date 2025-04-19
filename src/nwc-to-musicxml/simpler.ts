@@ -40,6 +40,7 @@ class MusicXML {
   readonly startTie: Element;
   readonly stopTie: Element;
   readonly dot: Element;
+  readonly barlines: Record<string, Element>;
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
@@ -65,6 +66,48 @@ class MusicXML {
     this.startTie = xml.create("tie", { type: "start" });
     this.stopTie = xml.create("tie", { type: "stop" });
     this.dot = xml.create("dot");
+
+    this.barlines = {
+      "Double": xml.create(
+        "barline",
+        { position: "left" },
+        xml.create("bar-style", undefined, "double"),
+      ),
+      "SectionOpen": xml.create(
+        "barline",
+        { position: "left" },
+        xml.create("bar-style", undefined, "heavy-light"),
+      ),
+      "SectionClose": xml.create(
+        "barline",
+        { position: "right" },
+        xml.create("bar-style", undefined, "light-heavy"),
+      ),
+      "MasterRepeatOpen": xml.create(
+        "barline",
+        { position: "left" },
+        xml.create("bar-style", undefined, "heavy-light"),
+        xml.create("repeat", { direction: "forward" }),
+      ),
+      "MasterRepeatClose": xml.create(
+        "barline",
+        { position: "right" },
+        xml.create("bar-style", undefined, "light-heavy"),
+        xml.create("repeat", { direction: "backward" }),
+      ),
+      "LocalRepeatOpen": xml.create(
+        "barline",
+        { position: "left" },
+        xml.create("bar-style", undefined, "light-light"),
+        xml.create("repeat", { direction: "forward" }),
+      ),
+      "LocalRepeatClose": xml.create(
+        "barline",
+        { position: "right" },
+        xml.create("bar-style", undefined, "light-light"),
+        xml.create("repeat", { direction: "backward" }),
+      ),
+    };
   }
 
   key(fifths: number): Element {
@@ -607,10 +650,18 @@ class Options {
   }
 }
 
+const CLOSING_BARS = new Set([
+  "SectionClose",
+  "MasterRepeatClose",
+  "LocalRepeatClose",
+]);
+
 class Bars {
   #lines: number[] = [];
   #staves: number[] = [];
   #measures = -1;
+
+  #barStyles: Map<number, string> = new Map();
 
   visit(line: NWCLine) {
     switch (line.tag) {
@@ -622,6 +673,10 @@ class Bars {
       case "Bar":
         this.#lines.push(line.number);
         this.#measures++;
+        if (line.values.Style) {
+          const style = line.values.Style[0];
+          this.#barStyles.set(this.#measures - +CLOSING_BARS.has(style), style);
+        }
         break;
       default:
         break;
@@ -638,11 +693,17 @@ class Bars {
     const from = this.#staves[staff];
     const to = this.#staves[staff + 1] ?? this.#measures + 1;
     for (let i = from; i < to; i++) {
+      const notes = durations.notes(i, positions, xml);
+      if (notes.length === 0) continue;
+      const barStyle = this.#barStyles.get(i);
+      const closingBar = barStyle && CLOSING_BARS.has(barStyle);
       result.push(
         xml.create(
           "measure",
           { number: (i + 1 - from).toString() },
+          barStyle && !closingBar ? xml.barlines[barStyle] : null,
           ...durations.notes(i, positions, xml),
+          closingBar ? xml.barlines[barStyle] : null,
         ),
       );
     }

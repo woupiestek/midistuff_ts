@@ -1,5 +1,15 @@
 # Midistuff logs
 
+## 2025-04-19
+
+!NoteWorthyComposerClip(2.751,Single) |Bar |Bar|Style:Double
+|Bar|Style:SectionOpen |Bar|Style:SectionClose |Bar|Style:MasterRepeatOpen
+|Bar|Style:MasterRepeatClose |Bar|Style:LocalRepeatOpen
+|Bar|Style:LocalRepeatClose|Repeat:2 |Bar|Style:BrokenSingle
+|Bar|Style:BrokenDouble !NoteWorthyComposerClip-End
+
+https://www.w3.org/2021/06/musicxml40/musicxml-reference/data-types/bar-style/
+
 ## 2025-04-18
 
 ### time signatures
