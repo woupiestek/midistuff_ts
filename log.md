@@ -21,6 +21,21 @@ ties not showing in the bass part as expected
 
 dynamics, metronome, ...
 
+### dynamics
+
+!NoteWorthyComposerClip(2.751,Single) |Dynamic|Style:ppp|Pos:-8
+|Dynamic|Style:pp|Pos:-8 |Dynamic|Style:p|Pos:-8 |Dynamic|Style:mp|Pos:-8
+|Dynamic|Style:mp|Pos:-8 |Dynamic|Style:mf|Pos:-8 |Dynamic|Style:f|Pos:-8
+|Dynamic|Style:ff|Pos:-8 |Dynamic|Style:fff|Pos:-8 !NoteWorthyComposerClip-End
+
+!NoteWorthyComposerClip(2.751,Single)
+|Tempo|Tempo:115|Pos:12
+!NoteWorthyComposerClip-End
+
+!NoteWorthyComposerClip(2.751,Single)
+|Tempo|Base:Eighth Dotted|Tempo:153|Pos:12
+!NoteWorthyComposerClip-End
+
 ## 2025-04-19
 
 !NoteWorthyComposerClip(2.751,Single) |Bar |Bar|Style:Double

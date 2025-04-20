@@ -42,6 +42,7 @@ class MusicXML {
   readonly barlines: Record<string, Element>;
   readonly startSustain: Element;
   readonly stopSustain: Element;
+  readonly dynamics: Record<string, Element>;
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
@@ -109,23 +110,27 @@ class MusicXML {
         xml.create("repeat", { direction: "backward" }),
       ),
     };
-    this.startSustain = xml.create(
-      "direction",
-      undefined,
-      xml.create(
-        "direction-type",
-        undefined,
-        xml.create("pedal", { type: "start" }),
-      ),
+    this.startSustain = this.#direction(
+      xml.create("pedal", { type: "start" }),
     );
-    this.stopSustain = xml.create(
+    this.stopSustain = this.#direction(
+      xml.create("pedal", { type: "stop" }),
+    );
+    this.dynamics = Object.fromEntries(
+      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
+        d,
+      ) => [
+        d,
+        this.#direction(xml.create("dynamics", undefined, xml.create(d))),
+      ]),
+    );
+  }
+
+  #direction(type: Element) {
+    return this.create(
       "direction",
       undefined,
-      xml.create(
-        "direction-type",
-        undefined,
-        xml.create("pedal", { type: "stop" }),
-      ),
+      this.xml.create("direction-type", undefined, type),
     );
   }
 
@@ -378,6 +383,7 @@ class Durations {
   #times: Map<number, string> = new Map();
   #startSustain: Set<number> = new Set();
   #stopSustain: Set<number> = new Set();
+  #dynamics: Map<number, string> = new Map();
 
   visit(line: NWCLine) {
     switch (line.tag) {
@@ -434,6 +440,12 @@ class Durations {
         } else {
           this.#startSustain.add(this.#durations.length);
         }
+        break;
+      case "Dynamic":
+        this.#dynamics.set(
+          this.#durations.length,
+          line.values.Style[0],
+        );
         break;
       default:
         break;
@@ -592,6 +604,7 @@ class Durations {
     for (let i = this.#measure[measure]; i < to; i++) {
       // three types of element that should stay in proper order...
       result.push(this.#attributes(i, xml));
+
       // directions
       if (this.#stopSustain.has(i)) {
         result.push(xml.stopSustain);
@@ -599,6 +612,11 @@ class Durations {
       if (this.#startSustain.has(i)) {
         result.push(xml.startSustain);
       }
+      const dynamic = this.#dynamics.get(i);
+      if (dynamic) {
+        result.push(xml.dynamics[dynamic]);
+      }
+
       const duration = xml.create(
         "duration",
         undefined,
