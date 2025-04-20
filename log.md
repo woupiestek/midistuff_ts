@@ -1,5 +1,26 @@
 # Midistuff logs
 
+## 2025-04-20
+
+### multistave parts
+
+It looks like the way to do this, is to use a full measure `<backup>`,
+`<staves>` attributes and `<staff>` properties on notes.
+
+### attributes and directions
+
+Maybe them more like notes? They don't have a duration, so they fit between
+elements that have. Yet there can be any number (typically 0) in any order...
+
+### ties
+
+What is going on with ties into triplets? They don't seem to come out either.
+ties not showing in the bass part as expected
+
+### leftovers
+
+dynamics, metronome, ...
+
 ## 2025-04-19
 
 !NoteWorthyComposerClip(2.751,Single) |Bar |Bar|Style:Double

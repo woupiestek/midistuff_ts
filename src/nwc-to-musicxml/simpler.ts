@@ -1,6 +1,5 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Element, Elements } from "./xml.ts";
-import { XMLPrinter } from "../musicxml/xmlPrinter.ts";
 
 type NWCLine = {
   number: number;
@@ -41,6 +40,8 @@ class MusicXML {
   readonly stopTie: Element;
   readonly dot: Element;
   readonly barlines: Record<string, Element>;
+  readonly startSustain: Element;
+  readonly stopSustain: Element;
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
@@ -68,46 +69,64 @@ class MusicXML {
     this.dot = xml.create("dot");
 
     this.barlines = {
-      "Double": xml.create(
+      Double: xml.create(
         "barline",
         { position: "left" },
         xml.create("bar-style", undefined, "double"),
       ),
-      "SectionOpen": xml.create(
+      SectionOpen: xml.create(
         "barline",
         { position: "left" },
         xml.create("bar-style", undefined, "heavy-light"),
       ),
-      "SectionClose": xml.create(
+      SectionClose: xml.create(
         "barline",
         { position: "right" },
         xml.create("bar-style", undefined, "light-heavy"),
       ),
-      "MasterRepeatOpen": xml.create(
+      MasterRepeatOpen: xml.create(
         "barline",
         { position: "left" },
         xml.create("bar-style", undefined, "heavy-light"),
         xml.create("repeat", { direction: "forward" }),
       ),
-      "MasterRepeatClose": xml.create(
+      MasterRepeatClose: xml.create(
         "barline",
         { position: "right" },
         xml.create("bar-style", undefined, "light-heavy"),
         xml.create("repeat", { direction: "backward" }),
       ),
-      "LocalRepeatOpen": xml.create(
+      LocalRepeatOpen: xml.create(
         "barline",
         { position: "left" },
         xml.create("bar-style", undefined, "light-light"),
         xml.create("repeat", { direction: "forward" }),
       ),
-      "LocalRepeatClose": xml.create(
+      LocalRepeatClose: xml.create(
         "barline",
         { position: "right" },
         xml.create("bar-style", undefined, "light-light"),
         xml.create("repeat", { direction: "backward" }),
       ),
     };
+    this.startSustain = xml.create(
+      "direction",
+      undefined,
+      xml.create(
+        "direction-type",
+        undefined,
+        xml.create("pedal", { type: "start" }),
+      ),
+    );
+    this.stopSustain = xml.create(
+      "direction",
+      undefined,
+      xml.create(
+        "direction-type",
+        undefined,
+        xml.create("pedal", { type: "stop" }),
+      ),
+    );
   }
 
   key(fifths: number): Element {
@@ -353,11 +372,12 @@ class Durations {
   #types: string[] = [];
   #lines: number[] = [];
   #poly: Set<number> = new Set();
-
   #parts: Set<number> = new Set();
   #clefs: Map<number, string> = new Map();
   #keys: Map<number, number> = new Map();
   #times: Map<number, string> = new Map();
+  #startSustain: Set<number> = new Set();
+  #stopSustain: Set<number> = new Set();
 
   visit(line: NWCLine) {
     switch (line.tag) {
@@ -407,6 +427,13 @@ class Durations {
           this.#durations.length,
           line.values.Signature[0],
         );
+        break;
+      case "SustainPedal":
+        if (line.values.Status?.[0] === "Released") {
+          this.#stopSustain.add(this.#durations.length);
+        } else {
+          this.#startSustain.add(this.#durations.length);
+        }
         break;
       default:
         break;
@@ -563,7 +590,15 @@ class Durations {
     const result: (Element | null)[] = [];
     const to = this.#measure[measure + 1] ?? this.#durations.length;
     for (let i = this.#measure[measure]; i < to; i++) {
+      // three types of element that should stay in proper order...
       result.push(this.#attributes(i, xml));
+      // directions
+      if (this.#stopSustain.has(i)) {
+        result.push(xml.stopSustain);
+      }
+      if (this.#startSustain.has(i)) {
+        result.push(xml.startSustain);
+      }
       const duration = xml.create(
         "duration",
         undefined,
@@ -572,43 +607,42 @@ class Durations {
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
       const pitches = positions.pitches(i, xml);
-      const dots = this.#dots.get(i) ?? 0;
+      const dots = Array.from({ length: this.#dots.get(i) ?? 0 }).map(() =>
+        xml.dot
+      );
       if (pitches.length === 0) {
         result.push(
           xml.note(
             xml.rest,
             duration,
             type,
-            dots < 1 ? null : xml.dot,
-            dots < 2 ? null : xml.dot,
+            ...dots,
             timeMod,
           ),
         );
         continue;
       }
-      const startTie = positions.startTie(i);
       const stopTie = positions.stopTie(i);
+      const startTie = positions.startTie(i);
       result.push(xml.note(
-        pitches[0],
         this.#poly.has(i) ? xml.chord : null,
+        pitches[0],
         duration,
-        startTie.has(0) ? xml.startTie : null,
         stopTie.has(0) ? xml.stopTie : null,
+        startTie.has(0) ? xml.startTie : null,
         type,
-        dots < 1 ? null : xml.dot,
-        dots < 2 ? null : xml.dot,
+        ...dots,
         timeMod,
       ));
       for (let j = 1; j < pitches.length; j++) {
         result.push(xml.note(
-          pitches[j],
           xml.chord,
+          pitches[j],
           duration,
-          startTie.has(j) ? xml.startTie : null,
           stopTie.has(j) ? xml.stopTie : null,
+          startTie.has(j) ? xml.startTie : null,
           type,
-          dots < 1 ? null : xml.dot,
-          dots < 2 ? null : xml.dot,
+          ...dots,
           timeMod,
         ));
       }
@@ -702,7 +736,7 @@ class Bars {
           "measure",
           { number: (i + 1 - from).toString() },
           barStyle && !closingBar ? xml.barlines[barStyle] : null,
-          ...durations.notes(i, positions, xml),
+          ...notes,
           closingBar ? xml.barlines[barStyle] : null,
         ),
       );
