@@ -194,6 +194,22 @@ class MusicXML {
     );
   }
 
+  metronome(
+    tempo: number,
+    base: string = "Quarter",
+  ): Element {
+    const [type, dotted] = base.split(" ");
+    return this.#cache["M" + tempo + base] ||= this.#direction(
+      this.create(
+        "metronome",
+        undefined,
+        this.xml.create("beat-unit", undefined, type.toLowerCase()),
+        dotted ? this.xml.create("beat-unit-dot") : null,
+        this.xml.create("per-minute", undefined, tempo.toString()),
+      ),
+    );
+  }
+
   create(
     name: string,
     attributes?: Record<string, string>,
@@ -384,6 +400,8 @@ class Durations {
   #startSustain: Set<number> = new Set();
   #stopSustain: Set<number> = new Set();
   #dynamics: Map<number, string> = new Map();
+  #tempo: Map<number, number> = new Map();
+  #tempoBase: Map<number, string> = new Map();
 
   visit(line: NWCLine) {
     switch (line.tag) {
@@ -446,6 +464,18 @@ class Durations {
           this.#durations.length,
           line.values.Style[0],
         );
+        break;
+      case "Tempo":
+        this.#tempo.set(
+          this.#durations.length,
+          +line.values.Tempo[0],
+        );
+        if (line.values.Base) {
+          this.#tempoBase.set(
+            this.#durations.length,
+            line.values.Base[0],
+          );
+        }
         break;
       default:
         break;
@@ -615,6 +645,15 @@ class Durations {
       const dynamic = this.#dynamics.get(i);
       if (dynamic) {
         result.push(xml.dynamics[dynamic]);
+      }
+      const tempo = this.#tempo.get(i);
+      if (tempo) {
+        result.push(
+          xml.metronome(
+            tempo,
+            this.#tempoBase.get(i),
+          ),
+        );
       }
 
       const duration = xml.create(

@@ -28,12 +28,14 @@ dynamics, metronome, ...
 |Dynamic|Style:mp|Pos:-8 |Dynamic|Style:mf|Pos:-8 |Dynamic|Style:f|Pos:-8
 |Dynamic|Style:ff|Pos:-8 |Dynamic|Style:fff|Pos:-8 !NoteWorthyComposerClip-End
 
-!NoteWorthyComposerClip(2.751,Single)
-|Tempo|Tempo:115|Pos:12
+!NoteWorthyComposerClip(2.751,Single) |Tempo|Tempo:115|Pos:12
 !NoteWorthyComposerClip-End
 
-!NoteWorthyComposerClip(2.751,Single)
-|Tempo|Base:Eighth Dotted|Tempo:153|Pos:12
+!NoteWorthyComposerClip(2.751,Single) |Tempo|Base:Eighth Dotted|Tempo:153|Pos:12
+!NoteWorthyComposerClip-End
+
+!NoteWorthyComposerClip(2.751,Single) |Tempo|Tempo:114|Pos:12
+|Tempo|Base:Half|Tempo:57|Pos:12 |Tempo|Base:Quarter Dotted|Tempo:76|Pos:12
 !NoteWorthyComposerClip-End
 
 ## 2025-04-19
