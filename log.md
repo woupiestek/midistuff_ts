@@ -125,6 +125,11 @@ are only start & stop needed? this is different from NWC..., but still
 |DynamicVariance|Style:Rinforzando|Pos:0 |Rest|Dur:4th
 |DynamicVariance|Style:Sforzando|Pos:0 |Rest|Dur:4th !NoteWorthyComposerClip-End
 
+### third test case
+
+1 endings 2 last pedal !NoteWorthyComposerClip(2.751,Single)
+|Ending|Endings:1,2,3,4,5,6,7,D !NoteWorthyComposerClip-End
+
 ## 2025-04-13
 
 ### positions versus durations
