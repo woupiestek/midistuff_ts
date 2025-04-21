@@ -124,6 +124,12 @@ class MusicXML {
     this.accent = xml.create("accent");
   }
 
+  wedge(type: string) {
+    return this.#cache["wedge" + type] = this.#direction(
+      this.xml.create("wedge", { type }),
+    );
+  }
+
   clef(type: string, octaveChange: number): Element {
     const key = type + octaveChange;
     if (this.#cache[key]) return this.#cache[key];
@@ -249,6 +255,7 @@ class MusicXML {
       this.xml.create("beat-type", undefined, d),
     );
   }
+
   create(
     name: string,
     attributes?: Record<string, string>,
@@ -464,7 +471,8 @@ class Durations {
         }
         break;
       case "Dynamic":
-        this.#dynamics.set(this.#durations.length, line.values.Style[0]);
+      case "DynamicVariance":
+        this.#dynamic(this.#durations.length, line.values.Style[0]);
         break;
       case "Tempo":
         this.#tempo.set(this.#durations.length, +line.values.Tempo[0]);
@@ -477,10 +485,40 @@ class Durations {
     }
   }
 
+  #wedged: boolean = false;
+  #wedge: Map<number, string> = new Map();
+
+  #dynamic(length: number, arg1: string) {
+    if (this.#wedged) {
+      this.#wedge.set(length, "stop");
+      this.#wedged = false;
+    }
+    switch (arg1) {
+      case "Sforzando":
+        this.#dynamics.set(length, "sfz");
+        break;
+      case "Rinforzando":
+        this.#dynamics.set(length, "rfz");
+        break;
+      case "Crescendo":
+        this.#wedge.set(length, "crescendo");
+        this.#wedged = true;
+        break;
+      case "Decrescendo":
+      case "Diminuendo":
+        this.#wedge.set(length, "diminuendo");
+        this.#wedged = true;
+        break;
+      default:
+        this.#dynamics.set(length, arg1);
+        break;
+    }
+  }
+
   #staccato: Set<number> = new Set();
   #tenuto: Set<number> = new Set();
   #accent: Set<number> = new Set();
-  #slurred: boolean = false; //Set<number> = new Set();
+  #slurred: boolean = false;
   #startSlur: Set<number> = new Set();
   #stopSlur: Set<number> = new Set();
   #grace: Set<number> = new Set();
@@ -682,12 +720,16 @@ class Durations {
   }
 
   #directions(i: number, result: (Element | null)[], xml: MusicXML) {
+    const tempo = this.#tempo.get(i);
+    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
     if (this.#stopSustain.has(i)) result.push(xml.stopSustain);
     if (this.#startSustain.has(i)) result.push(xml.startSustain);
     const dynamic = this.#dynamics.get(i);
     if (dynamic) result.push(xml.dynamics[dynamic]);
-    const tempo = this.#tempo.get(i);
-    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
+    const wedge = this.#wedge.get(i);
+    if (wedge) {
+      result.push(xml.wedge(wedge));
+    }
   }
 }
 
@@ -779,7 +821,8 @@ class Staves {
         break;
     }
   }
-  parts(
+
+parts(
     bars: Bars,
     durations: Durations,
     positions: Positions,
