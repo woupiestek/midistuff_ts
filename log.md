@@ -111,7 +111,7 @@ It works, but Musescore complains. Adding voices helps.
 
 ### staccato
 
-note/notations/articulations/
+note/notations/articulations/staccato
 
 ## 2025-04-13
 

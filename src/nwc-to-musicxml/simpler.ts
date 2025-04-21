@@ -41,6 +41,9 @@ class MusicXML {
   readonly startSustain: Element;
   readonly stopSustain: Element;
   readonly dynamics: Record<string, Element>;
+  readonly staccato: Element;
+  readonly tenuto: Element;
+  readonly accent: Element;
 
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
@@ -116,6 +119,9 @@ class MusicXML {
         this.#direction(xml.create("dynamics", undefined, xml.create(d))),
       ]),
     );
+    this.staccato = xml.create("staccato");
+    this.tenuto = xml.create("tenuto");
+    this.accent = xml.create("accent");
   }
 
   clef(type: string, octaveChange: number): Element {
@@ -611,8 +617,21 @@ class Durations {
         result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
         continue;
       }
+      const notations = [];
+      const articulations = [];
+      if (this.#staccato.has(i)) articulations.push(xml.staccato);
+      if (this.#tenuto.has(i)) articulations.push(xml.tenuto);
+      if (this.#accent.has(i)) articulations.push(xml.accent);
+      if (articulations.length > 0) {
+        notations.push(
+          xml.create("articulations", undefined, ...articulations),
+        );
+      }
       for (let j = 0; j < notes.length; j++) {
         const ties = positions.ties(notes[j]);
+        notations.push(
+          ...ties.map((it) => xml.tied[it]),
+        );
         result.push(
           xml.note(
             grace,
@@ -624,11 +643,11 @@ class Durations {
             type,
             ...dots,
             timeMod,
-            ties.length > 0
+            notations.length > 0
               ? xml.create(
                 "notations",
                 undefined,
-                ...ties.map((it) => xml.tied[it]),
+                ...notations,
               )
               : null,
           ),
