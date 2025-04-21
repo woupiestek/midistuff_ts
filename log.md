@@ -113,6 +113,26 @@ It works, but Musescore complains. Adding voices helps.
 
 note/notations/articulations/staccato
 
+### slur
+
+are only start & stop needed? this is different from NWC..., but still
+
+### more dynamics
+
+!NoteWorthyComposerClip(2.751,Single)
+|DynamicVariance|Style:Crescendo|Pos:0
+|Rest|Dur:4th
+|DynamicVariance|Style:Decrescendo|Pos:0
+|Rest|Dur:4th
+|DynamicVariance|Style:Diminuendo|Pos:0
+|Rest|Dur:4th
+|DynamicVariance|Style:Rinforzando|Pos:0
+|Rest|Dur:4th
+|DynamicVariance|Style:Sforzando|Pos:0
+|Rest|Dur:4th
+!NoteWorthyComposerClip-End
+
+
 ## 2025-04-13
 
 ### positions versus durations

@@ -480,7 +480,9 @@ class Durations {
   #staccato: Set<number> = new Set();
   #tenuto: Set<number> = new Set();
   #accent: Set<number> = new Set();
-  #slur: Set<number> = new Set();
+  #slurred: boolean = false; //Set<number> = new Set();
+  #startSlur: Set<number> = new Set();
+  #stopSlur: Set<number> = new Set();
   #grace: Set<number> = new Set();
   #triplet: Map<number, string> = new Map();
   #gcd = FRACTION;
@@ -489,6 +491,7 @@ class Durations {
   #duration(dur: string[]) {
     const index = this.#durations.length;
     let duration = FRACTION;
+    let slurred = false;
     for (const s of dur) {
       switch (s) {
         case "16th":
@@ -548,7 +551,7 @@ class Durations {
           this.#accent.add(index);
           break;
         case "Slur":
-          this.#slur.add(index);
+          slurred = true;
           break;
         case "Grace":
           this.#grace.add(index);
@@ -556,6 +559,14 @@ class Durations {
         default:
           break;
       }
+    }
+    if (slurred !== this.#slurred) {
+      if (slurred) {
+        this.#startSlur.add(index);
+      } else {
+        this.#stopSlur.add(index);
+      }
+      this.#slurred = slurred;
     }
     this.#gcd = gcd(this.#gcd, duration);
     this.#durations.push(duration);
@@ -617,15 +628,13 @@ class Durations {
         result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
         continue;
       }
-      const notations = [];
-      const articulations = [];
-      if (this.#staccato.has(i)) articulations.push(xml.staccato);
-      if (this.#tenuto.has(i)) articulations.push(xml.tenuto);
-      if (this.#accent.has(i)) articulations.push(xml.accent);
-      if (articulations.length > 0) {
-        notations.push(
-          xml.create("articulations", undefined, ...articulations),
-        );
+      const notations: Element[] = [];
+      this.#articulations(i, xml, notations);
+      if (this.#startSlur.has(i)) {
+        notations.push(xml.create("slur", { type: "start" }));
+      }
+      if (this.#stopSlur.has(i)) {
+        notations.push(xml.create("slur", { type: "stop" }));
       }
       for (let j = 0; j < notes.length; j++) {
         const ties = positions.ties(notes[j]);
@@ -658,6 +667,18 @@ class Durations {
       }
     }
     return result;
+  }
+
+  #articulations(i: number, xml: MusicXML, notations: Element[]) {
+    const articulations = [];
+    if (this.#staccato.has(i)) articulations.push(xml.staccato);
+    if (this.#tenuto.has(i)) articulations.push(xml.tenuto);
+    if (this.#accent.has(i)) articulations.push(xml.accent);
+    if (articulations.length > 0) {
+      notations.push(
+        xml.create("articulations", undefined, ...articulations),
+      );
+    }
   }
 
   #directions(i: number, result: (Element | null)[], xml: MusicXML) {
