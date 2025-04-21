@@ -36,8 +36,8 @@ class MusicXML {
   readonly rest: Element;
   readonly clefs: Record<string, Element>;
   readonly timeMod: Element;
-  readonly startTie: Element;
-  readonly stopTie: Element;
+  readonly tie: { start: Element; stop: Element };
+  readonly tied: { start: Element; stop: Element };
   readonly dot: Element;
   readonly barlines: Record<string, Element>;
   readonly startSustain: Element;
@@ -65,8 +65,14 @@ class MusicXML {
       xml.create("actual-notes", undefined, "3"),
       xml.create("normal-notes", undefined, "2"),
     );
-    this.startTie = xml.create("tie", { type: "start" });
-    this.stopTie = xml.create("tie", { type: "stop" });
+    this.tie = {
+      start: xml.create("tie", { type: "start" }),
+      stop: xml.create("tie", { type: "stop" }),
+    };
+    this.tied = {
+      start: xml.create("tied", { type: "start" }),
+      stop: xml.create("tied", { type: "stop" }),
+    };
     this.dot = xml.create("dot");
 
     this.barlines = {
@@ -210,6 +216,14 @@ class MusicXML {
     );
   }
 
+  time(n: string, d: string): Element {
+    return this.#cache["T" + n + "/" + d] ||= this.xml.create(
+      "time",
+      undefined,
+      this.xml.create("beats", undefined, n),
+      this.xml.create("beat-type", undefined, d),
+    );
+  }
   create(
     name: string,
     attributes?: Record<string, string>,
@@ -280,28 +294,21 @@ class Positions {
         this.#altersByTone = [...this.#signature];
         break;
       case "Note":
-        for (const pos of line.values.Pos) {
-          this.#pitch(pos);
-        }
+        for (const pos of line.values.Pos) this.#pitch(pos);
         this.#lines.push(line.number);
         this.#groups.push(this.#tones.length);
         break;
       case "Rest":
-        // encode as empty chord
-        this.#lines.push(line.number);
+        // encode as empty chordthis.#lines.push(line.number);
         this.#groups.push(this.#tones.length);
         break;
       case "Chord":
         if (line.values.Pos2) {
-          for (const pos of line.values.Pos2) {
-            this.#pitch(pos);
-          }
+          for (const pos of line.values.Pos2) this.#pitch(pos);
           this.#lines.push(line.number);
           this.#groups.push(this.#tones.length);
         }
-        for (const pos of line.values.Pos) {
-          this.#pitch(pos);
-        }
+        for (const pos of line.values.Pos) this.#pitch(pos);
         this.#lines.push(line.number);
         this.#groups.push(this.#tones.length);
         break;
@@ -318,61 +325,43 @@ class Positions {
   #pitch(pos: string) {
     const altered = ALTSTR.includes(pos[0]);
     const startTie = pos[pos.length - 1] === "^";
-    const tone = +pos.substring(+altered, pos.length - +startTie) +
-      this.#tone;
+    const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
     const index = this.#tones.length;
     const stopTie = this.#open.get(tone);
 
-    if (stopTie) {
-      this.#stopTie.add(index);
-    }
+    if (stopTie) this.#stopTie.add(index);
 
     if (altered) {
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
-    } else if (stopTie) {
-      this.#alters.push(stopTie);
-    } else {
+    } else if (stopTie) this.#alters.push(stopTie);
+    else {
       this.#alters.push(this.#altersByTone[tone % 7]);
     }
 
     if (startTie) {
       this.#open.set(tone, this.#alters[index]);
       this.#startTie.add(index);
-    } else {
-      this.#open.delete(tone);
-    }
-
+    } else this.#open.delete(tone);
     this.#tones.push(tone);
   }
 
-  pitches(group: number, xml: MusicXML): Element[] {
-    const pitches: Element[] = [];
-    const l = this.#groups[group];
-    for (let i = group && this.#groups[group - 1]; i < l; i++) {
-      pitches.push(xml.pitch(this.#tones[i], this.#alters[i]));
-    }
-    return pitches;
-  }
-
-  startTie(group: number): Set<number> {
+  // a group is a set of simultaneous notes of equal duration
+  notes(group: number): number[] {
     const from = group && this.#groups[group - 1];
     const to = this.#groups[group];
-    return new Set(
-      Array.from({ length: to - from }).map((_, i) => i).filter((i) =>
-        this.#startTie.has(i + from)
-      ),
-    );
+    return Array.from({ length: to - from }, (_, i) => i + from);
   }
 
-  stopTie(group: number): Set<number> {
-    const from = group && this.#groups[group - 1];
-    const to = this.#groups[group];
-    return new Set(
-      Array.from({ length: to - from }).map((_, i) => i).filter((i) =>
-        this.#stopTie.has(i + from)
-      ),
-    );
+  pitch(note: number, xml: MusicXML): Element {
+    return xml.pitch(this.#tones[note], this.#alters[note]);
+  }
+
+  ties(note: number): ("start" | "stop")[] {
+    const ties: ("start" | "stop")[] = [];
+    if (this.#stopTie.has(note)) ties.push("stop");
+    if (this.#startTie.has(note)) ties.push("start");
+    return ties;
   }
 }
 
@@ -426,31 +415,19 @@ class Durations {
         this.#duration(line.values.Dur);
         break;
       case "Clef":
-        this.#clefs.set(
-          this.#durations.length,
-          line.values.Type[0],
-        );
+        this.#clefs.set(this.#durations.length, line.values.Type[0]);
         break;
       case "Key": {
         let fifths = 0;
         for (const x of line.values.Signature) {
-          if (x[1] === "#") {
-            fifths++;
-          } else {
-            fifths--;
-          }
+          if (x[1] === "#") fifths++;
+          else fifths--;
         }
-        this.#keys.set(
-          this.#durations.length,
-          fifths,
-        );
+        this.#keys.set(this.#durations.length, fifths);
         break;
       }
       case "TimeSig":
-        this.#times.set(
-          this.#durations.length,
-          line.values.Signature[0],
-        );
+        this.#times.set(this.#durations.length, line.values.Signature[0]);
         break;
       case "SustainPedal":
         if (line.values.Status?.[0] === "Released") {
@@ -460,21 +437,12 @@ class Durations {
         }
         break;
       case "Dynamic":
-        this.#dynamics.set(
-          this.#durations.length,
-          line.values.Style[0],
-        );
+        this.#dynamics.set(this.#durations.length, line.values.Style[0]);
         break;
       case "Tempo":
-        this.#tempo.set(
-          this.#durations.length,
-          +line.values.Tempo[0],
-        );
+        this.#tempo.set(this.#durations.length, +line.values.Tempo[0]);
         if (line.values.Base) {
-          this.#tempoBase.set(
-            this.#durations.length,
-            line.values.Base[0],
-          );
+          this.#tempoBase.set(this.#durations.length, line.values.Base[0]);
         }
         break;
       default:
@@ -579,51 +547,21 @@ class Durations {
       );
     }
     const key = this.#keys.get(i);
-    if (key !== undefined) {
-      content.push(xml.key(key));
-    }
+    if (key !== undefined) content.push(xml.key(key));
     const time = this.#times.get(i);
     if (time === "Common") {
-      content.push(
-        xml.create(
-          "time",
-          undefined,
-          xml.create("beats", undefined, "4"),
-          xml.create("beat-type", undefined, "4"),
-        ),
-      );
+      content.push(xml.time("4", "4"));
     } else if (time === "AllaBreve") {
-      content.push(
-        xml.create(
-          "time",
-          undefined,
-          xml.create("beats", undefined, "2"),
-          xml.create("beat-type", undefined, "2"),
-        ),
-      );
+      content.push(xml.time("2", "2"));
     } else if (time) {
       const [beats, beatType] = time.split("/");
-      content.push(
-        xml.create(
-          "time",
-          undefined,
-          xml.create("beats", undefined, beats),
-          xml.create("beat-type", undefined, beatType),
-        ),
-      );
+      content.push(xml.time(beats, beatType));
     }
     const clef = this.#clefs.get(i);
-    if (clef) {
-      content.push(xml.clefs[clef]);
-    }
+    if (clef) content.push(xml.clefs[clef]);
     if (content.length === 0) return null;
-    return xml.create(
-      "attributes",
-      undefined,
-      ...content,
-    );
+    return xml.create("attributes", undefined, ...content);
   }
-
   notes(
     measure: number,
     positions: Positions,
@@ -636,25 +574,14 @@ class Durations {
       result.push(this.#attributes(i, xml));
 
       // directions
-      if (this.#stopSustain.has(i)) {
-        result.push(xml.stopSustain);
-      }
-      if (this.#startSustain.has(i)) {
-        result.push(xml.startSustain);
-      }
+      if (this.#stopSustain.has(i)) result.push(xml.stopSustain);
+      if (this.#startSustain.has(i)) result.push(xml.startSustain);
       const dynamic = this.#dynamics.get(i);
       if (dynamic) {
         result.push(xml.dynamics[dynamic]);
       }
       const tempo = this.#tempo.get(i);
-      if (tempo) {
-        result.push(
-          xml.metronome(
-            tempo,
-            this.#tempoBase.get(i),
-          ),
-        );
-      }
+      if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
 
       const duration = xml.create(
         "duration",
@@ -663,81 +590,55 @@ class Durations {
       );
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
-      const pitches = positions.pitches(i, xml);
-      const dots = Array.from({ length: this.#dots.get(i) ?? 0 }).map(() =>
-        xml.dot
+      const dots = Array.from(
+        { length: this.#dots.get(i) ?? 0 },
+        () => xml.dot,
       );
-      if (pitches.length === 0) {
-        result.push(
-          xml.note(
-            xml.rest,
-            duration,
-            type,
-            ...dots,
-            timeMod,
-          ),
-        );
+      const notes = positions.notes(i);
+      if (notes.length === 0) {
+        result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
         continue;
       }
-      const stopTie = positions.stopTie(i);
-      const startTie = positions.startTie(i);
+      const ties0 = positions.ties(notes[0]);
       result.push(xml.note(
         this.#poly.has(i) ? xml.chord : null,
-        pitches[0],
+        positions.pitch(notes[0], xml),
         duration,
-        stopTie.has(0) ? xml.stopTie : null,
-        startTie.has(0) ? xml.startTie : null,
+        ...ties0.map((it) => xml.tie[it]),
         type,
         ...dots,
         timeMod,
+        ties0.length > 0
+          ? xml.create(
+            "notations",
+            undefined,
+            ...ties0.map((it) => xml.tied[it]),
+          )
+          : null,
       ));
-      for (let j = 1; j < pitches.length; j++) {
-        result.push(xml.note(
-          xml.chord,
-          pitches[j],
-          duration,
-          stopTie.has(j) ? xml.stopTie : null,
-          startTie.has(j) ? xml.startTie : null,
-          type,
-          ...dots,
-          timeMod,
-        ));
+      for (let j = 1; j < notes.length; j++) {
+        const ties = positions.ties(notes[j]);
+        result.push(
+          xml.note(
+            xml.chord,
+            positions.pitch(notes[j], xml),
+            duration,
+            ...ties.map((it) => xml.tie[it]),
+            type,
+            ...dots,
+            timeMod,
+            ties.length > 0
+              ? xml.create(
+                "notations",
+                undefined,
+                ...ties.map((it) => xml.tied[it]),
+              )
+              : null,
+          ),
+        );
       }
     }
     return result;
-  }
-}
-
-class Options {
-  visit(line: NWCLine) {
-    switch (line.tag) {
-      case "Chord":
-      case "Note":
-        if (line.values.Opts) {
-          this.#options(line.number, line.values.Opts);
-        }
-        break;
-    }
-  }
-
-  #beam: Map<number, string> = new Map();
-
-  #options(index: number, opts: string[]) {
-    for (const opt of opts) {
-      switch (opt) {
-        case "Beam=First":
-          this.#beam.set(index, "First");
-          break;
-        case "Beam=End":
-          this.#beam.set(index, "End");
-          break;
-        case "Beam":
-          this.#beam.set(index, "");
-          break;
-        default:
-          break;
-      }
-    }
   }
 }
 
@@ -773,7 +674,6 @@ class Bars {
         break;
     }
   }
-
   measures(
     staff: number,
     durations: Durations,
@@ -781,17 +681,18 @@ class Bars {
     xml: MusicXML,
   ): Element[] {
     const result: Element[] = [];
-    const from = this.#staves[staff];
     const to = this.#staves[staff + 1] ?? this.#measures + 1;
-    for (let i = from; i < to; i++) {
+    for (let i = this.#staves[staff], number = 0; i < to; i++) {
       const notes = durations.notes(i, positions, xml);
       if (notes.length === 0) continue;
+      // be careful with measure numbers
+      number++;
       const barStyle = this.#barStyles.get(i);
       const closingBar = barStyle && CLOSING_BARS.has(barStyle);
       result.push(
         xml.create(
           "measure",
-          { number: (i + 1 - from).toString() },
+          { number: number.toString() },
           barStyle && !closingBar ? xml.barlines[barStyle] : null,
           ...notes,
           closingBar ? xml.barlines[barStyle] : null,
@@ -841,11 +742,7 @@ class Staffs {
     return xml.create(
       "score-partwise",
       { version: "4.0" },
-      xml.create(
-        "part-list",
-        undefined,
-        ...scoreParts,
-      ),
+      xml.create("part-list", undefined, ...scoreParts),
       ...parts,
     );
   }
@@ -854,14 +751,12 @@ class Staffs {
 export class Transformer {
   #positions: Positions;
   #durations: Durations;
-  #options: Options;
   #bars: Bars;
   #staffs: Staffs;
 
   constructor() {
     this.#positions = new Positions();
     this.#durations = new Durations();
-    this.#options = new Options();
     this.#bars = new Bars();
     this.#staffs = new Staffs();
   }
@@ -869,22 +764,16 @@ export class Transformer {
   visit(line: NWCLine) {
     this.#positions.visit(line);
     this.#durations.visit(line);
-    this.#options.visit(line);
     this.#bars.visit(line);
     this.#staffs.visit(line);
   }
 
   transform(source: string): string {
     const lines = scan(source);
-    for (const line of lines) {
-      this.visit(line);
-    }
+    for (const line of lines) this.visit(line);
     const xml = new MusicXML();
-    return xml.stringify(this.#staffs.parts(
-      this.#bars,
-      this.#durations,
-      this.#positions,
-      xml,
-    ));
+    return xml.stringify(
+      this.#staffs.parts(this.#bars, this.#durations, this.#positions, xml),
+    );
   }
 }

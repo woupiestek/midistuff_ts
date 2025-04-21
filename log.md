@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2025-04-21
+
+### ideas
+
+- further breakup into responsibilities
+- note/measure numbers with attached attributes
+
 ## 2025-04-20
 
 ### multistave parts
