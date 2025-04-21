@@ -7,6 +7,13 @@
 - further breakup into responsibilities
 - note/measure numbers with attached attributes
 
+### combining parts
+
+NWC doesn't have parts, just staves. How to tell when a two staff piano part is
+supposed to be a single part?
+
+Proper ending barline is still missing BTW.
+
 ## 2025-04-20
 
 ### multistave parts
