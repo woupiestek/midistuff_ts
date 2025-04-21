@@ -107,6 +107,12 @@ And we see: chording the noteworthy way does not work!
 
 - produce backup...
 
+It works, but Musescore complains. Adding voices helps.
+
+### staccato
+
+note/notations/articulations/
+
 ## 2025-04-13
 
 ### positions versus durations

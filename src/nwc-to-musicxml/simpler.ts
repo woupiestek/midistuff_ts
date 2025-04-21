@@ -276,7 +276,7 @@ class Positions {
   #tone = 34;
   #signature = [...N7];
   #altersByTone = [...N7];
-  #startChord: Set<number> = new Set();
+  #backup: Set<number> = new Set();
 
   visit(line: NWCLine) {
     switch (line.tag) {
@@ -310,28 +310,17 @@ class Positions {
         this.#altersByTone = [...this.#signature];
         break;
       case "Note":
-        this.#startChord.add(this.#tones.length);
-        for (const pos of line.values.Pos) this.#pitch(pos);
-        this.#groups.push(this.#tones.length);
-        break;
       case "Rest":
-        // encode rest as empty chord
-        this.#groups.push(this.#tones.length);
-        break;
       case "Chord":
-        this.#startChord.add(this.#tones.length);
+      case "RestChord":
         if (line.values.Pos2) {
           for (const pos of line.values.Pos2) this.#pitch(pos);
+          this.#backup.add(this.#groups.length);
           this.#groups.push(this.#tones.length);
         }
-        for (const pos of line.values.Pos) this.#pitch(pos);
-        this.#groups.push(this.#tones.length);
-        break;
-      case "RestChord":
-        this.#startChord.add(this.#tones.length);
-        for (const pos of line.values.Pos2) this.#pitch(pos);
-        this.#groups.push(this.#tones.length);
-        // encode rest as empty chord
+        if (line.values.Pos) {
+          for (const pos of line.values.Pos) this.#pitch(pos);
+        }
         this.#groups.push(this.#tones.length);
         break;
       default:
@@ -386,8 +375,8 @@ class Positions {
     return ties;
   }
 
-  chord(note: number): boolean {
-    return !this.#startChord.has(note);
+  backup(group: number): boolean {
+    return this.#backup.has(group);
   }
 }
 
@@ -627,10 +616,11 @@ class Durations {
         result.push(
           xml.note(
             grace,
-            positions.chord(notes[j]) ? xml.chord : null,
+            j ? xml.chord : null, // no chord element in the first note
             positions.pitch(notes[j], xml),
             duration,
             ...ties.map((it) => xml.tie[it]),
+            xml.create("voice", undefined, positions.backup(i) ? "2" : "1"),
             type,
             ...dots,
             timeMod,
@@ -643,6 +633,9 @@ class Durations {
               : null,
           ),
         );
+      }
+      if (positions.backup(i)) {
+        result.push(xml.create("backup", undefined, duration));
       }
     }
     return result;
