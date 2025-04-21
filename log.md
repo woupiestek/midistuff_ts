@@ -101,6 +101,12 @@ number in the nwc file!
 
 Want notes grouped by measure, measures by staff
 
+### new test case
+
+And we see: chording the noteworthy way does not work!
+
+- produce backup...
+
 ## 2025-04-13
 
 ### positions versus durations

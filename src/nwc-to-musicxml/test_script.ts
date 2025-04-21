@@ -1,6 +1,6 @@
 import { scan, Transformer } from "./simpler.ts";
 
-const source = await Deno.readTextFile("samples\\2008-8-24!.nwctxt");
+const source = await Deno.readTextFile("samples\\2007-3-12.nwctxt");
 try {
   await Deno.writeTextFile(
     ".\\target\\scan.json",

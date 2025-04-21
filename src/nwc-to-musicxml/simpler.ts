@@ -33,7 +33,6 @@ const HEADER = '<?xml version="1.0" encoding="UTF-8"?>'; //<!DOCTYPE score-partw
 class MusicXML {
   readonly chord: Element;
   readonly rest: Element;
-  readonly clefs: Record<string, Element>;
   readonly timeMod: Element;
   readonly tie: { start: Element; stop: Element };
   readonly tied: { start: Element; stop: Element };
@@ -46,18 +45,6 @@ class MusicXML {
   constructor(private xml = new Elements()) {
     this.chord = xml.create("chord");
     this.rest = xml.create("rest");
-    const c = xml.create("sign", undefined, "C");
-    this.clefs = {
-      Bass: xml.create("clef", undefined, xml.create("sign", undefined, "F")),
-      Alto: xml.create("clef", undefined, c),
-      Tenor: xml.create(
-        "clef",
-        undefined,
-        c,
-        xml.create("line", undefined, "4"),
-      ),
-      Treble: xml.create("clef", undefined, xml.create("sign", undefined, "G")),
-    };
     this.timeMod = xml.create(
       "time-modification",
       undefined,
@@ -131,6 +118,39 @@ class MusicXML {
     );
   }
 
+  clef(type: string, octaveChange: number): Element {
+    const key = type + octaveChange;
+    if (this.#cache[key]) return this.#cache[key];
+    const elements = [];
+    switch (type) {
+      case "Bass":
+        elements.push(this.xml.create("sign", undefined, "F"));
+        break;
+      case "Alto":
+        elements.push(this.xml.create("sign", undefined, "C"));
+        break;
+      case "Tenor":
+        elements.push(
+          this.xml.create("sign", undefined, "C"),
+          this.xml.create("line", undefined, "4"),
+        );
+        break;
+      case "Treble":
+        elements.push(this.xml.create("sign", undefined, "G"));
+        break;
+      default:
+        throw new Error("Unknown Clef Type");
+    }
+    if (octaveChange) {
+      elements.push(this.xml.create("clef-octave-change", undefined, "octave"));
+    }
+    return this.#cache[key] = this.create(
+      "clef",
+      undefined,
+      ...elements,
+    );
+  }
+
   #direction(type: Element) {
     return this.create(
       "direction",
@@ -174,8 +194,8 @@ class MusicXML {
     return this.#cache["T" + dur] ||= this.xml.create("type", undefined, dur);
   }
 
-  note(...Elements: (Element | null)[]): Element {
-    return this.create("note", undefined, ...Elements);
+  note(...elements: (Element | null)[]): Element {
+    return this.create("note", undefined, ...elements);
   }
 
   measure(
@@ -267,17 +287,15 @@ class Positions {
       case "Clef":
         this.#tone = CLEF_TONE.get(line.values.Type[0]) ?? 34;
         if (!line.values.OctaveShift) break;
-        for (const shift of line.values.OctaveShift) {
-          switch (shift) {
-            case "Octave Up":
-              this.#tone += 7;
-              break;
-            case "Octave Down":
-              this.#tone -= 7;
-              break;
-            default:
-              break;
-          }
+        switch (line.values.OctaveShift[0]) {
+          case "Octave Up":
+            this.#tone += 7;
+            break;
+          case "Octave Down":
+            this.#tone -= 7;
+            break;
+          default:
+            break;
         }
         break;
       case "Key":
@@ -297,7 +315,7 @@ class Positions {
         this.#groups.push(this.#tones.length);
         break;
       case "Rest":
-        // encode as empty chord
+        // encode rest as empty chord
         this.#groups.push(this.#tones.length);
         break;
       case "Chord":
@@ -307,6 +325,13 @@ class Positions {
           this.#groups.push(this.#tones.length);
         }
         for (const pos of line.values.Pos) this.#pitch(pos);
+        this.#groups.push(this.#tones.length);
+        break;
+      case "RestChord":
+        this.#startChord.add(this.#tones.length);
+        for (const pos of line.values.Pos2) this.#pitch(pos);
+        this.#groups.push(this.#tones.length);
+        // encode rest as empty chord
         this.#groups.push(this.#tones.length);
         break;
       default:
@@ -383,6 +408,7 @@ class Durations {
   #types: string[] = [];
   #parts: Set<number> = new Set();
   #clefs: Map<number, string> = new Map();
+  #clefOctaveChanges: Map<number, number> = new Map();
   #keys: Map<number, number> = new Map();
   #times: Map<number, string> = new Map();
   #startSustain: Set<number> = new Set();
@@ -402,9 +428,8 @@ class Durations {
         break;
       case "Note":
       case "Rest":
-        this.#duration(line.values.Dur);
-        break;
       case "Chord":
+      case "RestChord":
         if (line.values.Dur2) {
           this.#duration(line.values.Dur2);
         }
@@ -412,6 +437,17 @@ class Durations {
         break;
       case "Clef":
         this.#clefs.set(this.#durations.length, line.values.Type[0]);
+        if (!line.values.OctaveShift) break;
+        switch (line.values.OctaveShift[0]) {
+          case "Octave Up":
+            this.#clefOctaveChanges.set(this.#durations.length, 1);
+            break;
+          case "Octave Down":
+            this.#clefOctaveChanges.set(this.#durations.length, -1);
+            break;
+          default:
+            break;
+        }
         break;
       case "Key": {
         let fifths = 0;
@@ -554,10 +590,11 @@ class Durations {
       content.push(xml.time(beats, beatType));
     }
     const clef = this.#clefs.get(i);
-    if (clef) content.push(xml.clefs[clef]);
+    if (clef) content.push(xml.clef(clef, this.#clefOctaveChanges.get(i) ?? 0));
     if (content.length === 0) return null;
     return xml.create("attributes", undefined, ...content);
   }
+
   notes(
     measure: number,
     positions: Positions,
@@ -566,19 +603,8 @@ class Durations {
     const result: (Element | null)[] = [];
     const to = this.#measure[measure + 1] ?? this.#durations.length;
     for (let i = this.#measure[measure]; i < to; i++) {
-      // three types of element that should stay in proper order...
       result.push(this.#attributes(i, xml));
-
-      // directions
-      if (this.#stopSustain.has(i)) result.push(xml.stopSustain);
-      if (this.#startSustain.has(i)) result.push(xml.startSustain);
-      const dynamic = this.#dynamics.get(i);
-      if (dynamic) {
-        result.push(xml.dynamics[dynamic]);
-      }
-      const tempo = this.#tempo.get(i);
-      if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
-
+      this.#directions(i, result, xml);
       const duration = xml.create(
         "duration",
         undefined,
@@ -590,6 +616,7 @@ class Durations {
         { length: this.#dots.get(i) ?? 0 },
         () => xml.dot,
       );
+      const grace = this.#grace.has(i) ? xml.create("grace") : null;
       const notes = positions.notes(i);
       if (notes.length === 0) {
         result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
@@ -599,6 +626,7 @@ class Durations {
         const ties = positions.ties(notes[j]);
         result.push(
           xml.note(
+            grace,
             positions.chord(notes[j]) ? xml.chord : null,
             positions.pitch(notes[j], xml),
             duration,
@@ -618,6 +646,15 @@ class Durations {
       }
     }
     return result;
+  }
+
+  #directions(i: number, result: (Element | null)[], xml: MusicXML) {
+    if (this.#stopSustain.has(i)) result.push(xml.stopSustain);
+    if (this.#startSustain.has(i)) result.push(xml.startSustain);
+    const dynamic = this.#dynamics.get(i);
+    if (dynamic) result.push(xml.dynamics[dynamic]);
+    const tempo = this.#tempo.get(i);
+    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
   }
 }
 
