@@ -1,5 +1,28 @@
 # Midistuff logs
 
+## 2025-04-22
+
+### ideas
+
+Four things at the measure level:
+
+- notes
+- attributes
+- directions
+- barlines
+
+None to challenging. The big issue now is combining staves into parts.
+
+This could be an indication: |StaffProperties|WithNextStaff:Brace,ConnectBars
+However, NWC allows staffs to be hidden and layered as well, So how do we then
+determine combinations?
+
+The strategy is two voices per staff, to support Noteworthy's system.
+
+### explicit accidentals
+
+Where they are needed, that is!
+
 ## 2025-04-21
 
 ### ideas

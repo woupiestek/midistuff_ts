@@ -2,6 +2,7 @@ import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Element, Elements } from "./xml.ts";
 
 type NWCLine = {
+  number: number;
   tag: string;
   values: Record<string, string[]>;
 };
@@ -22,7 +23,7 @@ export function scan(source: string): NWCLine[] {
         return [k, v.split(",")];
       }),
     );
-    result.push({ tag, values });
+    result.push({ number, tag, values });
   }
   return result;
 }
@@ -82,13 +83,13 @@ class MusicXML {
   }
 
   #barStyles: Record<string, string> = {
-    Double: "double",
+    Double: "light-light",
     SectionOpen: "heavy-light",
     SectionClose: "light-heavy",
     MasterRepeatOpen: "heavy-light",
     MasterRepeatClose: "light-heavy",
-    LocalRepeatOpen: "double",
-    LocalRepeatClose: "double",
+    LocalRepeatOpen: "light-light",
+    LocalRepeatClose: "light-light",
   };
 
   #rightBarStyles = new Set([
@@ -564,9 +565,10 @@ class Durations {
   #startSlur: Set<number> = new Set();
   #stopSlur: Set<number> = new Set();
   #grace: Set<number> = new Set();
-  #triplet: Map<number, string> = new Map();
+  #triplet: Set<number> = new Set();
   #gcd = FRACTION;
-  #dots: Map<number, number> = new Map();
+  #dotted: Set<number> = new Set();
+  #doubleDotted: Set<number> = new Set();
 
   #duration(dur: string[]) {
     const index = this.#durations.length;
@@ -603,23 +605,17 @@ class Durations {
           break;
         case "Dotted":
           duration *= 3 / 2;
-          this.#dots.set(index, 1);
+          this.#dotted.add(index);
           break;
         case "DblDotted":
           duration *= 7 / 4;
-          this.#dots.set(index, 2);
+          this.#doubleDotted.add(index);
           break;
         case "Triplet=First":
-          duration *= 2 / 3;
-          this.#triplet.set(index, "First");
-          break;
         case "Triplet=End":
-          duration *= 2 / 3;
-          this.#triplet.set(index, "End");
-          break;
         case "Triplet":
           duration *= 2 / 3;
-          this.#triplet.set(index, "");
+          this.#triplet.add(index);
           break;
         case "Staccato":
           this.#staccato.add(index);
@@ -698,10 +694,11 @@ class Durations {
       );
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
-      const dots = Array.from(
-        { length: this.#dots.get(i) ?? 0 },
-        () => xml.dot,
-      );
+      const dots = this.#doubleDotted.has(i)
+        ? [xml.dot, xml.dot]
+        : this.#dotted.has(i)
+        ? [xml.dot]
+        : [];
       const notes = positions.notes(i);
       if (notes.length === 0) {
         result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
