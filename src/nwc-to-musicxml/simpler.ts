@@ -1,8 +1,8 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Element, Elements } from "./xml.ts";
+import { Element } from "./xml.ts";
+import { MusicXML } from "./musicxml.ts";
 
 type NWCLine = {
-  number: number;
   tag: string;
   values: Record<string, string[]>;
 };
@@ -12,8 +12,7 @@ export function scan(source: string): NWCLine[] {
     line.length > 0
   );
   const result = [];
-  for (let number = 0, len = lines.length; number < len; number++) {
-    const line = lines[number];
+  for (const line of lines) {
     const columns = line.split("|");
     if (columns[0] !== "") continue;
     const tag = columns[1].trim();
@@ -23,294 +22,12 @@ export function scan(source: string): NWCLine[] {
         return [k, v.split(",")];
       }),
     );
-    result.push({ number, tag, values });
+    result.push({ tag, values });
   }
   return result;
 }
 
 const ALTSTR = "vbn#x";
-const HEADER = '<?xml version="1.0" encoding="UTF-8"?>'; //<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "https://raw.githubusercontent.com/w3c/musicxml/refs/tags/v4.0/schema/partwise.dtd">';
-
-class MusicXML {
-  readonly chord: Element;
-  readonly rest: Element;
-  readonly timeMod: Element;
-  readonly tie: { start: Element; stop: Element };
-  readonly tied: { start: Element; stop: Element };
-  readonly dot: Element;
-  readonly startSustain: Element;
-  readonly stopSustain: Element;
-  readonly dynamics: Record<string, Element>;
-  readonly staccato: Element;
-  readonly tenuto: Element;
-  readonly accent: Element;
-
-  constructor(private xml = new Elements()) {
-    this.chord = xml.create("chord");
-    this.rest = xml.create("rest");
-    this.timeMod = xml.create(
-      "time-modification",
-      undefined,
-      xml.create("actual-notes", undefined, "3"),
-      xml.create("normal-notes", undefined, "2"),
-    );
-    this.tie = {
-      start: xml.create("tie", { type: "start" }),
-      stop: xml.create("tie", { type: "stop" }),
-    };
-    this.tied = {
-      start: xml.create("tied", { type: "start" }),
-      stop: xml.create("tied", { type: "stop" }),
-    };
-    this.dot = xml.create("dot");
-    this.startSustain = this.#direction(
-      xml.create("pedal", { type: "start" }),
-    );
-    this.stopSustain = this.#direction(
-      xml.create("pedal", { type: "stop" }),
-    );
-    this.dynamics = Object.fromEntries(
-      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
-        d,
-      ) => [
-        d,
-        this.#direction(xml.create("dynamics", undefined, xml.create(d))),
-      ]),
-    );
-    this.staccato = xml.create("staccato");
-    this.tenuto = xml.create("tenuto");
-    this.accent = xml.create("accent");
-  }
-
-  #barStyles: Record<string, string> = {
-    Double: "light-light",
-    SectionOpen: "heavy-light",
-    SectionClose: "light-heavy",
-    MasterRepeatOpen: "heavy-light",
-    MasterRepeatClose: "light-heavy",
-    LocalRepeatOpen: "light-light",
-    LocalRepeatClose: "light-light",
-  };
-
-  #rightBarStyles = new Set([
-    "SectionClose",
-    "MasterRepeatClose",
-    "LocalRepeatClose",
-  ]);
-
-  #leftBarStyles = new Set([
-    "Double",
-    "SectionOpen",
-    "MasterRepeatOpen",
-    "LocalRepeatOpen",
-  ]);
-
-  #repeatBars = new Set([
-    "MasterRepeatOpen",
-    "LocalRepeatOpen",
-    "MasterRepeatClose",
-    "LocalRepeatClose",
-  ]);
-
-  leftBarline(
-    type: string = "Single",
-    ending: string[] = [],
-  ) {
-    if (!this.#leftBarStyles.has(type) && !ending.length) return null;
-    return this.#cache[type + ending] ||= this.create(
-      "barline",
-      { location: "left" },
-      type === "Single"
-        ? null
-        : this.xml.create("bar-style", undefined, this.#barStyles[type]),
-      ending.length
-        ? this.create("ending", {
-          number: ending.join(","),
-          type: "start",
-        })
-        : null,
-      this.#repeatBars.has(type)
-        ? this.xml.create("repeat", {
-          direction: "forward",
-        })
-        : null,
-    );
-  }
-
-  rightBarline(
-    type: string = "Single",
-    ending: string[] = [],
-  ) {
-    if (!this.#rightBarStyles.has(type) && !ending.length) return null;
-    const single = type === "Single";
-    return this.#cache[type + ending] ||= this.create(
-      "barline",
-      { location: "right" },
-      single
-        ? null
-        : this.xml.create("bar-style", undefined, this.#barStyles[type]),
-      ending.length
-        ? this.create("ending", {
-          number: ending.join(","),
-          type: single ? "discontinue" : "stop",
-        })
-        : null,
-      this.#repeatBars.has(type)
-        ? this.xml.create("repeat", {
-          direction: "backward",
-        })
-        : null,
-    );
-  }
-
-  wedge(type: string) {
-    return this.#cache["wedge" + type] = this.#direction(
-      this.xml.create("wedge", { type }),
-    );
-  }
-
-  clef(type: string, octaveChange: number): Element {
-    const key = type + octaveChange;
-    if (this.#cache[key]) return this.#cache[key];
-    const elements = [];
-    switch (type) {
-      case "Bass":
-        elements.push(this.xml.create("sign", undefined, "F"));
-        break;
-      case "Alto":
-        elements.push(this.xml.create("sign", undefined, "C"));
-        break;
-      case "Tenor":
-        elements.push(
-          this.xml.create("sign", undefined, "C"),
-          this.xml.create("line", undefined, "4"),
-        );
-        break;
-      case "Treble":
-        elements.push(this.xml.create("sign", undefined, "G"));
-        break;
-      default:
-        throw new Error("Unknown Clef Type");
-    }
-    if (octaveChange) {
-      elements.push(this.xml.create("clef-octave-change", undefined, "octave"));
-    }
-    return this.#cache[key] = this.create(
-      "clef",
-      undefined,
-      ...elements,
-    );
-  }
-
-  #direction(type: Element) {
-    return this.create(
-      "direction",
-      undefined,
-      this.xml.create("direction-type", undefined, type),
-    );
-  }
-
-  key(fifths: number): Element {
-    return this.#cache["K" + fifths] ||= this.xml.create(
-      "key",
-      undefined,
-      this.xml.create("fifths", undefined, fifths.toString()),
-    );
-  }
-
-  #steps = [..."CDEFGAB"].map((step) =>
-    this.xml.create("step", undefined, step)
-  );
-  #octaves = [..."0123456789"].map((octave) =>
-    this.xml.create("octave", undefined, octave)
-  );
-  #alters = Object.fromEntries(
-    [...ALTSTR].map((
-      alter,
-      i,
-    ) => [alter, this.xml.create("alter", undefined, (i - 2).toString())]),
-  );
-
-  pitch(tone: number, alter: string): Element {
-    return this.#cache[alter + tone] ||= this.create(
-      "pitch",
-      undefined,
-      this.#steps[tone % 7],
-      alter === "n" ? null : this.#alters[alter],
-      this.#octaves[(tone / 7) | 0],
-    );
-  }
-
-  type(dur: string): Element {
-    return this.#cache["T" + dur] ||= this.xml.create("type", undefined, dur);
-  }
-
-  note(...elements: (Element | null)[]): Element {
-    return this.create("note", undefined, ...elements);
-  }
-
-  measure(
-    number: number,
-    ...elements: Element[]
-  ): Element {
-    return this.xml.create(
-      "measure",
-      { number: number.toString() },
-      ...elements,
-    );
-  }
-
-  #cache: Record<string, Element> = {};
-
-  duration(duration: string): Element {
-    return this.#cache["D" + duration] ||= this.xml.create(
-      "duration",
-      undefined,
-      duration,
-    );
-  }
-
-  metronome(
-    tempo: number,
-    base: string = "Quarter",
-  ): Element {
-    const [type, dotted] = base.split(" ");
-    return this.#cache["M" + tempo + base] ||= this.#direction(
-      this.create(
-        "metronome",
-        undefined,
-        this.xml.create("beat-unit", undefined, type.toLowerCase()),
-        dotted ? this.xml.create("beat-unit-dot") : null,
-        this.xml.create("per-minute", undefined, tempo.toString()),
-      ),
-    );
-  }
-
-  time(n: string, d: string): Element {
-    return this.#cache["T" + n + "/" + d] ||= this.xml.create(
-      "time",
-      undefined,
-      this.xml.create("beats", undefined, n),
-      this.xml.create("beat-type", undefined, d),
-    );
-  }
-
-  create(
-    name: string,
-    attributes?: Record<string, string>,
-    ...Elements: (Element | string | null)[]
-  ): Element {
-    return this.xml.create(
-      name,
-      attributes,
-      ...Elements.filter((x) => x !== null),
-    );
-  }
-
-  stringify(element: Element): string {
-    return HEADER + this.xml.stringify(element);
-  }
-}
 
 const N7 = "nnnnnnn";
 
@@ -330,7 +47,7 @@ class Positions {
   #altersByTone = [...N7];
   #backup: Set<number> = new Set();
 
-  visit(line: NWCLine) {
+  visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
         this.#signature = [...N7];
@@ -376,13 +93,16 @@ class Positions {
         this.#groups.push(this.#tones.length);
         break;
       default:
-        break;
+        return false;
     }
+    return true;
   }
 
   #open: Map<number, string> = new Map();
   #startTie: Set<number> = new Set();
   #stopTie: Set<number> = new Set();
+  // track explicit accidentals
+  #altered: Map<number, string> = new Map();
 
   // this is what musicians must do in their heads while reading sheet music
   #pitch(pos: string) {
@@ -395,6 +115,7 @@ class Positions {
     if (stopTie) this.#stopTie.add(index);
 
     if (altered) {
+      this.#altered.set(index, pos[0]);
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
     } else if (stopTie) this.#alters.push(stopTie);
@@ -427,43 +148,33 @@ class Positions {
     return ties;
   }
 
+  accidental(note: number, xml: MusicXML): Element | null {
+    const alter = this.#altered.get(note);
+    if (!alter) return null;
+    return xml.accidental(alter);
+  }
+
   backup(group: number): boolean {
     return this.#backup.has(group);
   }
 }
 
-function gcd(a: number, b: number): number {
-  for (;;) {
-    if (!b) return a;
-    a = a % b;
-    if (!a) return b;
-    b = b % a;
-  }
-}
-
-const FRACTION = 768;
+const PER_WHOLE = 768;
+const PER_QUARTER = 192;
 
 class Durations {
   #measure: number[] = [];
   #durations: number[] = [];
   #types: string[] = [];
-  #parts: Set<number> = new Set();
-  #clefs: Map<number, string> = new Map();
-  #clefOctaveChanges: Map<number, number> = new Map();
-  #keys: Map<number, number> = new Map();
-  #times: Map<number, string> = new Map();
   #startSustain: Set<number> = new Set();
   #stopSustain: Set<number> = new Set();
   #dynamics: Map<number, string> = new Map();
   #tempo: Map<number, number> = new Map();
   #tempoBase: Map<number, string> = new Map();
 
-  visit(line: NWCLine) {
+  visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
-        this.#measure.push(this.#durations.length);
-        this.#parts.add(this.#durations.length);
-        break;
       case "Bar":
         this.#measure.push(this.#durations.length);
         break;
@@ -475,32 +186,6 @@ class Durations {
           this.#duration(line.values.Dur2);
         }
         this.#duration(line.values.Dur);
-        break;
-      case "Clef":
-        this.#clefs.set(this.#durations.length, line.values.Type[0]);
-        if (!line.values.OctaveShift) break;
-        switch (line.values.OctaveShift[0]) {
-          case "Octave Up":
-            this.#clefOctaveChanges.set(this.#durations.length, 1);
-            break;
-          case "Octave Down":
-            this.#clefOctaveChanges.set(this.#durations.length, -1);
-            break;
-          default:
-            break;
-        }
-        break;
-      case "Key": {
-        let fifths = 0;
-        for (const x of line.values.Signature) {
-          if (x[1] === "#") fifths++;
-          else fifths--;
-        }
-        this.#keys.set(this.#durations.length, fifths);
-        break;
-      }
-      case "TimeSig":
-        this.#times.set(this.#durations.length, line.values.Signature[0]);
         break;
       case "SustainPedal":
         if (line.values.Status?.[0] === "Released") {
@@ -520,8 +205,9 @@ class Durations {
         }
         break;
       default:
-        break;
+        return false;
     }
+    return true;
   }
 
   visitEnd() {
@@ -566,13 +252,12 @@ class Durations {
   #stopSlur: Set<number> = new Set();
   #grace: Set<number> = new Set();
   #triplet: Set<number> = new Set();
-  #gcd = FRACTION;
   #dotted: Set<number> = new Set();
   #doubleDotted: Set<number> = new Set();
 
   #duration(dur: string[]) {
     const index = this.#durations.length;
-    let duration = FRACTION;
+    let duration = PER_WHOLE;
     let slurred = false;
     for (const s of dur) {
       switch (s) {
@@ -633,6 +318,7 @@ class Durations {
           this.#grace.add(index);
           break;
         default:
+          console.error("Unused duration", s);
           break;
       }
     }
@@ -644,54 +330,20 @@ class Durations {
       }
       this.#slurred = slurred;
     }
-    this.#gcd = gcd(this.#gcd, duration);
     this.#durations.push(duration);
     assert(this.#types.length === this.#durations.length);
   }
 
-  #attributes(i: number, xml: MusicXML) {
-    const content: (Element)[] = [];
-    if (this.#parts.has(i)) {
-      content.push(
-        xml.create(
-          "divisions",
-          undefined,
-          (FRACTION / 4 / this.#gcd).toString(),
-        ),
-      );
-    }
-    const key = this.#keys.get(i);
-    if (key !== undefined) content.push(xml.key(key));
-    const time = this.#times.get(i);
-    if (time === "Common") {
-      content.push(xml.time("4", "4"));
-    } else if (time === "AllaBreve") {
-      content.push(xml.time("2", "2"));
-    } else if (time) {
-      const [beats, beatType] = time.split("/");
-      content.push(xml.time(beats, beatType));
-    }
-    const clef = this.#clefs.get(i);
-    if (clef) content.push(xml.clef(clef, this.#clefOctaveChanges.get(i) ?? 0));
-    if (content.length === 0) return null;
-    return xml.create("attributes", undefined, ...content);
-  }
-
   notes(
     measure: number,
+    staff: number,
     positions: Positions,
     xml: MusicXML,
   ): (Element | null)[] {
     const result: (Element | null)[] = [];
     const to = this.#measure[measure + 1];
     for (let i = this.#measure[measure]; i < to; i++) {
-      result.push(this.#attributes(i, xml));
-      this.#directions(i, result, xml);
-      const duration = xml.create(
-        "duration",
-        undefined,
-        (this.#durations[i] / this.#gcd).toString(),
-      );
+      this.#directions(i, staff, result, xml);
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
       const dots = this.#doubleDotted.has(i)
@@ -701,7 +353,19 @@ class Durations {
         : [];
       const notes = positions.notes(i);
       if (notes.length === 0) {
-        result.push(xml.note(xml.rest, duration, type, ...dots, timeMod));
+        result.push(
+          xml.note(
+            xml.rest,
+            xml.duration(this.#durations[i]),
+            xml.voice(
+              positions.backup(i) ? staff.toString() + "'" : staff.toString(),
+            ),
+            type,
+            ...dots,
+            timeMod,
+            xml.staff(staff),
+          ),
+        );
       } else {
         const grace = this.#grace.has(i) ? xml.create("grace") : null;
         const notations: Element[] = [];
@@ -722,12 +386,16 @@ class Durations {
               grace,
               j ? xml.chord : null, // no chord element in the first note
               positions.pitch(notes[j], xml),
-              duration,
+              xml.duration(this.#durations[i]),
               ...ties.map((it) => xml.tie[it]),
-              xml.create("voice", undefined, positions.backup(i) ? "2" : "1"),
+              xml.voice(
+                positions.backup(i) ? staff.toString() + "'" : staff.toString(),
+              ),
               type,
               ...dots,
+              positions.accidental(notes[j], xml),
               timeMod,
+              xml.staff(staff),
               notations.length > 0
                 ? xml.create(
                   "notations",
@@ -739,9 +407,9 @@ class Durations {
           );
         }
       }
-      if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain);
+      if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain(staff));
       if (positions.backup(i)) {
-        result.push(xml.create("backup", undefined, duration));
+        result.push(xml.backup(this.#durations[i]));
       }
     }
     return result;
@@ -759,16 +427,19 @@ class Durations {
     }
   }
 
-  // trouble with pedal marks at the very end.
-  // see, there is no good way to put this stuff at the right side of the bar line
-  #directions(i: number, result: (Element | null)[], xml: MusicXML) {
+  #directions(
+    i: number,
+    staff: number,
+    result: (Element | null)[],
+    xml: MusicXML,
+  ) {
     const tempo = this.#tempo.get(i);
-    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i)));
-    if (this.#startSustain.has(i)) result.push(xml.startSustain);
+    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i), staff));
+    if (this.#startSustain.has(i)) result.push(xml.startSustain(staff));
     const dynamic = this.#dynamics.get(i);
-    if (dynamic) result.push(xml.dynamics[dynamic]);
+    if (dynamic) result.push(xml.direction(xml.dynamics[dynamic], staff));
     const wedge = this.#wedge.get(i);
-    if (wedge) result.push(xml.wedge(wedge));
+    if (wedge) result.push(xml.wedge(wedge, staff));
   }
 }
 
@@ -779,7 +450,12 @@ class Bars {
   #endings: Map<number, string[]> = new Map();
   #endingBar: string = "SectionClose";
 
-  visit(line: NWCLine) {
+  #times: Map<number, string> = new Map();
+  #clefs: Map<number, string> = new Map();
+  #clefOctaveChanges: Map<number, number> = new Map();
+  #keys: Map<number, number> = new Map();
+
+  visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
         this.#measures++;
@@ -802,9 +478,46 @@ class Bars {
       case "Ending":
         this.#endings.set(this.#measures, line.values.Endings);
         break;
-      default:
+      case "TimeSig":
+        switch (line.values.Signature[0]) {
+          case "Common":
+            this.#times.set(this.#measures, "4/4");
+            break;
+          case "AllaBreve":
+            this.#times.set(this.#measures, "2/2");
+            break;
+          default:
+            this.#times.set(this.#measures, line.values.Signature[0]);
+            break;
+        }
         break;
+      case "Clef":
+        this.#clefs.set(this.#measures, line.values.Type[0]);
+        if (!line.values.OctaveShift) break;
+        switch (line.values.OctaveShift[0]) {
+          case "Octave Up":
+            this.#clefOctaveChanges.set(this.#measures, 1);
+            break;
+          case "Octave Down":
+            this.#clefOctaveChanges.set(this.#measures, -1);
+            break;
+          default:
+            break;
+        }
+        break;
+      case "Key": {
+        let fifths = 0;
+        for (const x of line.values.Signature) {
+          if (x[1] === "#") fifths++;
+          else fifths--;
+        }
+        this.#keys.set(this.#measures, fifths);
+        break;
+      }
+      default:
+        return false;
     }
+    return true;
   }
 
   visitEnd() {
@@ -813,7 +526,7 @@ class Bars {
     this.#barStyles.set(this.#measures, this.#endingBar);
   }
 
-  measures(
+  single(
     staff: number,
     durations: Durations,
     positions: Positions,
@@ -821,11 +534,13 @@ class Bars {
   ): Element[] {
     const result: Element[] = [];
     for (
-      let i = this.#staves[staff], to = this.#staves[staff + 1], number = 0;
+      let i = this.#staves[staff],
+        to = this.#staves[staff + 1],
+        number = 0;
       i < to;
       i++
     ) {
-      const notes = durations.notes(i, positions, xml);
+      const notes = durations.notes(i, 1, positions, xml);
       if (notes.length === 0) continue;
       // be careful with measure numbers
       number++;
@@ -835,6 +550,7 @@ class Bars {
           "measure",
           { number: number.toString() },
           xml.leftBarline(this.#barStyles.get(i), endings),
+          this.#attributes(xml, i),
           ...notes,
           xml.rightBarline(this.#barStyles.get(i + 1), endings),
         ),
@@ -842,20 +558,124 @@ class Bars {
     }
     return result;
   }
+
+  double(
+    staff: number,
+    durations: Durations,
+    positions: Positions,
+    xml: MusicXML,
+  ): Element[] {
+    const result: Element[] = [];
+    const offset = this.#staves[staff + 1] - this.#staves[staff];
+    assert(
+      this.#staves[staff + 2] === this.#staves[staff + 1] + offset,
+      `Problem: unequal numbers of measures in staves ${staff} and ${
+        staff + 1
+      }.`,
+    );
+    let backup = xml.backup(PER_WHOLE);
+    for (
+      let i = this.#staves[staff],
+        to = this.#staves[staff + 1],
+        number = 0;
+      i < to;
+      i++
+    ) {
+      const time = this.#times.get(i) || this.#times.get(i + offset);
+      if (time) {
+        const [n, d] = time.split("/");
+        backup = xml.backup(PER_WHOLE * +n / +d);
+      }
+      const notes = durations.notes(i, 1, positions, xml);
+      notes.push(backup);
+      notes.push(...durations.notes(i + offset, 2, positions, xml));
+      // mind the backup!
+      if (notes.length === 1) continue;
+      // be careful with measure numbers
+      number++;
+      const endings = this.#endings.get(i) || this.#endings.get(i + offset);
+      result.push(
+        xml.create(
+          "measure",
+          { number: number.toString() },
+          xml.leftBarline(
+            this.#barStyles.get(i) || this.#barStyles.get(i + offset),
+            endings,
+          ),
+          this.#attributes(xml, i, i + offset),
+          ...notes,
+          xml.rightBarline(
+            this.#barStyles.get(i + 1) || this.#barStyles.get(i + offset + 1),
+            endings,
+          ),
+        ),
+      );
+    }
+    return result;
+  }
+
+  #attributes(xml: MusicXML, i: number, j?: number) {
+    const content: (Element)[] = [];
+    if (this.#staves.includes(i)) {
+      content.push(
+        xml.create(
+          "divisions",
+          undefined,
+          PER_QUARTER.toString(),
+        ),
+      );
+    }
+    const key = this.#keys.get(i) || (j && this.#keys.get(j));
+    if (key !== undefined) content.push(xml.key(key));
+    const time = this.#times.get(i) || (j && this.#times.get(j));
+    if (time) {
+      const [beats, beatType] = time.split("/");
+      content.push(xml.time(beats, beatType));
+    }
+    if (j && this.#staves.includes(i)) {
+      content.push(
+        xml.create(
+          "staves",
+          undefined,
+          "2",
+        ),
+      );
+    }
+    // two staves, two clefs!
+    const clef1 = this.#clefs.get(i);
+    if (clef1) {
+      content.push(xml.clef(clef1, this.#clefOctaveChanges.get(i) ?? 0, 1));
+    }
+    if (j) {
+      const clef2 = this.#clefs.get(j);
+      if (clef2) {
+        content.push(xml.clef(clef2, this.#clefOctaveChanges.get(j) ?? 0, 2));
+      }
+    }
+    if (content.length === 0) return null;
+    return xml.create("attributes", undefined, ...content);
+  }
 }
 
 class Staves {
   #names: string[] = [];
-  #ids: { id: string }[] = [];
-  visit(line: NWCLine) {
+  #double: Set<number> = new Set();
+  visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
         this.#names.push(line.values.Name[0].slice(1, -1));
-        this.#ids.push({ id: `P${this.#names.length}` });
+        break;
+      case "StaffProperties":
+        if (
+          line.values.WithNextStaff?.[0] === "Brace"
+        ) {
+          this.#double.add(this.#names.length - 1);
+        }
         break;
       default:
-        break;
+        return false;
     }
+    return true;
   }
 
   parts(
@@ -866,19 +686,28 @@ class Staves {
   ): Element {
     const scoreParts = [];
     const parts = [];
+    let id = 0;
     for (let i = 0; i < this.#names.length; i++) {
+      const attributes = { id: `P${++id}` };
       scoreParts.push(
         xml.create(
           "score-part",
-          this.#ids[i],
+          attributes,
           xml.create("part-name", undefined, this.#names[i]),
         ),
       );
+      let measures;
+      if (this.#double.has(i)) {
+        measures = bars.double(i, durations, positions, xml);
+        i++;
+      } else {
+        measures = bars.single(i, durations, positions, xml);
+      }
       parts.push(
         xml.create(
           "part",
-          this.#ids[i],
-          ...bars.measures(i, durations, positions, xml),
+          attributes,
+          ...measures,
         ),
       );
     }
@@ -908,10 +737,15 @@ export class Transformer {
   transform(source: string): string {
     const lines = scan(source);
     for (const line of lines) {
-      this.#positions.visit(line);
-      this.#durations.visit(line);
-      this.#bars.visit(line);
-      this.#staves.visit(line);
+      let visited = false;
+      // no short-circuiting here
+      if (this.#positions.visit(line)) visited = true;
+      if (this.#bars.visit(line)) visited = true;
+      if (this.#staves.visit(line)) visited = true;
+      if (this.#durations.visit(line)) visited = true;
+      if (!visited) {
+        console.warn("Unused line", line);
+      }
     }
     this.#bars.visitEnd();
     this.#durations.visitEnd();

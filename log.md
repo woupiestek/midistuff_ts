@@ -1,5 +1,19 @@
 # Midistuff logs
 
+## 2025-04-23
+
+### limited durations
+
+type of note, tripleted/number of dots, that is it right?
+
+What problem am I trying to solve? I cannot preserve the ordering of things
+placed between notes, So they always go come out in the same order, and that may
+not be the original one...
+
+### combining parts
+
+Multistave parts... I did it.
+
 ## 2025-04-22
 
 ### ideas
