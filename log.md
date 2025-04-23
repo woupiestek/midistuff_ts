@@ -14,6 +14,16 @@ not be the original one...
 
 Multistave parts... I did it.
 
+### helpful
+
+C:\Users\woupi\workspace\midistuff\samples
+C:\Users\woupi\OneDrive\Documents\NoteWorthy\Wouter
+
+### new problems
+
+- Ties in "2015-7-27 2(!)" are not correct.
+- TempoVariance and other trouble in coollove
+
 ## 2025-04-22
 
 ### ideas
