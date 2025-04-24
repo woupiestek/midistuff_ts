@@ -208,8 +208,22 @@ class Durations {
           this.#tempoBase.set(this.#durations.length, line.values.Base[0]);
         }
         break;
-      case "TempoVariance":
-        this.#addNotation(line.values.Style[0]);
+      case "TempoVariance": {
+        const style = line.values.Style[0];
+        switch (style) {
+          case "Breath Mark":
+          case "Caesura":
+          case "Fermata":
+            this.#addNotation(style);
+            break;
+          default:
+            this.#addWord(style.toLowerCase());
+            break;
+        }
+        break;
+      }
+      case "PerformanceStyle":
+        this.#addWord(line.values.Style[0].toLowerCase());
         break;
       default:
         return false;
@@ -227,12 +241,23 @@ class Durations {
     (this.#notations[this.#durations.length] ||= new Set()).add(style);
   }
 
+  #words: { [_: number]: Set<string> } = {};
+
+  #addWord(word: string) {
+    (this.#words[this.#durations.length] ||= new Set()).add(word);
+  }
+
   #wedged: boolean = false;
-  #wedge: Map<number, string> = new Map();
+  #wedge: Map<number, { type: string; number: string }> = new Map();
+  #wedgeNumber = 1;
 
   #dynamic(length: number, arg1: string) {
     if (this.#wedged) {
-      this.#wedge.set(length, "stop");
+      this.#wedge.set(length, {
+        type: "stop",
+        number: this.#wedgeNumber.toString(),
+      });
+      this.#wedgeNumber = this.#wedgeNumber % 16 + 1;
       this.#wedged = false;
     }
     switch (arg1) {
@@ -243,12 +268,18 @@ class Durations {
         this.#dynamics.set(length, "rfz");
         break;
       case "Crescendo":
-        this.#wedge.set(length, "crescendo");
+        this.#wedge.set(length, {
+          type: "crescendo",
+          number: this.#wedgeNumber.toString(),
+        });
         this.#wedged = true;
         break;
       case "Decrescendo":
       case "Diminuendo":
-        this.#wedge.set(length, "diminuendo");
+        this.#wedge.set(length, {
+          type: "diminuendo",
+          number: this.#wedgeNumber.toString(),
+        });
         this.#wedged = true;
         break;
       default:
@@ -459,6 +490,15 @@ class Durations {
     if (dynamic) result.push(xml.direction(xml.dynamics[dynamic], staff));
     const wedge = this.#wedge.get(i);
     if (wedge) result.push(xml.wedge(wedge, staff));
+    const words = this.#words[i];
+    if (words) {
+      for (const word of words) {
+        result.push(xml.direction(
+          xml.create("words", undefined, word),
+          staff,
+        ));
+      }
+    }
   }
 }
 

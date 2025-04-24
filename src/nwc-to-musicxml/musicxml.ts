@@ -161,11 +161,8 @@ export class MusicXML {
     );
   }
 
-  wedge(type: string, staff: number): Element {
-    return this.#cache["wedge" + type + staff] = this.direction(
-      this.xml.create("wedge", { type }),
-      staff,
-    );
+  wedge(wegde: { type: string; number: string }, staff: number): Element {
+    return this.direction(this.xml.create("wedge", wegde), staff);
   }
 
   clef(type: string, octaveChange: number, number: number): Element {
@@ -193,7 +190,11 @@ export class MusicXML {
     }
     if (octaveChange) {
       elements.push(
-        this.xml.create("clef-octave-change", undefined, "octave"),
+        this.xml.create(
+          "clef-octave-change",
+          undefined,
+          octaveChange.toString(),
+        ),
       );
     }
     return this.#cache[key] = this.create(
