@@ -1,5 +1,5 @@
 !NoteWorthyComposer(2.751)
-|Editor|ActiveStaff:1|CaretIndex:11|CaretPos:1
+|Editor|ActiveStaff:1|CaretIndex:138|CaretPos:2
 |SongInfo|Title:"Piano Template"|Author:"<Name>"|Lyricist:""|Copyright1:"Copyright © <Year> by <Name>"|Copyright2:"All Rights Reserved"
 |PgSetup|StaffSize:18|Zoom:5|TitlePage:Y|JustifyVertically:Y|PrintSystemSepMark:N|ExtendLastSystem:N|DurationPadding:Y|PageNumbers:0|StaffLabels:None|BarNumbers:Plain|StartingBar:1|AllowLayering:N
 |Font|Style:StaffItalic|Typeface:"Times New Roman"|Size:11|Bold:Y|Italic:Y|CharSet:0
@@ -164,7 +164,7 @@
 |Note|Dur:8th,Slur|Pos:-2|Opts:Stem=Up,Beam=First
 |Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=End
 |Note|Dur:8th,Slur|Pos:b-4|Opts:Stem=Up,Beam=First
-|Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=End
+|Note|Dur:8th,Slur|Pos:-2|Opts:Stem=Up,Beam=End
 |Bar
 |Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=First
 |Note|Dur:8th,Slur|Pos:-2|Opts:Stem=Up,Beam=End
@@ -178,7 +178,7 @@
 |Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=First
 |Note|Dur:8th,Slur|Pos:-4|Opts:Stem=Up,Beam=End
 |Note|Dur:8th,Slur|Pos:-5|Opts:Stem=Up,Beam=First
-|Note|Dur:8th,Slur|Pos:-4|Opts:Stem=Up,Beam=End
+|Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,StemLength=7,Beam=End
 |Bar
 |Note|Dur:8th,Slur|Pos:-4|Opts:Stem=Up,Beam=First
 |Note|Dur:8th,Slur|Pos:-3|Opts:Stem=Up,Beam=End

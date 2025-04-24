@@ -51,6 +51,13 @@ export class MusicXML {
     this.accent = xml.create("accent");
   }
 
+  slur(type: string, number: number): Element {
+    return this.#cache["slur" + type + number] ||= this.xml.create(
+      "slur",
+      { type, number: number.toString() },
+    );
+  }
+
   #barStyles: Record<string, string> = {
     Double: "light-light",
     SectionOpen: "heavy-light",

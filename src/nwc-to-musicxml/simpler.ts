@@ -177,6 +177,10 @@ class Durations {
       case "AddStaff":
       case "Bar":
         this.#measure.push(this.#durations.length);
+        if (this.#slurred) {
+          this.#continueSlur.set(this.#durations.length - 1, this.#slurNumber);
+          this.#continueSlur.set(this.#durations.length, this.#slurNumber);
+        }
         break;
       case "Note":
       case "Rest":
@@ -248,8 +252,10 @@ class Durations {
   #tenuto: Set<number> = new Set();
   #accent: Set<number> = new Set();
   #slurred: boolean = false;
-  #startSlur: Set<number> = new Set();
-  #stopSlur: Set<number> = new Set();
+  #startSlur: Map<number, number> = new Map();
+  #continueSlur: Map<number, number> = new Map();
+  #stopSlur: Map<number, number> = new Map();
+  #slurNumber: number = 16;
   #grace: Set<number> = new Set();
   #triplet: Set<number> = new Set();
   #dotted: Set<number> = new Set();
@@ -324,9 +330,10 @@ class Durations {
     }
     if (slurred !== this.#slurred) {
       if (slurred) {
-        this.#startSlur.add(index);
+        this.#slurNumber = this.#slurNumber % 16 + 1;
+        this.#startSlur.set(index, ++this.#slurNumber);
       } else {
-        this.#stopSlur.add(index);
+        this.#stopSlur.set(index, this.#slurNumber);
       }
       this.#slurred = slurred;
     }
@@ -371,10 +378,11 @@ class Durations {
         const notations: Element[] = [];
         this.#articulations(i, xml, notations);
         if (this.#stopSlur.has(i)) {
-          notations.push(xml.create("slur", { type: "stop" }));
-        }
-        if (this.#startSlur.has(i)) {
-          notations.push(xml.create("slur", { type: "start" }));
+          notations.push(xml.slur("stop", this.#stopSlur.get(i) ?? 0));
+        } else if (this.#startSlur.has(i)) {
+          notations.push(xml.slur("start", this.#startSlur.get(i) ?? 0));
+        } else if (this.#continueSlur.has(i)) {
+          notations.push(xml.slur("continue", this.#continueSlur.get(i) ?? 0));
         }
         for (let j = 0; j < notes.length; j++) {
           const ties = positions.ties(notes[j]);

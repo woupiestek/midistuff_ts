@@ -1,5 +1,11 @@
 # Midistuff logs
 
+## 2025-04-24
+
+### big slurs
+
+Slur number help, but some still get lost in musescore
+
 ## 2025-04-23
 
 ### limited durations
