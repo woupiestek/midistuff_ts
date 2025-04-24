@@ -10,10 +10,9 @@ export class MusicXML {
   readonly tied: { start: Element; stop: Element };
   readonly dot: Element;
   readonly dynamics: Record<string, Element>;
-  readonly staccato: Element;
-  readonly tenuto: Element;
-  readonly accent: Element;
   readonly staves: Element[] = [];
+  readonly atriculations: Map<string, Element>;
+  readonly fermata: Element;
 
   constructor(private xml = new Elements()) {
     this.staves = [
@@ -46,9 +45,14 @@ export class MusicXML {
         xml.create("dynamics", undefined, xml.create(d)),
       ]),
     );
-    this.staccato = xml.create("staccato");
-    this.tenuto = xml.create("tenuto");
-    this.accent = xml.create("accent");
+    this.atriculations = new Map([
+      ["Accent", xml.create("accent")],
+      ["Breath Mark", xml.create("breath-mark", undefined, "comma")],
+      ["Caesura", xml.create("caesura")],
+      ["Staccato", xml.create("staccato")],
+      ["Tenuto", xml.create("tenuto")],
+    ]);
+    this.fermata = xml.create("fermata");
   }
 
   slur(type: string, number: number): Element {

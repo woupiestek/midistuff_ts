@@ -208,6 +208,9 @@ class Durations {
           this.#tempoBase.set(this.#durations.length, line.values.Base[0]);
         }
         break;
+      case "TempoVariance":
+        this.#addNotation(line.values.Style[0]);
+        break;
       default:
         return false;
     }
@@ -216,6 +219,12 @@ class Durations {
 
   visitEnd() {
     this.#measure.push(this.#durations.length);
+  }
+
+  #notations: { [_: number]: Set<string> } = {};
+
+  #addNotation(style: string) {
+    (this.#notations[this.#durations.length] ||= new Set()).add(style);
   }
 
   #wedged: boolean = false;
@@ -248,9 +257,6 @@ class Durations {
     }
   }
 
-  #staccato: Set<number> = new Set();
-  #tenuto: Set<number> = new Set();
-  #accent: Set<number> = new Set();
   #slurred: boolean = false;
   #startSlur: Map<number, number> = new Map();
   #continueSlur: Map<number, number> = new Map();
@@ -308,14 +314,10 @@ class Durations {
           duration *= 2 / 3;
           this.#triplet.add(index);
           break;
-        case "Staccato":
-          this.#staccato.add(index);
-          break;
-        case "Tenuto":
-          this.#tenuto.add(index);
-          break;
         case "Accent":
-          this.#accent.add(index);
+        case "Staccato":
+        case "Tenuto":
+          this.#addNotation(s);
           break;
         case "Slur":
           slurred = true;
@@ -375,20 +377,16 @@ class Durations {
         );
       } else {
         const grace = this.#grace.has(i) ? xml.create("grace") : null;
-        const notations: Element[] = [];
-        this.#articulations(i, xml, notations);
-        if (this.#stopSlur.has(i)) {
-          notations.push(xml.slur("stop", this.#stopSlur.get(i) ?? 0));
-        } else if (this.#startSlur.has(i)) {
-          notations.push(xml.slur("start", this.#startSlur.get(i) ?? 0));
-        } else if (this.#continueSlur.has(i)) {
-          notations.push(xml.slur("continue", this.#continueSlur.get(i) ?? 0));
-        }
+        const notationContent: (Element | null)[] = this.#notationContent(
+          i,
+          xml,
+        );
         for (let j = 0; j < notes.length; j++) {
           const ties = positions.ties(notes[j]);
-          notations.push(
+          const notations = [
+            ...notationContent,
             ...ties.map((it) => xml.tied[it]),
-          );
+          ];
           result.push(
             xml.note(
               grace,
@@ -423,16 +421,29 @@ class Durations {
     return result;
   }
 
-  #articulations(i: number, xml: MusicXML, notations: Element[]) {
-    const articulations = [];
-    if (this.#staccato.has(i)) articulations.push(xml.staccato);
-    if (this.#tenuto.has(i)) articulations.push(xml.tenuto);
-    if (this.#accent.has(i)) articulations.push(xml.accent);
-    if (articulations.length > 0) {
-      notations.push(
-        xml.create("articulations", undefined, ...articulations),
-      );
+  #notationContent(i: number, xml: MusicXML) {
+    const notations: Element[] = [];
+    if (this.#notations[i]) {
+      const articulations: Element[] = [...this.#notations[i]]
+        .map((it) => xml.atriculations.get(it))
+        .filter((it) => it !== undefined);
+      if (articulations.length > 0) {
+        notations.push(
+          xml.create("articulations", undefined, ...articulations),
+        );
+      }
+      if (this.#notations[i].has("Fermata")) {
+        notations.push(xml.fermata);
+      }
     }
+    if (this.#stopSlur.has(i)) {
+      notations.push(xml.slur("stop", this.#stopSlur.get(i) ?? 0));
+    } else if (this.#startSlur.has(i)) {
+      notations.push(xml.slur("start", this.#startSlur.get(i) ?? 0));
+    } else if (this.#continueSlur.has(i)) {
+      notations.push(xml.slur("continue", this.#continueSlur.get(i) ?? 0));
+    }
+    return notations;
   }
 
   #directions(
@@ -667,6 +678,7 @@ class Bars {
 
 class Staves {
   #names: string[] = [];
+  #midiPrograms: number[] = [];
   #double: Set<number> = new Set();
   visit(line: NWCLine): boolean {
     switch (line.tag) {
@@ -678,6 +690,12 @@ class Staves {
           line.values.WithNextStaff?.[0] === "Brace"
         ) {
           this.#double.add(this.#names.length - 1);
+        }
+        break;
+      case "StaffInstrument":
+        if (line.values.Patch) {
+          this.#midiPrograms[this.#names.length - 1] = +line.values.Patch[0] +
+            1;
         }
         break;
       default:
@@ -702,6 +720,17 @@ class Staves {
           "score-part",
           attributes,
           xml.create("part-name", undefined, this.#names[i]),
+          this.#midiPrograms[i]
+            ? xml.create(
+              "midi-instrument",
+              undefined,
+              xml.create(
+                "midi-program",
+                undefined,
+                this.#midiPrograms[i].toString(),
+              ),
+            )
+            : null,
         ),
       );
       let measures;
@@ -729,6 +758,12 @@ class Staves {
   }
 }
 
+const TECHNICAL_TAGS = new Set([
+  "Editor",
+  "Font",
+  "PgMargins",
+  "PgSetup",
+]);
 export class Transformer {
   #positions: Positions;
   #durations: Durations;
@@ -745,6 +780,7 @@ export class Transformer {
   transform(source: string): string {
     const lines = scan(source);
     for (const line of lines) {
+      if (TECHNICAL_TAGS.has(line.tag)) continue;
       let visited = false;
       // no short-circuiting here
       if (this.#positions.visit(line)) visited = true;

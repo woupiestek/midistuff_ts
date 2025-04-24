@@ -6,6 +6,13 @@
 
 Slur number help, but some still get lost in musescore
 
+### tempo variance
+
+Breath Mark: articulations; Caesura: atriculation; Fermata: barline, notations;
+Accellerando; Allargando; Rallentando; Ritardando; Ritenuto; Rubato; Stringento;
+
+For now, I have nothing.
+
 ## 2025-04-23
 
 ### limited durations
