@@ -724,6 +724,7 @@ class Staves {
   #names: string[] = [];
   #midiPrograms: number[] = [];
   #double: Set<number> = new Set();
+  #songInfo: Map<string, string> = new Map();
   visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
@@ -740,6 +741,12 @@ class Staves {
         if (line.values.Patch) {
           this.#midiPrograms[this.#names.length - 1] = +line.values.Patch[0] +
             1;
+        }
+        break;
+
+      case "SongInfo":
+        for (const [k, v] of Object.entries(line.values)) {
+          this.#songInfo.set(k, v[0]);
         }
         break;
       default:
@@ -793,9 +800,38 @@ class Staves {
       );
     }
 
+    const songInfo: (Element)[] = [];
+    const identification: (Element)[] = [];
+    for (const [k, v] of this.#songInfo) {
+      switch (k) {
+        case "Title":
+          songInfo.push(
+            xml.create(
+              "work",
+              undefined,
+              xml.create("work-title", undefined, v),
+            ),
+          );
+          break;
+        case "Author":
+        case "Lyricist":
+          identification.push(
+            xml.create("creator", { type: k.toLowerCase() }, v),
+          );
+          break;
+        case "Copyright1":
+        case "Copyright2":
+          identification.push(xml.create("rights", undefined, v));
+          break;
+        default:
+          console.warn("song data ignored:", k, v);
+      }
+    }
+    songInfo.push(xml.create("identification", undefined, ...identification));
     return xml.create(
       "score-partwise",
       { version: "4.0" },
+      ...songInfo,
       xml.create("part-list", undefined, ...scoreParts),
       ...parts,
     );
