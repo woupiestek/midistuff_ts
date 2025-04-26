@@ -98,9 +98,9 @@ class Positions {
     return true;
   }
 
-  #open: Map<number, string> = new Map();
-  #startTie: Set<number> = new Set();
-  #stopTie: Set<number> = new Set();
+  #open: (string | null)[] = Array.from({ length: 68 }, () => null);
+  #startTie: Map<number, string> = new Map();
+  #stopTie: Map<number, string> = new Map();
   // track explicit accidentals
   #altered: Map<number, string> = new Map();
 
@@ -110,23 +110,21 @@ class Positions {
     const startTie = pos[pos.length - 1] === "^";
     const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
     const index = this.#tones.length;
-    const stopTie = this.#open.get(tone);
+    const stopTie = this.#open[tone];
 
-    if (stopTie) this.#stopTie.add(index);
+    if (stopTie) this.#stopTie.set(index, (tone % 16 + 1).toString());
 
     if (altered) {
       this.#altered.set(index, pos[0]);
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
     } else if (stopTie) this.#alters.push(stopTie);
-    else {
-      this.#alters.push(this.#altersByTone[tone % 7]);
-    }
+    else this.#alters.push(this.#altersByTone[tone % 7]);
 
     if (startTie) {
-      this.#open.set(tone, this.#alters[index]);
-      this.#startTie.add(index);
-    } else this.#open.delete(tone);
+      this.#open[tone] = this.#alters[index];
+      this.#startTie.set(index, (tone % 16 + 1).toString());
+    } else this.#open[tone] = null;
     this.#tones.push(tone);
   }
 
@@ -141,10 +139,16 @@ class Positions {
     return xml.pitch(this.#tones[note], this.#alters[note]);
   }
 
-  ties(note: number): ("start" | "stop")[] {
-    const ties: ("start" | "stop")[] = [];
-    if (this.#stopTie.has(note)) ties.push("stop");
-    if (this.#startTie.has(note)) ties.push("start");
+  ties(note: number): ({ type: "start" | "stop"; number: string })[] {
+    const ties: ({ type: "start" | "stop"; number: string })[] = [];
+    const stopTie = this.#stopTie.get(note);
+    if (stopTie) {
+      ties.push({ type: "stop", number: stopTie.toString() });
+    }
+    const startTie = this.#startTie.get(note);
+    if (startTie) {
+      ties.push({ type: "start", number: startTie.toString() });
+    }
     return ties;
   }
 
@@ -416,7 +420,7 @@ class Durations {
           const ties = positions.ties(notes[j]);
           const notations = [
             ...notationContent,
-            ...ties.map((it) => xml.tied[it]),
+            ...ties.map((it) => xml.tied(it)),
           ];
           result.push(
             xml.note(
@@ -424,7 +428,7 @@ class Durations {
               j ? xml.chord : null, // no chord element in the first note
               positions.pitch(notes[j], xml),
               xml.duration(this.#durations[i]),
-              ...ties.map((it) => xml.tie[it]),
+              ...ties.map((it) => xml.tie[it.type]),
               xml.voice(
                 positions.backup(i) ? staff.toString() + "'" : staff.toString(),
               ),

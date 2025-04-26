@@ -7,7 +7,6 @@ export class MusicXML {
   readonly rest: Element;
   readonly timeMod: Element;
   readonly tie: { start: Element; stop: Element };
-  readonly tied: { start: Element; stop: Element };
   readonly dot: Element;
   readonly dynamics: Record<string, Element>;
   readonly staves: Element[] = [];
@@ -31,10 +30,7 @@ export class MusicXML {
       start: xml.create("tie", { type: "start" }),
       stop: xml.create("tie", { type: "stop" }),
     };
-    this.tied = {
-      start: xml.create("tied", { type: "start" }),
-      stop: xml.create("tied", { type: "stop" }),
-    };
+
     this.dot = xml.create("dot");
 
     this.dynamics = Object.fromEntries(
@@ -53,6 +49,11 @@ export class MusicXML {
       ["Tenuto", xml.create("tenuto")],
     ]);
     this.fermata = xml.create("fermata");
+  }
+
+  tied(attributes: { type: string; number: string }) {
+    return this.#cache["tied" + attributes.type + attributes.number] ||= this
+      .xml.create("tied", attributes);
   }
 
   slur(type: string, number: number): Element {
