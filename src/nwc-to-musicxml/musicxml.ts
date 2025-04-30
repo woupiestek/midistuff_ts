@@ -9,15 +9,10 @@ export class MusicXML {
   readonly tie: { start: Element; stop: Element };
   readonly dot: Element;
   readonly dynamics: Record<string, Element>;
-  readonly staves: Element[] = [];
   readonly atriculations: Map<string, Element>;
   readonly fermata: Element;
 
   constructor(private xml = new Elements()) {
-    this.staves = [
-      xml.create("staff", undefined, "1"),
-      xml.create("staff", undefined, "2"),
-    ];
     this.chord = xml.create("chord");
     this.rest = xml.create("rest");
     this.timeMod = xml.create(
@@ -206,7 +201,11 @@ export class MusicXML {
   }
 
   staff(number: number): Element {
-    return this.staves[number - 1];
+    return this.#cache["staff" + number] ||= this.xml.create(
+      "staff",
+      undefined,
+      number.toString(),
+    );
   }
 
   voice(name: string): Element {
@@ -222,7 +221,7 @@ export class MusicXML {
       "direction",
       undefined,
       this.xml.create("direction-type", undefined, type),
-      this.staves[staff - 1],
+      this.staff(staff),
     );
   }
 

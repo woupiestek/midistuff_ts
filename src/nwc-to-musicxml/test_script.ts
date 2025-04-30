@@ -1,17 +1,13 @@
 import { scan, Transformer } from "./simpler.ts";
 
-const filesNames = [
-  "2007-3-12",
-  "2008-8-24!",
-  "2009-2-20 web!",
-  "2010-11-2!",
-  "2011-6-30 kwint!",
-  "2012-1-20 3!",
-  "2015-7-27 2(!)",
-  "coollove",
-];
+const list = [];
+for await (const entry of Deno.readDir("samples")) {
+  if (entry.name.endsWith(".nwctxt")) {
+    list.push(entry.name.substring(0, entry.name.length - 7));
+  }
+}
 
-for (const fileName of filesNames) {
+for (const fileName of list) {
   const source = await Deno.readTextFile(`samples\\${fileName}.nwctxt`);
   try {
     await Deno.writeTextFile(

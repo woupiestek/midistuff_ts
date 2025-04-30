@@ -589,86 +589,60 @@ class Bars {
     this.#barStyles.set(this.#measures, this.#endingBar);
   }
 
-  single(
-    staff: number,
+  multiple(
+    from: number,
+    to: number,
     durations: Durations,
     positions: Positions,
     xml: MusicXML,
-  ): Element[] {
-    const result: Element[] = [];
-    for (
-      let i = this.#staves[staff],
-        to = this.#staves[staff + 1],
-        number = 0;
-      i < to;
-      i++
-    ) {
-      const notes = durations.notes(i, 1, positions, xml);
-      if (notes.length === 0) continue;
-      // be careful with measure numbers
-      number++;
-      const endings = this.#endings.get(i);
-      result.push(
-        xml.create(
-          "measure",
-          { number: number.toString() },
-          xml.leftBarline(this.#barStyles.get(i), endings),
-          this.#attributes(xml, i),
-          ...notes,
-          xml.rightBarline(this.#barStyles.get(i + 1), endings),
-        ),
+  ) {
+    const offsets = this.#staves.slice(from, to);
+    const length = this.#staves[from + 1] - this.#staves[from];
+    for (let j = from + 1; j < to; j++) {
+      const l2 = this.#staves[j + 1] - this.#staves[j];
+      assert(
+        length === l2,
+        `combined staves must have the same length ${length} !== ${l2}`,
       );
     }
-    return result;
-  }
-
-  double(
-    staff: number,
-    durations: Durations,
-    positions: Positions,
-    xml: MusicXML,
-  ): Element[] {
-    const result: Element[] = [];
-    const offset = this.#staves[staff + 1] - this.#staves[staff];
-    assert(
-      this.#staves[staff + 2] === this.#staves[staff + 1] + offset,
-      `Problem: unequal numbers of measures in staves ${staff} and ${
-        staff + 1
-      }.`,
-    );
     let backup = xml.backup(PER_WHOLE);
-    for (
-      let i = this.#staves[staff],
-        to = this.#staves[staff + 1],
-        number = 0;
-      i < to;
-      i++
-    ) {
-      const time = this.#times.get(i) || this.#times.get(i + offset);
-      if (time) {
-        const [n, d] = time.split("/");
-        backup = xml.backup(PER_WHOLE * +n / +d);
+    const result: Element[] = [];
+    for (let i = 0; i < length; i++) {
+      for (const j of offsets) {
+        const time = this.#times.get(i + j);
+        if (time) {
+          const [n, d] = time.split("/");
+          backup = xml.backup(PER_WHOLE * +n / +d);
+          break;
+        }
       }
-      const notes = durations.notes(i, 1, positions, xml);
-      notes.push(backup);
-      notes.push(...durations.notes(i + offset, 2, positions, xml));
-      // mind the backup!
-      if (notes.length === 1) continue;
-      // be careful with measure numbers
-      number++;
-      const endings = this.#endings.get(i) || this.#endings.get(i + offset);
+
+      const notes = durations.notes(i + offsets[0], 1, positions, xml);
+      for (let j = 1; j < length; j++) {
+        notes.push(backup);
+        notes.push(...durations.notes(i + offsets[j], j + 1, positions, xml));
+      }
+      // mind the backups!
+      if (notes.length === length - 1) continue;
+      let endings, leftBarstyle, rightBarstyle;
+      for (const j of offsets) {
+        endings ||= this.#endings.get(i + j);
+        leftBarstyle ||= this.#barStyles.get(i + j);
+        rightBarstyle ||= this.#barStyles.get(i + j + 1);
+        if (endings && leftBarstyle && rightBarstyle) break;
+      }
       result.push(
         xml.create(
           "measure",
-          { number: number.toString() },
+          { number: (i + 1).toString() },
           xml.leftBarline(
-            this.#barStyles.get(i) || this.#barStyles.get(i + offset),
+            leftBarstyle,
             endings,
           ),
-          this.#attributes(xml, i, i + offset),
+          this.#attributes2(xml, i, offsets),
           ...notes,
           xml.rightBarline(
-            this.#barStyles.get(i + 1) || this.#barStyles.get(i + offset + 1),
+            rightBarstyle,
             endings,
           ),
         ),
@@ -677,9 +651,9 @@ class Bars {
     return result;
   }
 
-  #attributes(xml: MusicXML, i: number, j?: number) {
+  #attributes2(xml: MusicXML, i: number, offsets: number[]) {
     const content: (Element)[] = [];
-    if (this.#staves.includes(i)) {
+    if (i === 0) {
       content.push(
         xml.create(
           "divisions",
@@ -688,55 +662,67 @@ class Bars {
         ),
       );
     }
-    const key = this.#keys.get(i) || (j && this.#keys.get(j));
+
+    let key, time;
+    const clefs = [];
+
+    for (let k = 0, l = offsets.length; k < l; k++) {
+      const j = i + offsets[k];
+      key ||= this.#keys.get(j);
+      time ||= this.#times.get(j);
+      const clef = this.#clefs.get(j);
+      if (clef) {
+        clefs.push(xml.clef(clef, this.#clefOctaveChanges.get(j) ?? 0, k + 1));
+      }
+    }
     if (key !== undefined) content.push(xml.key(key));
-    const time = this.#times.get(i) || (j && this.#times.get(j));
     if (time) {
       const [beats, beatType] = time.split("/");
       content.push(xml.time(beats, beatType));
     }
-    if (j && this.#staves.includes(i)) {
+    if (offsets.length > 1) {
+      // todo: is it really more than 2?
       content.push(
         xml.create(
           "staves",
           undefined,
-          "2",
+          offsets.length.toString(),
         ),
       );
     }
-    // two staves, two clefs!
-    const clef1 = this.#clefs.get(i);
-    if (clef1) {
-      content.push(xml.clef(clef1, this.#clefOctaveChanges.get(i) ?? 0, 1));
-    }
-    if (j) {
-      const clef2 = this.#clefs.get(j);
-      if (clef2) {
-        content.push(xml.clef(clef2, this.#clefOctaveChanges.get(j) ?? 0, 2));
-      }
-    }
+    // if th number of staves is not correct, is the number of clefs?
+    content.push(...clefs);
     if (content.length === 0) return null;
     return xml.create("attributes", undefined, ...content);
   }
 }
 
 class Staves {
+  #parts: number[] = [];
   #names: string[] = [];
   #midiPrograms: number[] = [];
-  #double: Set<number> = new Set();
+  // #double: Set<number> = new Set();
+  #merge = false;
   #songInfo: Map<string, string> = new Map();
   visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
+        if (!this.#merge) {
+          this.#parts.push(this.#names.length);
+        } else {
+          this.#merge = false;
+        }
         this.#names.push(line.values.Name[0].slice(1, -1));
         break;
-      case "StaffProperties":
+      case "StaffProperties": {
+        const withNextStaff = new Set(line.values.WithNextStaff);
         if (
-          line.values.WithNextStaff?.[0] === "Brace"
+          withNextStaff.has("Brace") || withNextStaff.has("Layer")
         ) {
-          this.#double.add(this.#names.length - 1);
+          this.#merge = true;
         }
         break;
+      }
       case "StaffInstrument":
         if (line.values.Patch) {
           this.#midiPrograms[this.#names.length - 1] = +line.values.Patch[0] +
@@ -763,39 +749,40 @@ class Staves {
   ): Element {
     const scoreParts = [];
     const parts = [];
-    let id = 0;
-    for (let i = 0; i < this.#names.length; i++) {
-      const attributes = { id: `P${++id}` };
+    for (let id = 1; id <= this.#parts.length; id++) {
+      const attributes = { id: `P${id}` };
+      const from = this.#parts[id - 1];
+      const to = this.#parts[id] ?? this.#names.length;
+      const program = this.#midiPrograms.slice(from, to).find((it) =>
+        it !== undefined
+      );
       scoreParts.push(
         xml.create(
           "score-part",
           attributes,
-          xml.create("part-name", undefined, this.#names[i]),
-          this.#midiPrograms[i]
+          xml.create(
+            "part-name",
+            undefined,
+            this.#names.slice(from, to).join(", "),
+          ),
+          program
             ? xml.create(
               "midi-instrument",
               undefined,
               xml.create(
                 "midi-program",
                 undefined,
-                this.#midiPrograms[i].toString(),
+                program.toString(),
               ),
             )
             : null,
         ),
       );
-      let measures;
-      if (this.#double.has(i)) {
-        measures = bars.double(i, durations, positions, xml);
-        i++;
-      } else {
-        measures = bars.single(i, durations, positions, xml);
-      }
       parts.push(
         xml.create(
           "part",
           attributes,
-          ...measures,
+          ...bars.multiple(from, to, durations, positions, xml),
         ),
       );
     }

@@ -56,6 +56,9 @@ export class Elements {
       }
     }
     let content = "";
+    if (!this.#element[element]) {
+      return "<ERROR/>";
+    }
     const l = this.#element[element].length;
     for (let i = 0; i < l; i++) {
       content += this.escapeXml(this.#text[element][i]);
