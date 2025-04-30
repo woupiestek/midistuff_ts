@@ -1,8 +1,26 @@
 # Midistuff logs
 
+## 2025-05-01
+
+### messing with nwc
+
+`& "C:\Program Files (x86)\Noteworthy Software\NoteWorthy Composer 2\NWC2.exe"`
+
+This doesn't seem to do much good.
+
+However, there is also `nwc-conv.exe`, which seems to do what I want.
+
 ## 2025-04-30
 
-### combining more staves
+### combining more staves and crashing musescore...
+
+From commandline: `& "C:/Program Files/MuseScore 4/bin/MuseScore4.exe"`
+
+Messing with staves: it seems feasible to collect the xmls onces an pass them
+around, however, mush code was dependiong on numbers, and accepting xml element
+as they are represented that way. This let to staffs 56 and 57--the generated
+numbers of the xml elements, and parts with that many staffs. That crashed
+Musescore.
 
 ## 2025-04-24
 

@@ -1,6 +1,7 @@
 import { Element, Elements } from "./xml.ts";
 
-const HEADER = '<?xml version="1.0" encoding="UTF-8"?>'; //<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "https://raw.githubusercontent.com/w3c/musicxml/refs/tags/v4.0/schema/partwise.dtd">';
+const HEADER =
+  '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
 
 export class MusicXML {
   readonly chord: Element;
@@ -46,6 +47,10 @@ export class MusicXML {
     this.fermata = xml.create("fermata");
   }
 
+  stem(sv: string) {
+    return this.#cache["stem" + sv] ||= this.xml.create("stem", undefined, sv);
+  }
+
   tied(attributes: { type: string; number: string }) {
     return this.#cache["tied" + attributes.type + attributes.number] ||= this
       .xml.create("tied", attributes);
@@ -88,14 +93,14 @@ export class MusicXML {
     "LocalRepeatClose",
   ]);
 
-  startSustain(staff: number) {
+  startSustain(staff: Element) {
     return this.#cache["startSustain" + staff] ||= this.direction(
       this.xml.create("pedal", { type: "start" }),
       staff,
     );
   }
 
-  stopSustain(staff: number) {
+  stopSustain(staff: Element) {
     return this.#cache["stopSustain" + staff] ||= this.direction(
       this.xml.create("pedal", { type: "stop" }),
       staff,
@@ -157,7 +162,7 @@ export class MusicXML {
     );
   }
 
-  wedge(wegde: { type: string; number: string }, staff: number): Element {
+  wedge(wegde: { type: string; number: string }, staff: Element): Element {
     return this.direction(this.xml.create("wedge", wegde), staff);
   }
 
@@ -216,12 +221,12 @@ export class MusicXML {
     );
   }
 
-  direction(type: Element, staff: number) {
+  direction(type: Element, staff: Element) {
     return this.create(
       "direction",
       undefined,
       this.xml.create("direction-type", undefined, type),
-      this.staff(staff),
+      staff,
     );
   }
 
@@ -320,7 +325,7 @@ export class MusicXML {
   metronome(
     tempo: number,
     base: string = "Quarter",
-    staff: number,
+    staff: Element,
   ): Element {
     const [type, dotted] = base.split(" ");
     return this.#cache["M" + tempo + base + staff] ||= this.direction(

@@ -193,6 +193,7 @@ class Durations {
         if (line.values.Dur2) {
           this.#duration(line.values.Dur2);
         }
+        this.#options(line.values.Opts);
         this.#duration(line.values.Dur);
         break;
       case "SustainPedal":
@@ -301,6 +302,15 @@ class Durations {
   #triplet: Set<number> = new Set();
   #dotted: Set<number> = new Set();
   #doubleDotted: Set<number> = new Set();
+  #stems: Map<number, string> = new Map();
+
+  #options(opts?: string[]) {
+    if (!opts) return;
+    if (opts.includes("Stem=Up")) this.#stems.set(this.#durations.length, "up");
+    if (opts.includes("Stem=Down")) {
+      this.#stems.set(this.#durations.length, "down");
+    }
+  }
 
   #duration(dur: string[]) {
     const index = this.#durations.length;
@@ -380,7 +390,8 @@ class Durations {
 
   notes(
     measure: number,
-    staff: number,
+    voice: string,
+    staff: Element,
     positions: Positions,
     xml: MusicXML,
   ): (Element | null)[] {
@@ -395,19 +406,21 @@ class Durations {
         : this.#dotted.has(i)
         ? [xml.dot]
         : [];
+      const _voice = xml.voice(
+        positions.backup(i) ? voice + "'" : voice,
+      );
+      const duration = xml.duration(this.#durations[i]);
       const notes = positions.notes(i);
       if (notes.length === 0) {
         result.push(
           xml.note(
             xml.rest,
-            xml.duration(this.#durations[i]),
-            xml.voice(
-              positions.backup(i) ? staff.toString() + "'" : staff.toString(),
-            ),
+            duration,
+            _voice,
             type,
             ...dots,
             timeMod,
-            xml.staff(staff),
+            staff,
           ),
         );
       } else {
@@ -416,6 +429,8 @@ class Durations {
           i,
           xml,
         );
+        const sv = this.#stems.get(i);
+        const stem = sv ? xml.stem(sv) : null;
         for (let j = 0; j < notes.length; j++) {
           const ties = positions.ties(notes[j]);
           const notations = [
@@ -427,16 +442,15 @@ class Durations {
               grace,
               j ? xml.chord : null, // no chord element in the first note
               positions.pitch(notes[j], xml),
-              xml.duration(this.#durations[i]),
+              duration,
               ...ties.map((it) => xml.tie[it.type]),
-              xml.voice(
-                positions.backup(i) ? staff.toString() + "'" : staff.toString(),
-              ),
+              _voice,
               type,
               ...dots,
               positions.accidental(notes[j], xml),
               timeMod,
-              xml.staff(staff),
+              stem,
+              staff,
               notations.length > 0
                 ? xml.create(
                   "notations",
@@ -483,7 +497,7 @@ class Durations {
 
   #directions(
     i: number,
-    staff: number,
+    staff: Element,
     result: (Element | null)[],
     xml: MusicXML,
   ) {
@@ -518,6 +532,8 @@ class Bars {
   #clefOctaveChanges: Map<number, number> = new Map();
   #keys: Map<number, number> = new Map();
 
+  #layered: Set<number> = new Set();
+
   visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
@@ -530,6 +546,10 @@ class Bars {
       case "StaffProperties":
         if (line.values.EndingBar) {
           this.#endingBar = line.values.EndingBar[0].replaceAll(" ", "");
+        }
+        if (new Set(line.values.WithNextStaff).has("Layer")) {
+          // technically the next staff
+          this.#layered.add(this.#staves.length);
         }
         break;
       case "Bar":
@@ -598,6 +618,12 @@ class Bars {
   ) {
     const offsets = this.#staves.slice(from, to);
     const length = this.#staves[from + 1] - this.#staves[from];
+    const staves: number[] = [];
+    for (let i = from, staff = 0; i < to; i++) {
+      if (!this.#layered.has(i)) staff++;
+      staves.push(staff);
+    }
+
     for (let j = from + 1; j < to; j++) {
       const l2 = this.#staves[j + 1] - this.#staves[j];
       assert(
@@ -607,7 +633,7 @@ class Bars {
     }
     let backup = xml.backup(PER_WHOLE);
     const result: Element[] = [];
-    for (let i = 0; i < length; i++) {
+    for (let i = 0, measure = 0; i < length; i++) {
       for (const j of offsets) {
         const time = this.#times.get(i + j);
         if (time) {
@@ -617,13 +643,21 @@ class Bars {
         }
       }
 
-      const notes = durations.notes(i + offsets[0], 1, positions, xml);
-      for (let j = 1; j < length; j++) {
-        notes.push(backup);
-        notes.push(...durations.notes(i + offsets[j], j + 1, positions, xml));
-      }
-      // mind the backups!
-      if (notes.length === length - 1) continue;
+      const nested = offsets.map((offset, k) =>
+        durations.notes(
+          i + offset,
+          (k + 1).toString(),
+          xml.staff(staves[k]),
+          positions,
+          xml,
+        )
+      ).filter((it) => it.length);
+      if (!nested.length) continue;
+      measure++;
+      nested.forEach((it) => it.push(backup));
+      const notes = nested.flat();
+      notes.pop();
+
       let endings, leftBarstyle, rightBarstyle;
       for (const j of offsets) {
         endings ||= this.#endings.get(i + j);
@@ -634,12 +668,12 @@ class Bars {
       result.push(
         xml.create(
           "measure",
-          { number: (i + 1).toString() },
+          { number: measure.toString() },
           xml.leftBarline(
             leftBarstyle,
             endings,
           ),
-          this.#attributes2(xml, i, offsets),
+          this.#attributes(xml, i, offsets, staves),
           ...notes,
           xml.rightBarline(
             rightBarstyle,
@@ -651,7 +685,7 @@ class Bars {
     return result;
   }
 
-  #attributes2(xml: MusicXML, i: number, offsets: number[]) {
+  #attributes(xml: MusicXML, i: number, offsets: number[], staves: number[]) {
     const content: (Element)[] = [];
     if (i === 0) {
       content.push(
@@ -664,7 +698,7 @@ class Bars {
     }
 
     let key, time;
-    const clefs = [];
+    const clefs = new Map();
 
     for (let k = 0, l = offsets.length; k < l; k++) {
       const j = i + offsets[k];
@@ -672,7 +706,10 @@ class Bars {
       time ||= this.#times.get(j);
       const clef = this.#clefs.get(j);
       if (clef) {
-        clefs.push(xml.clef(clef, this.#clefOctaveChanges.get(j) ?? 0, k + 1));
+        clefs.set(
+          staves[k],
+          xml.clef(clef, this.#clefOctaveChanges.get(j) ?? 0, staves[k]),
+        );
       }
     }
     if (key !== undefined) content.push(xml.key(key));
@@ -681,17 +718,15 @@ class Bars {
       content.push(xml.time(beats, beatType));
     }
     if (offsets.length > 1) {
-      // todo: is it really more than 2?
       content.push(
         xml.create(
           "staves",
           undefined,
-          offsets.length.toString(),
+          staves[staves.length - 1].toString(),
         ),
       );
     }
-    // if th number of staves is not correct, is the number of clefs?
-    content.push(...clefs);
+    content.push(...clefs.values());
     if (content.length === 0) return null;
     return xml.create("attributes", undefined, ...content);
   }
@@ -701,7 +736,6 @@ class Staves {
   #parts: number[] = [];
   #names: string[] = [];
   #midiPrograms: number[] = [];
-  // #double: Set<number> = new Set();
   #merge = false;
   #songInfo: Map<string, string> = new Map();
   visit(line: NWCLine): boolean {
