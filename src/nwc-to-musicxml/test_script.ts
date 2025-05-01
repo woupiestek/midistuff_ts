@@ -1,4 +1,5 @@
-import { scan, Transformer } from "./simpler.ts";
+import { scan } from "./scanner.ts";
+import { Transformer } from "./transformer.ts";
 
 const list = [];
 for await (const entry of Deno.readDir("samples")) {

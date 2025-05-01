@@ -1,5 +1,5 @@
 import { MusicXML } from "./musicxml.ts";
-import { NWCLine } from "./simpler.ts";
+import { NWCLine } from "./scanner.ts";
 
 export class Lyrics {
   #syllables: string[][] = Array.from({ length: 8 }, () => []);
