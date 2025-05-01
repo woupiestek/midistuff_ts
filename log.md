@@ -10,6 +10,8 @@ This doesn't seem to do much good.
 
 However, there is also `nwc-conv.exe`, which seems to do what I want.
 
+What did I want to do with this? I guess transform everything to musescore.
+
 ## 2025-04-30
 
 ### combining more staves and crashing musescore...

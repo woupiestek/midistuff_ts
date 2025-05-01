@@ -1,8 +1,9 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Element } from "./xml.ts";
 import { MusicXML } from "./musicxml.ts";
+import { Lyrics } from "./lyrics.ts";
 
-type NWCLine = {
+export type NWCLine = {
   tag: string;
   values: Record<string, string[]>;
 };
@@ -393,6 +394,7 @@ class Durations {
     voice: string,
     staff: Element,
     positions: Positions,
+    lyrics: Lyrics,
     xml: MusicXML,
   ): (Element | null)[] {
     const result: (Element | null)[] = [];
@@ -432,7 +434,8 @@ class Durations {
         const sv = this.#stems.get(i);
         const stem = sv ? xml.stem(sv) : null;
         for (let j = 0; j < notes.length; j++) {
-          const ties = positions.ties(notes[j]);
+          const note = notes[j];
+          const ties = positions.ties(note);
           const notations = [
             ...notationContent,
             ...ties.map((it) => xml.tied(it)),
@@ -441,13 +444,13 @@ class Durations {
             xml.note(
               grace,
               j ? xml.chord : null, // no chord element in the first note
-              positions.pitch(notes[j], xml),
+              positions.pitch(note, xml),
               duration,
               ...ties.map((it) => xml.tie[it.type]),
               _voice,
               type,
               ...dots,
-              positions.accidental(notes[j], xml),
+              positions.accidental(note, xml),
               timeMod,
               stem,
               staff,
@@ -458,6 +461,7 @@ class Durations {
                   ...notations,
                 )
                 : null,
+              ...lyrics.get(note, xml),
             ),
           );
         }
@@ -614,6 +618,7 @@ class Bars {
     to: number,
     durations: Durations,
     positions: Positions,
+    lyrics: Lyrics,
     xml: MusicXML,
   ) {
     const offsets = this.#staves.slice(from, to);
@@ -649,6 +654,7 @@ class Bars {
           (k + 1).toString(),
           xml.staff(staves[k]),
           positions,
+          lyrics,
           xml,
         )
       ).filter((it) => it.length);
@@ -779,6 +785,7 @@ class Staves {
     bars: Bars,
     durations: Durations,
     positions: Positions,
+    lyrics: Lyrics,
     xml: MusicXML,
   ): Element {
     const scoreParts = [];
@@ -816,7 +823,7 @@ class Staves {
         xml.create(
           "part",
           attributes,
-          ...bars.multiple(from, to, durations, positions, xml),
+          ...bars.multiple(from, to, durations, positions, lyrics, xml),
         ),
       );
     }
@@ -864,18 +871,21 @@ const TECHNICAL_TAGS = new Set([
   "Font",
   "PgMargins",
   "PgSetup",
+  "Spacer",
 ]);
 export class Transformer {
   #positions: Positions;
   #durations: Durations;
   #bars: Bars;
   #staves: Staves;
+  #lyrics: Lyrics;
 
   constructor() {
     this.#positions = new Positions();
     this.#durations = new Durations();
     this.#bars = new Bars();
     this.#staves = new Staves();
+    this.#lyrics = new Lyrics();
   }
 
   transform(source: string): string {
@@ -888,6 +898,7 @@ export class Transformer {
       if (this.#bars.visit(line)) visited = true;
       if (this.#staves.visit(line)) visited = true;
       if (this.#durations.visit(line)) visited = true;
+      if (this.#lyrics.visit(line)) visited = true;
       if (!visited) {
         console.warn("Unused line", line);
       }
@@ -896,7 +907,13 @@ export class Transformer {
     this.#durations.visitEnd();
     const xml = new MusicXML();
     return xml.stringify(
-      this.#staves.parts(this.#bars, this.#durations, this.#positions, xml),
+      this.#staves.parts(
+        this.#bars,
+        this.#durations,
+        this.#positions,
+        this.#lyrics,
+        xml,
+      ),
     );
   }
 }
