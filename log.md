@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2025-05-07
+
+### how to run?
+
+The nwctxt to musicxml converter:
+`deno run --allow-all src\nwc-to-musicxml\test_script.ts`
+
 ## 2025-05-01
 
 ### messing with nwc
