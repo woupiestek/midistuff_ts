@@ -1,5 +1,5 @@
 !NoteWorthyComposer(2.751)
-|Editor|ActiveStaff:3|CaretIndex:1|CaretPos:10
+|Editor|ActiveStaff:1|CaretIndex:187|CaretPos:-12
 |SongInfo|Title:"Quartet Template"|Author:"<Name>"|Lyricist:""|Copyright1:"Copyright © <Year> by <Name>"|Copyright2:"All Rights Reserved"
 |PgSetup|StaffSize:11|Zoom:4|TitlePage:Y|JustifyVertically:Y|PrintSystemSepMark:N|ExtendLastSystem:N|DurationPadding:Y|PageNumbers:1|StaffLabels:Top Systems|BarNumbers:Boxed|StartingBar:1|AllowLayering:N
 |Font|Style:StaffItalic|Typeface:"Times New Roman"|Size:7|Bold:Y|Italic:Y|CharSet:0
@@ -23,7 +23,7 @@
 |Key|Signature:F#,C#,G#|Tonic:A
 |TimeSig|Signature:4/4
 |Dynamic|Style:p|Pos:-8
-|Tempo|Tempo:125|Pos:12
+|Tempo|Tempo:115|Pos:12
 |Note|Dur:16th|Pos:-3|Opts:Stem=Up,Beam=First
 |Rest|Dur:16th
 |Note|Dur:16th|Pos:-2|Opts:Stem=Up,Beam
@@ -497,7 +497,7 @@
 |Key|Signature:F#,C#,G#|Tonic:A
 |TimeSig|Signature:4/4
 |Dynamic|Style:p|Pos:-8
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-6
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Bar
@@ -511,7 +511,7 @@
 |Note|Dur:16th|Pos:-1|Opts:Stem=Up,Beam=First
 |Note|Dur:8th|Pos:-1|Opts:Stem=Up,Beam=End
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-6
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Bar
@@ -646,7 +646,7 @@
 |Note|Dur:16th|Pos:-4
 |Rest|Dur:8th
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-6
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Bar
@@ -660,7 +660,7 @@
 |Note|Dur:16th|Pos:-1|Opts:Stem=Up,Beam=First
 |Note|Dur:8th|Pos:-1|Opts:Stem=Up,Beam=End
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-6
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Note|Dur:4th,Dotted,Slur|Pos:-3
 |Bar
@@ -959,7 +959,7 @@
 |Key|Signature:F#,C#,G#|Tonic:A
 |TimeSig|Signature:4/4
 |Dynamic|Style:p|Pos:-8
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-4
 |Note|Dur:4th,Dotted,Slur|Pos:2
 |Note|Dur:4th,Dotted,Slur|Pos:1
 |Bar
@@ -973,7 +973,7 @@
 |Note|Dur:16th|Pos:0|Opts:Stem=Down,Beam=First
 |Note|Dur:8th|Pos:0|Opts:Stem=Down,Beam=End
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-4
 |Note|Dur:4th,Dotted,Slur|Pos:2
 |Note|Dur:4th,Dotted,Slur|Pos:1
 |Bar
@@ -1108,7 +1108,7 @@
 |Note|Dur:16th|Pos:#-5
 |Rest|Dur:8th
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-4
 |Note|Dur:4th,Dotted,Slur|Pos:2
 |Note|Dur:4th,Dotted,Slur|Pos:1
 |Bar
@@ -1122,7 +1122,7 @@
 |Note|Dur:16th|Pos:0|Opts:Stem=Down,Beam=First
 |Note|Dur:8th|Pos:0|Opts:Stem=Down,Beam=End
 |Bar
-|Rest|Dur:4th
+|Note|Dur:4th,Staccato|Pos:-4
 |Note|Dur:4th,Dotted,Slur|Pos:2
 |Note|Dur:4th,Dotted,Slur|Pos:1
 |Bar
