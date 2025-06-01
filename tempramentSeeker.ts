@@ -5,7 +5,7 @@ function approximateLog(b: number, a: number) {
   assert(b > 1);
   const c = [1, 0];
   const d = [0, 1];
-  for (let i = 2; i < 10; i++) {
+  for (let i = 2; i < 8; i++) {
     const p = i & 1;
     let ci = c[i - 2];
     let di = d[i - 2];
@@ -23,7 +23,7 @@ function approximateLog(b: number, a: number) {
   }
   console.log(
     `${b}:${a}`,
-    Array(10).keys().map((i) => `${c[i]}/${d[i]}`).toArray().join(", "),
+    Array(8).keys().map((i) => `${c[i]}/${d[i]}`).toArray().slice(3).join(),
   );
 }
 
@@ -64,3 +64,31 @@ function show(perthird: number, perfifth: number, peroctave: number) {
 show(4, 7, 12);
 show(6, 11, 19);
 show(10, 18, 31);
+
+function approximate(x: number) {
+  const t = [1, x | 0];
+  const n = [0, 1];
+  for (let i = 2; i < 5; i++) {
+    const a = Math.ceil((t[i - 2] - x * n[i - 2]) / (t[i - 1] - x * n[i - 1]));
+    t[i] = t[i - 2] - a * t[i - 1];
+    n[i] = n[i - 2] - a * n[i - 1];
+  }
+  console.log(
+    Array(5).keys().map((i) => `${t[i]}/${n[i]}`).toArray().slice(2).join(),
+  );
+}
+
+approximate(2 ** (7 / 12));
+approximate(2 ** (1 / 2));
+approximate(2 ** (5 / 12));
+approximate(2 ** (1 / 3));
+approximate(2 ** (1 / 4));
+approximate(2 ** (1 / 6));
+approximate(2 ** (1 / 12));
+
+approximate(2 ** (11 / 19));
+approximate(2 ** (8 / 19));
+approximate(2 ** (6 / 19));
+approximate(2 ** (5 / 19));
+approximate(2 ** (3 / 19));
+
