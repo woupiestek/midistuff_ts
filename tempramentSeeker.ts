@@ -91,4 +91,3 @@ approximate(2 ** (8 / 19));
 approximate(2 ** (6 / 19));
 approximate(2 ** (5 / 19));
 approximate(2 ** (3 / 19));
-
