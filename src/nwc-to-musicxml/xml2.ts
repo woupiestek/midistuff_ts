@@ -1,15 +1,9 @@
 import { cyrb53 } from "./cyrb53.ts";
 
-export type Element = number & { readonly __tag: unique symbol };
+export type Node = number & { readonly __tag: unique symbol };
 
 // note: no reuse possible!
 // everything must be copied
-
-const ELEMENT = 0;
-const TEXT = 0x4000;
-const ATTRIBUTE = 0x8000;
-const COMMENT = 0xC000;
-const MASK = 0x3FFFF;
 
 function escapeXml(unsafe: string) {
   return unsafe.replace(/[<>&'"]/g, (c) => {
@@ -29,132 +23,150 @@ function escapeXml(unsafe: string) {
   });
 }
 
-class Attributes {
-  #id = -1;
-  #keys: number[] = [];
-  #values: number[] = [];
-  add(key: number, value: number) {
-    this.#keys[++this.#id] = key;
-    this.#values[this.#id] = value;
-    return this.#id;
+class StringPool {
+  #entries: { [_: number]: string } = {};
+  insert(string: string) {
+    const hash = (cyrb53(string) & 0xFFFFFFFF) >>> 0;
+    this.#entries[hash] = string;
+    return hash;
   }
-  key(id: number) {
-    return this.#keys[id];
-  }
-  value(id: number) {
-    return this.#values[id];
+  get(hash: number) {
+    return this.#entries[hash];
   }
 }
 
-export class Elements {
-  #id = -1;
-  #values: number[] = [];
-  #parents: number[] = [];
-  // something...
-  // so collision avoidance might be good
-  #strings: Map<number, string> = new Map();
+const minByteLength = 32;
+const maxByteLength = 2 ** 28;
 
-  #attributes = new Attributes();
+export class XML {
+  #keyBuffer = new ArrayBuffer(minByteLength, { maxByteLength });
+  #keys = new Uint32Array(this.#keyBuffer);
+  #valueBuffer = new ArrayBuffer(minByteLength, { maxByteLength });
+  #values = new Uint32Array(this.#valueBuffer);
+  #parentBuffer = new ArrayBuffer(minByteLength, { maxByteLength });
+  #parents = new Uint32Array(this.#parentBuffer);
 
-  createElement(tag: string) {
-    const hash = cyrb53(tag) & MASK;
-    this.#strings.set(hash, tag);
-    this.#values[++this.#id] = hash ^ ELEMENT;
-    this.#parents[this.#id] = this.#id;
-    return this.#id as Element;
+  #size = 0;
+
+  get #capacity() {
+    return this.#keyBuffer.byteLength / 4;
   }
 
-  createComment(text: string) {
-    const hash = cyrb53(text) & MASK;
-    this.#strings.set(hash, text);
-    this.#values[++this.#id] = hash ^ COMMENT;
-    this.#parents[this.#id] = this.#id;
-    return this.#id as Element;
+  #grow() {
+    const length = 2 * this.#keyBuffer.byteLength;
+    this.#keyBuffer.resize(length);
+    this.#valueBuffer.resize(length);
+    this.#parentBuffer.resize(length);
   }
 
-  createText(text: string) {
-    text = escapeXml(text);
-    const hash = cyrb53(text) & MASK;
-    this.#strings.set(hash, text);
-    this.#values[++this.#id] = hash ^ TEXT;
-    this.#parents[this.#id] = this.#id;
-    return this.#id as Element;
-  }
+  // pool all strings
+  #stringPool = new StringPool();
+  #comment = this.#stringPool.insert("<!---->");
+  #element = this.#stringPool.insert("</>");
+  #text = this.#stringPool.insert('""');
 
-  createAttribute(key: string, value: string) {
-    const k = cyrb53(key);
-    this.#strings.set(k, key);
-    const v = cyrb53(value);
-    value = escapeXml(value);
-    this.#strings.set(v, value);
-    this.#values[++this.#id] = this.#attributes.add(k, v) ^ ATTRIBUTE;
-    this.#parents[this.#id] = this.#id;
-  }
-
-  insertChild(parent: Element, element: Element) {
-    this.#parents[element] = parent;
-  }
-
-  // todo: solve the order of xml problem.
-  // currently, content has to be inserted in order.
-  // goal: have a way to insert elements anywhere
-  // the left sibling and insert in front off operations work
-
-  #open(i: number) {
-    const x = this.#values[i];
-    const y = x & MASK;
-    switch (x & COMMENT) {
-      case ELEMENT:
-        return "<" + this.#strings.get(y);
-        // this does not work for attributes
-      case TEXT:
-        return this.#strings.get(y);
-      case ATTRIBUTE: {
-        const k = this.#strings.get(this.#attributes.key(y));
-        const v = this.#strings.get(this.#attributes.value(y));
-        return k + '="' + v + '"';
-      }
-      case COMMENT:
-        return "<!-- " + this.#strings.get(y) + " -->";
+  #create(key: number, value: number) {
+    if (this.#size >= this.#capacity) {
+      this.#grow();
     }
+    this.#keys[this.#size] = key;
+    this.#values[this.#size] = value;
+    this.#parents[this.#size] = this.#size;
+    return this.#size++ as Node;
+  }
+
+  element(tag: string) {
+    return this.#create(this.#element, this.#stringPool.insert(escapeXml(tag)));
+  }
+
+  comment(text: string) {
+    return this.#create(
+      this.#comment,
+      this.#stringPool.insert(escapeXml(text)),
+    );
+  }
+
+  text(text: string) {
+    return this.#create(this.#text, this.#stringPool.insert(escapeXml(text)));
+  }
+
+  attribute(key: string, value: string) {
+    return this.#create(
+      this.#stringPool.insert(escapeXml(key)),
+      this.#stringPool.insert(escapeXml(value)),
+    );
+  }
+
+  insertInto(parent: Node, ...nodes: Node[]) {
+    for (const node of nodes) this.#parents[node] = parent;
+    return parent;
+  }
+
+  insertAttributes(parent: Node, entries: { [_: string]: string }) {
+    return this.insertInto(
+      parent,
+      ...Object.entries(entries).map(([k, v]) => this.attribute(k, v)),
+    );
+  }
+
+  builder(tag: string) {
+    const element = this.element(tag);
+    const self = {
+      attributes: (entries: { [_: string]: string }) => {
+        for (const [k, v] of Object.entries(entries)) {
+          this.#parents[this.attribute(k, v)] = element;
+        }
+        return self;
+      },
+      children: (...nodes: (Node | string | null)[]) => {
+        for (const node of nodes) {
+          if (node === null) continue;
+          this.#parents[typeof node === "string" ? this.text(node) : node] =
+            element;
+        }
+        return self;
+      },
+      build: () => element,
+    };
+    return self;
   }
 
   stringify() {
-    const roots: number[] = [];
-    const firstChild = this.#parents.map(() => -1);
-    const nextSibling = this.#parents.map(() => -1);
-    for (let i = this.#parents.length - 1; i >= 0; i--) {
-      if (this.#parents[i] === i) {
-        roots.push(i);
-        continue;
-      }
-      // pick left sibling if available
-      // this screws up depth, but that is not a real problem!
-      nextSibling[i] = firstChild[this.#parents[i]];
-      firstChild[this.#parents[i]] = i;
-    }
-
-    const depths: number[] = [];
-    const indices = [];
-    for (let r = roots.length - 1; r >= 0; r--) {
-      let index = roots[r];
-      a: for (;;) {
-        depths[index] = this.#parents[index] === index
-          ? 0
-          : depths[this.#parents[index]];
-        indices.push(index);
-        if (firstChild[index] >= 0) {
-          index = firstChild[index];
-          continue;
-        }
-        while (nextSibling[index] < 0) {
-          if (this.#parents[index] === index) {
-            break a;
+    const as: string[] = [];
+    const cs: string[] = [];
+    for (let i = this.#size - 1; i >= 0; i--) {
+      let p = this.#parents[i];
+      if (p === i) p = this.#size;
+      switch (this.#keys[i]) {
+        case this.#comment:
+          cs[p] = `<!-- ${this.#stringPool.get(this.#values[i])} -->${
+            cs[p] ?? ""
+          }`;
+          break;
+        case this.#element: {
+          const tag = this.#stringPool.get(this.#values[i]);
+          let c = "<" + tag;
+          if (as[i]) {
+            c += " " + as[i];
           }
-          index = this.#parents[index];
+          if (cs[i]) {
+            c += ">" + cs[i] + "</" + tag + ">";
+          } else {
+            c += "/>";
+          }
+          cs[p] = c + (cs[p] ?? "");
+          break;
         }
-        index = nextSibling[index];
+        case this.#text:
+          cs[p] = this.#stringPool.get(this.#values[i]) + (cs[p] ?? "");
+          break;
+        default:
+          as[p] = `${this.#stringPool.get(this.#keys[i])}="${
+            this.#stringPool.get(this.#values[i])
+          }"${as[p] ? " " + as[p] : ""}`;
+          break;
       }
     }
+    return cs[this.#size];
   }
 }

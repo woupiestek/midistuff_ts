@@ -241,9 +241,9 @@ export class MusicXML {
   #steps = [..."CDEFGAB"].map((step) =>
     this.xml.create("step", undefined, step)
   );
-  #octaves = [..."0123456789"].map((octave) =>
-    this.xml.create("octave", undefined, octave)
-  );
+  #octaves = Array(10).keys().map((octave) =>
+    this.xml.create("octave", undefined, octave.toString())
+  ).toArray();
 
   alter(number: number): Element {
     return this.#cache["A" + number] ||= this.xml.create(
