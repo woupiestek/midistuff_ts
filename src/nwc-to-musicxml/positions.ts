@@ -1,6 +1,6 @@
 import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
-import { Element } from "./xml.ts";
+import { Element } from "./xml1.ts";
 
 const ALTSTR = "vbn#x";
 

@@ -45,7 +45,11 @@ export class XML {
   #values = new Uint32Array(this.#valueBuffer);
   #parentBuffer = new ArrayBuffer(minByteLength, { maxByteLength });
   #parents = new Uint32Array(this.#parentBuffer);
-
+  // pool all strings
+  #stringPool = new StringPool();
+  #comment = this.#stringPool.insert("<!---->");
+  #element = this.#stringPool.insert("</>");
+  #text = this.#stringPool.insert('""');
   #size = 0;
 
   get #capacity() {
@@ -58,12 +62,6 @@ export class XML {
     this.#valueBuffer.resize(length);
     this.#parentBuffer.resize(length);
   }
-
-  // pool all strings
-  #stringPool = new StringPool();
-  #comment = this.#stringPool.insert("<!---->");
-  #element = this.#stringPool.insert("</>");
-  #text = this.#stringPool.insert('""');
 
   #create(key: number, value: number) {
     if (this.#size >= this.#capacity) {

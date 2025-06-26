@@ -1,76 +1,65 @@
-import { Node, XML } from "./xml2.ts";
-export class MusicXML2 {
-  constructor(readonly xml: XML) {
-  }
-  #keyValue(k: string, v: string | Node): Node {
-    return this.xml.builder(k).children(v).build();
-  }
-  timeMod32() {
-    return this.xml.builder("time-modification").children(
-      this.#keyValue("actual-notes", "3"),
-      this.#keyValue("normal-notes", "2"),
-    ).build();
-  }
-  startTie() {
-    return this.xml.builder("tie").attributes({ type: "start" }).build();
-  }
-  stopTie() {
-    return this.xml.builder("tie").attributes({ type: "stop" }).build();
-  }
-  dynamic(d: string) {
-    return this.#keyValue("dynamics", this.xml.element(d));
-  }
-  articulation(a: string) {
-    switch (a) {
-      case "Accent":
-        this.xml.element("accent");
-        break;
-      case "Breath Mark":
-        this.#keyValue("breath-mark", "comma");
-        break;
-      case "Caesura":
-        this.xml.element("caesura");
-        break;
-      case "Staccato":
-        this.xml.element("staccato");
-        break;
-      case "Tenuto":
-        this.xml.element("tenuto");
-        break;
-    }
-  }
-  stem(sv: string) {
-    return this.#keyValue("stem", sv);
-  }
-  tied(attributes: { type: string; number: string }) {
-    return this.xml.builder("tied").attributes(attributes).build();
-  }
-  slur(type: string, number: number): Node {
-    return this.xml.builder(
-      "slur",
-    ).attributes(
-      { type, number: number.toString() },
-    ).build();
-  }
-  direction(type: Node, staff: number) {
-    return this.xml.builder(
-      "direction",
-    ).children(
-      this.#keyValue("direction-type", type),
-      this.staff(staff),
-    )
-      .build();
-  }
-  startSustain(staff: number) {
-    return this.direction(
-      this.xml.builder("pedal").attributes({ type: "start" }).build(),
-      staff,
+import { Element, create } from "./xml3.ts";
+
+const HEADER =
+  '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
+
+export class MusicXML {
+  readonly chord: Element;
+  readonly rest: Element;
+  readonly timeMod: Element;
+  readonly tie: { start: Element; stop: Element };
+  readonly dot: Element;
+  readonly dynamics: Record<string, Element>;
+  readonly atriculations: Map<string, Element>;
+  readonly fermata: Element;
+
+  constructor() {
+    this.chord = create("chord");
+    this.rest = create("rest");
+    this.timeMod = create(
+      "time-modification",
+      undefined,
+      create("actual-notes", undefined, "3"),
+      create("normal-notes", undefined, "2"),
     );
+    this.tie = {
+      start: create("tie", { type: "start" }),
+      stop: create("tie", { type: "stop" }),
+    };
+
+    this.dot = create("dot");
+
+    this.dynamics = Object.fromEntries(
+      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
+        d,
+      ) => [
+        d,
+        create("dynamics", undefined, create(d)),
+      ]),
+    );
+    this.atriculations = new Map([
+      ["Accent", create("accent")],
+      ["Breath Mark", create("breath-mark", undefined, "comma")],
+      ["Caesura", create("caesura")],
+      ["Staccato", create("staccato")],
+      ["Tenuto", create("tenuto")],
+    ]);
+    this.fermata = create("fermata");
   }
-  stopSustain(staff: number) {
-    return this.direction(
-      this.xml.builder("pedal").attributes({ type: "stop" }).build(),
-      staff,
+
+  stem(sv: string) {
+    return this.#cache["stem" + sv] ||= this.create("stem", undefined, sv);
+  }
+
+  tied(attributes: { type: string; number: string }) {
+    return this.#cache["tied" + attributes.type + attributes.number] ||= this
+      .create("tied", attributes);
+  }
+
+  slur(type: string, number: number): Element {
+    return this.#cache["slur" + type + number] ||= this.create(
+      "slur",
+      { type, number: number.toString() },
     );
   }
 
@@ -103,141 +92,284 @@ export class MusicXML2 {
     "MasterRepeatClose",
     "LocalRepeatClose",
   ]);
-  leftBarline(type: string = "Single", ending: string[] = []) {
-    if (!this.#leftBarStyles.has(type) && !ending.length) return null;
-    return this.xml.builder(
-      "barline",
-    ).attributes(
-      { location: "left" },
-    ).children(
-      type === "Single"
-        ? null
-        : this.#keyValue("bar-style", this.#barStyles[type]),
-      ending.length
-        ? this.xml.builder("ending").attributes({
-          number: ending.join(","),
-          type: "start",
-        }).build()
-        : null,
-      this.#repeatBars.has(type)
-        ? this.xml.builder("repeat").attributes({ direction: "forward" })
-          .build()
-        : null,
-    );
-  }
-  rightBarline(type: string = "Single", ending: string[] = []) {
-    if (!this.#rightBarStyles.has(type) && !ending.length) return null;
-    const single = type === "Single";
-    return this.xml.builder(
-      "barline",
-    ).attributes(
-      { location: "right" },
-    ).children(
-      single ? null : this.#keyValue("bar-style", this.#barStyles[type]),
-      ending.length
-        ? this.xml.builder("ending").attributes({
-          number: ending.join(","),
-          type: single ? "discontinue" : "stop",
-        }).build()
-        : null,
-      this.#repeatBars.has(type)
-        ? this.xml.builder("repeat").attributes({ direction: "backward" })
-          .build()
-        : null,
-    );
-  }
-  wedge(wegde: { type: string; number: string }, staff: number): Node {
-    return this.direction(
-      this.xml.builder("wedge").attributes(wegde).build(),
+
+  startSustain(staff: Element) {
+    return this.#cache["startSustain" + staff] ||= this.direction(
+      this.create("pedal", { type: "start" }),
       staff,
     );
   }
-  clef(type: string, octaveChange: number, number: number): Node {
+
+  stopSustain(staff: Element) {
+    return this.#cache["stopSustain" + staff] ||= this.direction(
+      this.create("pedal", { type: "stop" }),
+      staff,
+    );
+  }
+
+  leftBarline(
+    type: string = "Single",
+    ending: string[] = [],
+  ) {
+    if (!this.#leftBarStyles.has(type) && !ending.length) return null;
+    return this.#cache[type + ending] ||= this.create(
+      "barline",
+      { location: "left" },
+      type === "Single" ? null : this.create(
+        "bar-style",
+        undefined,
+        this.#barStyles[type],
+      ),
+      ending.length
+        ? this.create("ending", {
+          number: ending.join(","),
+          type: "start",
+        })
+        : null,
+      this.#repeatBars.has(type)
+        ? this.create("repeat", {
+          direction: "forward",
+        })
+        : null,
+    );
+  }
+
+  rightBarline(
+    type: string = "Single",
+    ending: string[] = [],
+  ) {
+    if (!this.#rightBarStyles.has(type) && !ending.length) return null;
+    const single = type === "Single";
+    return this.#cache[type + ending] ||= this.create(
+      "barline",
+      { location: "right" },
+      single ? null : this.create(
+        "bar-style",
+        undefined,
+        this.#barStyles[type],
+      ),
+      ending.length
+        ? this.create("ending", {
+          number: ending.join(","),
+          type: single ? "discontinue" : "stop",
+        })
+        : null,
+      this.#repeatBars.has(type)
+        ? this.create("repeat", {
+          direction: "backward",
+        })
+        : null,
+    );
+  }
+
+  wedge(wegde: { type: string; number: string }, staff: Element): Element {
+    return this.direction(this.create("wedge", wegde), staff);
+  }
+
+  clef(type: string, octaveChange: number, number: number): Element {
+    const key = type + octaveChange + "~" + number;
+    if (this.#cache[key]) return this.#cache[key];
     const elements = [];
     switch (type) {
       case "Bass":
-        elements.push(this.#keyValue("sign", "F"));
+        elements.push(this.create("sign", undefined, "F"));
         break;
       case "Alto":
-        elements.push(this.#keyValue("sign", "C"));
+        elements.push(this.create("sign", undefined, "C"));
         break;
       case "Tenor":
         elements.push(
-          this.#keyValue("sign", "C"),
-          this.#keyValue("line", "4"),
+          this.create("sign", undefined, "C"),
+          this.create("line", undefined, "4"),
         );
         break;
       case "Treble":
-        elements.push(this.#keyValue("sign", "G"));
+        elements.push(this.create("sign", undefined, "G"));
         break;
       default:
         throw new Error("Unknown Clef Type");
     }
     if (octaveChange) {
       elements.push(
-        this.#keyValue("clef-octave-change", octaveChange.toString()),
+        this.create(
+          "clef-octave-change",
+          undefined,
+          octaveChange.toString(),
+        ),
       );
     }
-    return this.xml.builder(
+    return this.#cache[key] = this.create(
       "clef",
-    ).attributes(
       { number: number.toString() },
-    ).children(
       ...elements,
-    ).build();
+    );
   }
-  staff(number: number): Node {
-    return this.#keyValue("staff", number.toString());
+
+  staff(number: number): Element {
+    return this.#cache["staff" + number] ||= this.create(
+      "staff",
+      undefined,
+      number.toString(),
+    );
   }
-  voice(name: string): Node {
-    return this.#keyValue("voice", name);
+
+  voice(name: string): Element {
+    return this.#cache["voice" + name] ||= this.create(
+      "voice",
+      undefined,
+      name,
+    );
   }
-  key(fifths: number): Node {
-    return this.#keyValue("key", this.#keyValue("fifths", fifths.toString()));
+
+  direction(type: Element, staff: Element) {
+    return this.create(
+      "direction",
+      undefined,
+      this.create("direction-type", undefined, type),
+      staff,
+    );
   }
-  pitch(tone: number, alter: string): Node {
-    return this.xml.builder(
+
+  key(fifths: number): Element {
+    return this.#cache["K" + fifths] ||= this.create(
+      "key",
+      undefined,
+      this.create("fifths", undefined, fifths.toString()),
+    );
+  }
+
+  #steps = [..."CDEFGAB"].map((step) =>
+    this.create("step", undefined, step)
+  );
+  #octaves = Array(10).keys().map((octave) =>
+    this.create("octave", undefined, octave.toString())
+  ).toArray();
+
+  alter(number: number): Element {
+    return this.#cache["A" + number] ||= this.create(
+      "alter",
+      undefined,
+      number.toString(),
+    );
+  }
+
+  // todo: don't use nwc alter names, use the xml ones
+  // v = flat-flat, b = flat, n = natural, # = sharp, x = double-sharp
+
+  #alters = Object.fromEntries(
+    [..."vbn#x"].map((
+      alter,
+      i,
+    ) => [alter, this.create("alter", undefined, (i - 2).toString())]),
+  );
+
+  static readonly accidentalType: Record<string, string> = {
+    v: "flat-flat",
+    b: "flat",
+    n: "natural",
+    "#": "sharp",
+    x: "double-sharp",
+  };
+
+  accidental(alter: string): Element {
+    return this.#cache["accidental" + alter] ||= this.create(
+      "accidental",
+      undefined,
+      MusicXML.accidentalType[alter],
+    );
+  }
+
+  pitch(tone: number, alter: string): Element {
+    return this.#cache[alter + tone] ||= this.create(
       "pitch",
-    ).children(
-      this.#keyValue("step", "CDEFGAB"[tone % 7]),
-      alter === "n"
-        ? null
-        : this.#keyValue("alter", ("vbn#x".indexOf(alter) - 2).toString()),
-      this.#keyValue("octave", ((tone / 7) | 0).toString()),
-    ).build();
+      undefined,
+      this.#steps[tone % 7],
+      alter === "n" ? null : this.#alters[alter],
+      this.#octaves[(tone / 7) | 0],
+    );
+  }
+
+  type(dur: string): Element {
+    return this.#cache["T" + dur] ||= this.create(
+      "type",
+      undefined,
+      dur,
+    );
+  }
+
+  note(...elements: (Element | null)[]): Element {
+    return this.create("note", undefined, ...elements);
+  }
+
+  measure(
+    number: number,
+    ...elements: Element[]
+  ): Element {
+    return this.create(
+      "measure",
+      { number: number.toString() },
+      ...elements,
+    );
+  }
+
+  #cache: Record<string, Element> = {};
+
+  duration(duration: number): Element {
+    return this.#cache["duration" + duration] ||= this.create(
+      "duration",
+      undefined,
+      duration.toString(),
+    );
   }
 
   metronome(
     tempo: number,
     base: string = "Quarter",
-    staff: number,
-  ): Node {
+    staff: Element,
+  ): Element {
     const [type, dotted] = base.split(" ");
-    return this.direction(
-      this.xml.builder(
+    return this.#cache["M" + tempo + base + staff] ||= this.direction(
+      this.create(
         "metronome",
-      ).children(
-        this.#keyValue("beat-unit", type.toLowerCase()),
-        dotted ? this.xml.element("beat-unit-dot") : null,
-        this.#keyValue("per-minute", tempo.toString()),
-      ).build(),
-      this.staff(staff),
+        undefined,
+        this.create("beat-unit", undefined, type.toLowerCase()),
+        dotted ? this.create("beat-unit-dot") : null,
+        this.create("per-minute", undefined, tempo.toString()),
+      ),
+      staff,
     );
   }
 
-  time(n: string, d: string): Node {
-    return this.xml.builder(
+  time(n: string, d: string): Element {
+    return this.#cache["T" + n + "/" + d] ||= this.create(
       "time",
-    ).children(
-      this.#keyValue("beats", n),
-      this.#keyValue("beat-type", d),
-    ).build();
+      undefined,
+      this.create("beats", undefined, n),
+      this.create("beat-type", undefined, d),
+    );
   }
 
-  backup(duration: number): Node {
-    return this.#keyValue(
-      "backup",
-      this.#keyValue("duration", duration.toString()),
+  create(
+    name: string,
+    attributes?: Record<string, string>,
+    ...Elements: (Element | string | null)[]
+  ): Element {
+    return this.create(
+      name,
+      attributes,
+      ...Elements.filter((x) => x !== null),
     );
+  }
+
+  backup(duration: number): Element {
+    return this.#cache["backup" + duration] ||= this.create(
+      "backup",
+      undefined,
+      this.duration(duration),
+    );
+  }
+
+  stringify(element: Element): string {
+    return HEADER + element.stringify();
   }
 }

@@ -1,5 +1,5 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Element } from "./xml.ts";
+import { Element } from "./xml1.ts";
 import { Positions } from "./positions.ts";
 import { Lyrics } from "./lyrics.ts";
 import { MusicXML } from "./musicxml.ts";

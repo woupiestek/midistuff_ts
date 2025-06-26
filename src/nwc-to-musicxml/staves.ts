@@ -1,4 +1,4 @@
-import { Element } from "./xml.ts";
+import { Element } from "./xml1.ts";
 import { MusicXML } from "./musicxml.ts";
 import { Lyrics } from "./lyrics.ts";
 import { Positions } from "./positions.ts";

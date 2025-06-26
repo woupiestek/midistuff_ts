@@ -4,7 +4,7 @@ import { Lyrics } from "./lyrics.ts";
 import { MusicXML } from "./musicxml.ts";
 import { Positions } from "./positions.ts";
 import { NWCLine } from "./scanner.ts";
-import { Element } from "./xml.ts";
+import { Element } from "./xml1.ts";
 
 export class Bars {
   #staves: number[] = [];
