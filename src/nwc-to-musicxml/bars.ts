@@ -1,10 +1,10 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Durations, PER_WHOLE } from "./durations.ts";
 import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml.ts";
+import { MusicXML } from "./musicxml2.ts";
 import { Positions } from "./positions.ts";
 import { NWCLine } from "./scanner.ts";
-import { Element } from "./xml1.ts";
+import { create, Element } from "./xml3.ts";
 
 export class Bars {
   #staves: number[] = [];
@@ -154,7 +154,7 @@ export class Bars {
         if (endings && leftBarstyle && rightBarstyle) break;
       }
       result.push(
-        xml.create(
+        create(
           "measure",
           { number: measure.toString() },
           xml.leftBarline(
@@ -177,7 +177,7 @@ export class Bars {
     const content: (Element)[] = [];
     if (i === 0) {
       content.push(
-        xml.create(
+        create(
           "divisions",
           undefined,
           (PER_WHOLE / 4).toString(),
@@ -207,7 +207,7 @@ export class Bars {
     }
     if (offsets.length > 1) {
       content.push(
-        xml.create(
+        create(
           "staves",
           undefined,
           staves[staves.length - 1].toString(),
@@ -216,6 +216,6 @@ export class Bars {
     }
     content.push(...clefs.values());
     if (content.length === 0) return null;
-    return xml.create("attributes", undefined, ...content);
+    return create("attributes", undefined, ...content);
   }
 }

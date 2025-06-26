@@ -1,5 +1,5 @@
-import { Element } from "./xml1.ts";
-import { MusicXML } from "./musicxml.ts";
+import { create, Element } from "./xml3.ts";
+import { MusicXML } from "./musicxml2.ts";
 import { Lyrics } from "./lyrics.ts";
 import { Positions } from "./positions.ts";
 import { Durations } from "./durations.ts";
@@ -66,19 +66,19 @@ export class Staves {
         it !== undefined
       );
       scoreParts.push(
-        xml.create(
+        create(
           "score-part",
           attributes,
-          xml.create(
+          create(
             "part-name",
             undefined,
             this.#names.slice(from, to).join(", "),
           ),
           program
-            ? xml.create(
+            ? create(
               "midi-instrument",
               undefined,
-              xml.create(
+              create(
                 "midi-program",
                 undefined,
                 program.toString(),
@@ -88,7 +88,7 @@ export class Staves {
         ),
       );
       parts.push(
-        xml.create(
+        create(
           "part",
           attributes,
           ...bars.multiple(from, to, durations, positions, lyrics, xml),
@@ -102,33 +102,33 @@ export class Staves {
       switch (k) {
         case "Title":
           songInfo.push(
-            xml.create(
+            create(
               "work",
               undefined,
-              xml.create("work-title", undefined, v),
+              create("work-title", undefined, v),
             ),
           );
           break;
         case "Author":
         case "Lyricist":
           identification.push(
-            xml.create("creator", { type: k.toLowerCase() }, v),
+            create("creator", { type: k.toLowerCase() }, v),
           );
           break;
         case "Copyright1":
         case "Copyright2":
-          identification.push(xml.create("rights", undefined, v));
+          identification.push(create("rights", undefined, v));
           break;
         default:
           console.warn("song data ignored:", k, v);
       }
     }
-    songInfo.push(xml.create("identification", undefined, ...identification));
-    return xml.create(
+    songInfo.push(create("identification", undefined, ...identification));
+    return create(
       "score-partwise",
       { version: "4.0" },
       ...songInfo,
-      xml.create("part-list", undefined, ...scoreParts),
+      create("part-list", undefined, ...scoreParts),
       ...parts,
     );
   }

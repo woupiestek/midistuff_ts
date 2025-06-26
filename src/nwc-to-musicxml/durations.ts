@@ -1,8 +1,8 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Element } from "./xml1.ts";
+import { create, Element } from "./xml3.ts";
 import { Positions } from "./positions.ts";
 import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml.ts";
+import { MusicXML } from "./musicxml2.ts";
 import { NWCLine } from "./scanner.ts";
 
 export const PER_WHOLE = 768;
@@ -266,7 +266,7 @@ export class Durations {
           ),
         );
       } else {
-        const grace = this.#grace.has(i) ? xml.create("grace") : null;
+        const grace = this.#grace.has(i) ? create("grace") : null;
         const notationContent: (Element | null)[] = this.#notationContent(
           i,
           xml,
@@ -295,13 +295,13 @@ export class Durations {
               stem,
               staff,
               notations.length > 0
-                ? xml.create(
+                ? create(
                   "notations",
                   undefined,
                   ...notations,
                 )
                 : null,
-              ...lyrics.get(note, xml),
+              ...lyrics.get(note),
             ),
           );
         }
@@ -322,7 +322,7 @@ export class Durations {
         .filter((it) => it !== undefined);
       if (articulations.length > 0) {
         notations.push(
-          xml.create("articulations", undefined, ...articulations),
+          create("articulations", undefined, ...articulations),
         );
       }
       if (this.#notations[i].has("Fermata")) {
@@ -356,7 +356,7 @@ export class Durations {
     if (words) {
       for (const word of words) {
         result.push(xml.direction(
-          xml.create("words", undefined, word),
+          create("words", undefined, word),
           staff,
         ));
       }

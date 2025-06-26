@@ -1,4 +1,4 @@
-import { Element, create } from "./xml3.ts";
+import { create, Element } from "./xml3.ts";
 
 const HEADER =
   '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
@@ -48,16 +48,18 @@ export class MusicXML {
   }
 
   stem(sv: string) {
-    return this.#cache["stem" + sv] ||= this.create("stem", undefined, sv);
+    return this.#cache["stem" + sv] ||= create("stem", undefined, sv);
   }
 
   tied(attributes: { type: string; number: string }) {
-    return this.#cache["tied" + attributes.type + attributes.number] ||= this
-      .create("tied", attributes);
+    return this.#cache["tied" + attributes.type + attributes.number] ||= create(
+      "tied",
+      attributes,
+    );
   }
 
   slur(type: string, number: number): Element {
-    return this.#cache["slur" + type + number] ||= this.create(
+    return this.#cache["slur" + type + number] ||= create(
       "slur",
       { type, number: number.toString() },
     );
@@ -95,14 +97,14 @@ export class MusicXML {
 
   startSustain(staff: Element) {
     return this.#cache["startSustain" + staff] ||= this.direction(
-      this.create("pedal", { type: "start" }),
+      create("pedal", { type: "start" }),
       staff,
     );
   }
 
   stopSustain(staff: Element) {
     return this.#cache["stopSustain" + staff] ||= this.direction(
-      this.create("pedal", { type: "stop" }),
+      create("pedal", { type: "stop" }),
       staff,
     );
   }
@@ -112,22 +114,22 @@ export class MusicXML {
     ending: string[] = [],
   ) {
     if (!this.#leftBarStyles.has(type) && !ending.length) return null;
-    return this.#cache[type + ending] ||= this.create(
+    return this.#cache[type + ending] ||= create(
       "barline",
       { location: "left" },
-      type === "Single" ? null : this.create(
+      type === "Single" ? null : create(
         "bar-style",
         undefined,
         this.#barStyles[type],
       ),
       ending.length
-        ? this.create("ending", {
+        ? create("ending", {
           number: ending.join(","),
           type: "start",
         })
         : null,
       this.#repeatBars.has(type)
-        ? this.create("repeat", {
+        ? create("repeat", {
           direction: "forward",
         })
         : null,
@@ -140,22 +142,22 @@ export class MusicXML {
   ) {
     if (!this.#rightBarStyles.has(type) && !ending.length) return null;
     const single = type === "Single";
-    return this.#cache[type + ending] ||= this.create(
+    return this.#cache[type + ending] ||= create(
       "barline",
       { location: "right" },
-      single ? null : this.create(
+      single ? null : create(
         "bar-style",
         undefined,
         this.#barStyles[type],
       ),
       ending.length
-        ? this.create("ending", {
+        ? create("ending", {
           number: ending.join(","),
           type: single ? "discontinue" : "stop",
         })
         : null,
       this.#repeatBars.has(type)
-        ? this.create("repeat", {
+        ? create("repeat", {
           direction: "backward",
         })
         : null,
@@ -163,7 +165,7 @@ export class MusicXML {
   }
 
   wedge(wegde: { type: string; number: string }, staff: Element): Element {
-    return this.direction(this.create("wedge", wegde), staff);
+    return this.direction(create("wedge", wegde), staff);
   }
 
   clef(type: string, octaveChange: number, number: number): Element {
@@ -172,33 +174,33 @@ export class MusicXML {
     const elements = [];
     switch (type) {
       case "Bass":
-        elements.push(this.create("sign", undefined, "F"));
+        elements.push(create("sign", undefined, "F"));
         break;
       case "Alto":
-        elements.push(this.create("sign", undefined, "C"));
+        elements.push(create("sign", undefined, "C"));
         break;
       case "Tenor":
         elements.push(
-          this.create("sign", undefined, "C"),
-          this.create("line", undefined, "4"),
+          create("sign", undefined, "C"),
+          create("line", undefined, "4"),
         );
         break;
       case "Treble":
-        elements.push(this.create("sign", undefined, "G"));
+        elements.push(create("sign", undefined, "G"));
         break;
       default:
         throw new Error("Unknown Clef Type");
     }
     if (octaveChange) {
       elements.push(
-        this.create(
+        create(
           "clef-octave-change",
           undefined,
           octaveChange.toString(),
         ),
       );
     }
-    return this.#cache[key] = this.create(
+    return this.#cache[key] = create(
       "clef",
       { number: number.toString() },
       ...elements,
@@ -206,7 +208,7 @@ export class MusicXML {
   }
 
   staff(number: number): Element {
-    return this.#cache["staff" + number] ||= this.create(
+    return this.#cache["staff" + number] ||= create(
       "staff",
       undefined,
       number.toString(),
@@ -214,7 +216,7 @@ export class MusicXML {
   }
 
   voice(name: string): Element {
-    return this.#cache["voice" + name] ||= this.create(
+    return this.#cache["voice" + name] ||= create(
       "voice",
       undefined,
       name,
@@ -222,31 +224,29 @@ export class MusicXML {
   }
 
   direction(type: Element, staff: Element) {
-    return this.create(
+    return create(
       "direction",
       undefined,
-      this.create("direction-type", undefined, type),
+      create("direction-type", undefined, type),
       staff,
     );
   }
 
   key(fifths: number): Element {
-    return this.#cache["K" + fifths] ||= this.create(
+    return this.#cache["K" + fifths] ||= create(
       "key",
       undefined,
-      this.create("fifths", undefined, fifths.toString()),
+      create("fifths", undefined, fifths.toString()),
     );
   }
 
-  #steps = [..."CDEFGAB"].map((step) =>
-    this.create("step", undefined, step)
-  );
+  #steps = [..."CDEFGAB"].map((step) => create("step", undefined, step));
   #octaves = Array(10).keys().map((octave) =>
-    this.create("octave", undefined, octave.toString())
+    create("octave", undefined, octave.toString())
   ).toArray();
 
   alter(number: number): Element {
-    return this.#cache["A" + number] ||= this.create(
+    return this.#cache["A" + number] ||= create(
       "alter",
       undefined,
       number.toString(),
@@ -260,7 +260,7 @@ export class MusicXML {
     [..."vbn#x"].map((
       alter,
       i,
-    ) => [alter, this.create("alter", undefined, (i - 2).toString())]),
+    ) => [alter, create("alter", undefined, (i - 2).toString())]),
   );
 
   static readonly accidentalType: Record<string, string> = {
@@ -272,7 +272,7 @@ export class MusicXML {
   };
 
   accidental(alter: string): Element {
-    return this.#cache["accidental" + alter] ||= this.create(
+    return this.#cache["accidental" + alter] ||= create(
       "accidental",
       undefined,
       MusicXML.accidentalType[alter],
@@ -280,7 +280,7 @@ export class MusicXML {
   }
 
   pitch(tone: number, alter: string): Element {
-    return this.#cache[alter + tone] ||= this.create(
+    return this.#cache[alter + tone] ||= create(
       "pitch",
       undefined,
       this.#steps[tone % 7],
@@ -290,7 +290,7 @@ export class MusicXML {
   }
 
   type(dur: string): Element {
-    return this.#cache["T" + dur] ||= this.create(
+    return this.#cache["T" + dur] ||= create(
       "type",
       undefined,
       dur,
@@ -298,14 +298,14 @@ export class MusicXML {
   }
 
   note(...elements: (Element | null)[]): Element {
-    return this.create("note", undefined, ...elements);
+    return create("note", undefined, ...elements);
   }
 
   measure(
     number: number,
     ...elements: Element[]
   ): Element {
-    return this.create(
+    return create(
       "measure",
       { number: number.toString() },
       ...elements,
@@ -315,7 +315,7 @@ export class MusicXML {
   #cache: Record<string, Element> = {};
 
   duration(duration: number): Element {
-    return this.#cache["duration" + duration] ||= this.create(
+    return this.#cache["duration" + duration] ||= create(
       "duration",
       undefined,
       duration.toString(),
@@ -329,40 +329,40 @@ export class MusicXML {
   ): Element {
     const [type, dotted] = base.split(" ");
     return this.#cache["M" + tempo + base + staff] ||= this.direction(
-      this.create(
+      create(
         "metronome",
         undefined,
-        this.create("beat-unit", undefined, type.toLowerCase()),
-        dotted ? this.create("beat-unit-dot") : null,
-        this.create("per-minute", undefined, tempo.toString()),
+        create("beat-unit", undefined, type.toLowerCase()),
+        dotted ? create("beat-unit-dot") : null,
+        create("per-minute", undefined, tempo.toString()),
       ),
       staff,
     );
   }
 
   time(n: string, d: string): Element {
-    return this.#cache["T" + n + "/" + d] ||= this.create(
+    return this.#cache["T" + n + "/" + d] ||= create(
       "time",
       undefined,
-      this.create("beats", undefined, n),
-      this.create("beat-type", undefined, d),
+      create("beats", undefined, n),
+      create("beat-type", undefined, d),
     );
   }
 
-  create(
-    name: string,
-    attributes?: Record<string, string>,
-    ...Elements: (Element | string | null)[]
-  ): Element {
-    return this.create(
-      name,
-      attributes,
-      ...Elements.filter((x) => x !== null),
-    );
-  }
+  // create(
+  //   name: string,
+  //   attributes?: Record<string, string>,
+  //   ...Elements: (Element | string | null)[]
+  // ): Element {
+  //   return create(
+  //     name,
+  //     attributes,
+  //     ...Elements,
+  //   );
+  // }
 
   backup(duration: number): Element {
-    return this.#cache["backup" + duration] ||= this.create(
+    return this.#cache["backup" + duration] ||= create(
       "backup",
       undefined,
       this.duration(duration),
