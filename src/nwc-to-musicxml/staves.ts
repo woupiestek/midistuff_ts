@@ -1,5 +1,5 @@
-import { create, Element } from "./xml3.ts";
-import { MusicXML } from "./musicxml2.ts";
+import { create, Element } from "./xml.ts";
+import { MusicXML } from "./musicxml.ts";
 import { Lyrics } from "./lyrics.ts";
 import { Positions } from "./positions.ts";
 import { Durations } from "./durations.ts";

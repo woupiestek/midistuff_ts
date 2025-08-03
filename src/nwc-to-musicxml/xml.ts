@@ -1,5 +1,3 @@
-// put one idea behind the face of the other.
-
 function escapeXml(unsafe: string) {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {

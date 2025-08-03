@@ -1,7 +1,9 @@
 param (
-  [string]$file = "",
-  [int]$from = 0,
-  [int]$to = 1000
+  [string]$file = ""
 )
 
-deno run --unstable-ffi --allow-env --allow-write --allow-read --allow-ffi .\src\player4.ts $file $from $to
+deno run --allow-all .\src\writer3.ts $file .\target\temp.mid
+
+Start-Process -FilePath "wmplayer.exe" -ArgumentList .\target\temp.mid
+
+# deno run --unstable-ffi --allow-env --allow-write --allow-read --allow-ffi .\src\player4.ts $file $from $to

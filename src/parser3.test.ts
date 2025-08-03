@@ -3,24 +3,24 @@ import {
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Node, NodeType, Parser } from "./parser3.ts";
-import { TokenType } from "./scanner3.ts";
+import { Tokens, TokenType } from "./tokens.ts";
 
 Deno.test(function parseRest() {
-  const { main: node } = new Parser("_/4 r").parse();
+  const { main: node } = new Parser(new Tokens("_/4 r")).parse();
   if (node.type !== NodeType.REST) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.duration?.numerator, 1);
   assertEquals(node.options?.duration?.denominator, 4);
 });
 
 Deno.test(function parseSimpleRest() {
-  const { main: node } = new Parser("r").parse();
+  const { main: node } = new Parser(new Tokens("r")).parse();
   if (node.type !== NodeType.REST) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.duration?.numerator, undefined);
   assertEquals(node.options?.duration?.denominator, undefined);
 });
 
 Deno.test(function parseNote() {
-  const { main: node } = new Parser("_3/4 -7++").parse();
+  const { main: node } = new Parser(new Tokens("_3/4 -7++")).parse();
   if (node.type !== NodeType.NOTE) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.degree, -7);
   assertEquals(node.accident, 2);
@@ -29,7 +29,7 @@ Deno.test(function parseNote() {
 });
 
 Deno.test(function parseSimpleNote() {
-  const { main: node } = new Parser("-7").parse();
+  const { main: node } = new Parser(new Tokens("-7")).parse();
   if (node.type !== NodeType.NOTE) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.degree, -7);
   assertEquals(node.accident, 0);
@@ -38,7 +38,8 @@ Deno.test(function parseSimpleNote() {
 });
 
 Deno.test(function parseSet() {
-  const { main: node } = new Parser("_/4[ _/8 0 1 2 0 _/8 r ]").parse();
+  const { main: node } = new Parser(new Tokens("_/4[ _/8 0 1 2 0 _/8 r ]"))
+    .parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong child type ${NodeType[node.type]}`);
   }
@@ -46,7 +47,7 @@ Deno.test(function parseSet() {
 });
 
 Deno.test(function parsePitchSet() {
-  const { main: node } = new Parser("_5/16[ 0 2 4 ]").parse();
+  const { main: node } = new Parser(new Tokens("_5/16[ 0 2 4 ]")).parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -56,7 +57,7 @@ Deno.test(function parsePitchSet() {
 });
 
 Deno.test(function parseJoin() {
-  const { main: node } = new Parser("_/2{ 0  2-  4 }").parse();
+  const { main: node } = new Parser(new Tokens("_/2{ 0  2-  4 }")).parse();
   if (node.type === NodeType.ERROR) throw node.error;
   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 3);
@@ -64,7 +65,7 @@ Deno.test(function parseJoin() {
 
 Deno.test(function parseMark() {
   const { main: node, sections } = new Parser(
-    "$line_1 = _/4[ _/8 0 1 2 0 _/8 r ]",
+    new Tokens("$line_1 = _/4[ _/8 0 1 2 0 _/8 r ]"),
   ).parse();
   if (node.type !== NodeType.INSERT) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.index, 0);
@@ -75,7 +76,8 @@ Deno.test(function parseMark() {
 });
 
 Deno.test(function parseResolvedRepeat() {
-  const { main: node, sections } = new Parser("[ C = 0 C ]").parse();
+  const { main: node, sections } = new Parser(new Tokens("[ C = 0 C ]"))
+    .parse();
   assertEquals(sections.length, 1);
   assertEquals(sections[0].mark, "C");
   if (node.type !== NodeType.ARRAY) {
@@ -91,17 +93,19 @@ Deno.test(function parseResolvedRepeat() {
 });
 
 Deno.test(function parseRepeat() {
-  const { main: node } = new Parser("$line_1").parse();
+  const { main: node } = new Parser(new Tokens("$line_1")).parse();
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(
     node.error.message,
-    "Error at [1;8] '…e_1…': Could not resolve '$line_1'",
+    "Error at [1;1] '…$li…': Could not resolve '$line_1'",
   );
 });
 
 Deno.test(function parseOperations() {
   const { main: node } = new Parser(
-    "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
+    new Tokens(
+      "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
+    ),
   ).parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
@@ -119,13 +123,19 @@ Deno.test(function parseOperations() {
 
 Deno.test(function parseCombination() {
   const { main: node, sections } = new Parser(
-    "['allegro' 'f' \n" +
-      "$A = [_/8 0 1 2 0 _/8 r] $A\n" +
-      "$B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
-      "% this was a puzzle to get right!\n" +
-      "$C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +
-      "$D = [_/8 0 -3 _/2 0 _/8r] $D\n]",
+    new Tokens(
+      "['allegro' 'f' \
+       $A = [_/8 0 1 2 0 _/8 r] $A\
+       $B = [_/8 2 3 _/2 4 _/8 r] $B\
+       % this was a puzzle to get right!\n\
+       $C = _/8[4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\
+       $D = [_/8 0 -3 _/2 0 _/8r] $D\n]",
+    ),
   ).parse();
+
+  if (node.type === NodeType.ERROR) {
+    fail(node.error.message);
+  }
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -136,19 +146,21 @@ Deno.test(function parseCombination() {
 });
 
 Deno.test(function parseError() {
-  const { main } = new Parser("{ 3h 2 4 }").parse();
+  const tokens = new Tokens("{ 3h 2 4 }");
+  const { main } = new Parser(tokens).parse();
   if (main.type !== NodeType.ERROR) {
     fail(`wrong child type ${NodeType[main.type]}`);
   }
-  assertEquals(main.token.type, TokenType.INTEGER);
+  assertEquals(tokens.types[main.token], TokenType.INTEGER);
   assertEquals(
     main.error.message,
-    "Error at [1;6] '…3h 2 4…': Could not resolve 'h'",
+    "Error at [1;4] '…{ 3h 2…': Could not resolve 'h'",
   );
 });
 
 Deno.test(function noFalseAccidentals() {
-  const { main: node } = new Parser("[_/8 0 -3 _/2 0 _/8 r]").parse();
+  const { main: node } = new Parser(new Tokens("[_/8 0 -3 _/2 0 _/8 r]"))
+    .parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -159,7 +171,8 @@ Deno.test(function noFalseAccidentals() {
 });
 
 Deno.test(function noFalseDurations() {
-  const { main: node } = new Parser("[_/8 2 3 _/2 4 _/8 r]").parse();
+  const { main: node } = new Parser(new Tokens("[_/8 2 3 _/2 4 _/8 r]"))
+    .parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -177,7 +190,9 @@ Deno.test(function noFalseDurations() {
 
 Deno.test(function addMetaData() {
   const { main, metadata } = new Parser(
-    "0,{ 'tempo'= 500000 'title'='one note' 'cresc poco a poco'={'from'=43'to'=85} 'parts'=['piano' 'viola']}",
+    new Tokens(
+      "0,{ 'tempo'= 500000 'title'='one note' 'cresc poco a poco'={'from'=43'to'=85} 'parts'=['piano' 'viola']}",
+    ),
   ).parse();
   if (main.type === NodeType.ERROR) {
     throw main.error;

@@ -3,7 +3,7 @@ import {
   fail,
 } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { NodeType, Parser } from "./parser4.ts";
-import { TokenType } from "./scanner3.ts";
+import { TokenType } from "./tokens.ts";
 
 Deno.test(function parseRest() {
   const { data: { nodes: [node] } } = new Parser("_/4 r").parse();
@@ -95,7 +95,7 @@ Deno.test(function parseRepeat() {
   const { data } = new Parser("$line_1").parse();
   assertEquals(
     data.errors[0].error.message,
-    "Error at [1;8] '…e_1…': Could not resolve '$line_1'",
+    "Error at [1;1] '…$li…': Could not resolve '$line_1'",
   );
 });
 
@@ -133,12 +133,13 @@ Deno.test(function parseCombination() {
 });
 
 Deno.test(function parseError() {
-  const { data } = new Parser("{ 3h 2 4 }").parse();
+  const parser = new Parser("{ 3h 2 4 }");
+  const { data } = parser.parse();
   const error = data.errors[0];
-  assertEquals(error.token.type, TokenType.INTEGER);
+  assertEquals(parser.tokens.types[error.token], TokenType.INTEGER);
   assertEquals(
     error.error.message,
-    "Error at [1;6] '…3h 2 4…': Could not resolve 'h'",
+    "Error at [1;4] '…{ 3h 2…': Could not resolve 'h'",
   );
 });
 

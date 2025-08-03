@@ -1,10 +1,10 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Durations, PER_WHOLE } from "./durations.ts";
 import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml2.ts";
+import { MusicXML } from "./musicxml.ts";
 import { Positions } from "./positions.ts";
 import { NWCLine } from "./scanner.ts";
-import { create, Element } from "./xml3.ts";
+import { create, Element } from "./xml.ts";
 
 export class Bars {
   #staves: number[] = [];

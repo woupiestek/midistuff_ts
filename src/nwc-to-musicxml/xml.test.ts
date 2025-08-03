@@ -1,5 +1,5 @@
 import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Element } from "./xml3.ts";
+import { Element } from "./xml.ts";
 
 Deno.test("some simple example", () => {
   assertEquals(

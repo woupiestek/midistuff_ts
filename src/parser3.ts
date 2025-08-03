@@ -1,4 +1,4 @@
-import { Scanner, Token, TokenType } from "./scanner3.ts";
+import { Tokens, TokenType } from "./tokens.ts";
 import { Ratio } from "./util.ts";
 
 export enum NodeType {
@@ -43,7 +43,7 @@ export type Node =
   }
   | {
     type: NodeType.ERROR;
-    token: Token;
+    token: number;
     error: Error;
   };
 
@@ -51,7 +51,7 @@ export const Node = {
   array(children: Node[], options?: Options): Node {
     return { type: NodeType.ARRAY, children, options };
   },
-  error(token: Token, e: Error): Node {
+  error(token: number, e: Error): Node {
     return { type: NodeType.ERROR, error: e, token };
   },
   event(value: string): Node {
@@ -81,25 +81,22 @@ export type AST = {
 };
 
 export class Parser {
-  #scanner;
-  #current;
+  #current = 0;
   #sections: { mark: string; node: Node }[] = [];
   #bindings: { mark: string; index: number }[] = [];
-  constructor(private readonly source: string) {
-    this.#scanner = new Scanner(source);
-    this.#current = this.#scanner.next();
-  }
+  constructor(readonly tokens: Tokens) {}
 
   #done() {
-    return this.#current.type === TokenType.END;
+    return this.#current === this.tokens.types.length;
   }
 
   #error(message: string) {
-    const [line, column] = this.#scanner.getLineAndColumn(this.#current.from);
+    const [line, column] = this.tokens.getLineAndColumn(this.#current - 1);
+    const from = this.tokens.froms[this.#current - 1] ?? -1;
     // add a few characters of the source?
     return new Error(
       `Error at [${line};${column}] '\u2026${
-        this.source.slice(this.#current.from - 3, this.#current.from + 3)
+        this.tokens.source.slice(from >= 3 ? from - 3 : 0, from + 3)
       }\u2026': ${message}`,
     );
   }
@@ -140,16 +137,20 @@ export class Parser {
 
   #advance() {
     if (!this.#done()) {
-      this.#current = this.#scanner.next();
+      this.#current++;
     }
   }
 
   #match(type: TokenType) {
-    if (type === this.#current.type) {
+    if (type === this.#currentType()) {
       this.#advance();
       return true;
     }
     return false;
+  }
+
+  #currentType() {
+    return this.tokens.types[this.#current];
   }
 
   #consume(type: TokenType) {
@@ -159,28 +160,28 @@ export class Parser {
   }
 
   #mark(): string {
-    if (this.#current.type !== TokenType.IDENTIFIER) {
+    if (this.#currentType() !== TokenType.IDENTIFIER) {
       throw this.#error(`Mark expected`);
     }
-    const value = this.#scanner.getIdentifierName(this.#current.from);
+    const value = this.tokens.getIdentifierName(this.#current);
     this.#advance();
     return value;
   }
 
   #integer(min: number, max: number): number {
-    if (this.#current.type !== TokenType.INTEGER) {
+    if (this.#currentType() !== TokenType.INTEGER) {
       throw this.#error(`Expected an integer`);
     }
 
-    const value = this.#scanner.getIntegerValue(this.#current.from);
-    if (typeof value !== "number") {
+    const value = +this.tokens.getIntegerValue(this.#current);
+    if (typeof value !== "number" || Number.isNaN(value)) {
       // should not be reachable
       throw this.#error(`Expected integer to have a value`);
     }
     if (value < min || max < value) {
       throw this.#error(`Value ${value} is out of range [${min}, ${max}]`);
     }
-    this.#current = this.#scanner.next();
+    this.#current++;
     return value;
   }
 
@@ -194,7 +195,7 @@ export class Parser {
   #options(): Options | undefined {
     const options: Options = {};
     a: for (;;) {
-      switch (this.#current.type) {
+      switch (this.#currentType()) {
         case TokenType.KEY:
           if (options.key !== undefined) {
             throw this.#error("Double key");
@@ -203,7 +204,7 @@ export class Parser {
           options.key = this.#integer(-7, 7);
           continue;
         case TokenType.DURATION:
-          options.duration = this.#scanner.getRatio(this.#current.from);
+          options.duration = this.tokens.getRatio(this.#current);
           this.#advance();
           continue;
         default:
@@ -217,11 +218,11 @@ export class Parser {
   }
 
   #note(accident: -2 | -1 | 0 | 1 | 2, options?: Options): Node {
-    const degree = this.#scanner.getIntegerValue(this.#current.from);
+    const degree = this.tokens.getIntegerValue(this.#current);
     if (degree < -34 || 38 < degree) {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
-    this.#current = this.#scanner.next();
+    this.#current++;
     return Node.note(
       degree,
       accident,
@@ -230,11 +231,11 @@ export class Parser {
   }
 
   #node(): Node {
-    if (this.#current.type === TokenType.IDENTIFIER) {
+    if (this.#currentType() === TokenType.IDENTIFIER) {
       return this.#insert();
     }
     const options: Options | undefined = this.#options();
-    switch (this.#current.type) {
+    switch (this.#currentType()) {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
         const scope = this.#bindings.length;
@@ -268,8 +269,7 @@ export class Parser {
         this.#advance();
         return Node.rest(options);
       case TokenType.TEXT: {
-        const value = this.#scanner
-          .getText(this.#current.from);
+        const value = this.tokens.getText(this.#current);
         this.#advance();
         return Node.event(
           value,
@@ -293,9 +293,7 @@ export class Parser {
   #panic() {
     let depth = 1;
     for (;;) {
-      switch (this.#current.type) {
-        case TokenType.END:
-          return;
+      switch (this.#currentType()) {
         case TokenType.LEFT_BRACE:
           depth++;
           break;
@@ -338,11 +336,9 @@ export class Parser {
     }
   }
 
-  #pop(): Token {
+  #pop(): number {
     if (this.#done()) throw this.#error("Expected more input");
-    const current = this.#current;
-    this.#current = this.#scanner.next();
-    return current;
+    return this.#current++;
   }
 
   #array(): Value[] {
@@ -355,15 +351,15 @@ export class Parser {
 
   #value(): Value {
     const token2 = this.#pop();
-    switch (token2.type) {
+    switch (this.tokens.types[token2]) {
       case TokenType.LEFT_BRACE:
         return this.dict();
       case TokenType.LEFT_BRACKET:
         return this.#array();
       case TokenType.INTEGER:
-        return this.#scanner.getIntegerValue(token2.from);
+        return this.tokens.getIntegerValue(token2);
       case TokenType.TEXT:
-        return this.#scanner.getText(token2.from);
+        return this.tokens.getText(token2);
       default:
         throw this.#error(
           "Expected integer, label, string, array or key-value pairs",
@@ -376,11 +372,11 @@ export class Parser {
     for (;;) {
       const token1 = this.#pop();
       let key: string;
-      switch (token1.type) {
+      switch (this.tokens.types[token1]) {
         case TokenType.RIGHT_BRACE:
           return result;
         case TokenType.TEXT:
-          key = this.#scanner.getText(token1.from);
+          key = this.tokens.getText(token1);
           break;
         default:
           throw this.#error("Expected label or string");

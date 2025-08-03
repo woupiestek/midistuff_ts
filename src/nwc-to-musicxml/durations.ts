@@ -1,8 +1,8 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { create, Element } from "./xml3.ts";
+import { create, Element } from "./xml.ts";
 import { Positions } from "./positions.ts";
 import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml2.ts";
+import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
 
 export const PER_WHOLE = 768;

@@ -1,6 +1,7 @@
 import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Parser } from "./parser3.ts";
 import { Printer } from "./printer3.ts";
+import { Tokens } from "./tokens.ts";
 
 Deno.test(function parseCombination() {
   const text = "[\n  'allegro' 'f' $A = [_/8 0 1 2 0 _/8 r] $A\n" +
@@ -9,7 +10,7 @@ Deno.test(function parseCombination() {
     "  $D = [_/8 0 -3 _/2 0 _/8 r] $D\n],\n{'bpm' = 135}";
   const text2 = new Printer().pretty(
     64,
-    new Parser(text).parse(),
+    new Parser(new Tokens(text)).parse(),
   );
   assertEquals(text2, text);
 });

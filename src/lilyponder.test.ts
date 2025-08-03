@@ -3,6 +3,7 @@ import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Ratio } from "./util.ts";
 import { Transformer } from "./transformer.ts";
 import { Parser } from "./parser3.ts";
+import { Tokens } from "./tokens.ts";
 
 Deno.test(function durationsInContext() {
   const expected = [
@@ -73,7 +74,7 @@ Deno.test(function simpleExample() {
   assertEquals(Ratio.int(0).compare(Ratio.int(1)), -1);
   const sample = "['treble' 0 1 2 0 ]";
   const result = lilyponder.process(
-    transformer.transform(new Parser(sample).parse()),
+    transformer.transform(new Parser(new Tokens(sample)).parse()),
   );
   assertEquals(result, "<<{c'4 d'4 e'4 c'4}>>");
 });

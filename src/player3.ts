@@ -1,6 +1,7 @@
 import { midi } from "https://deno.land/x/deno_midi@v0.1.1/mod.ts";
 import { Interpreter } from "./interpreter3.ts";
 import { Parser } from "./parser3.ts";
+import { Tokens } from "./tokens.ts";
 
 if (Deno.args.length < 1) {
   console.error("Usage: play path [from] [to]\n");
@@ -12,7 +13,7 @@ const to = Deno.args[2] ? Number.parseInt(Deno.args[2], 10) : 1000;
 
 const data = await Deno.readTextFile(Deno.args[0]);
 const { messages, realTime } = new Interpreter(
-  new Parser(data).parse(),
+  new Parser(new Tokens(data)).parse(),
   from,
   to,
 );

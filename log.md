@@ -1,5 +1,9 @@
 # Midistuff logs
 
+## 2025-08-04
+
+This no longer works: `.\play.ps1 .\samples\jacob.txt`
+
 ## 2025-05-07
 
 ### how to run?
