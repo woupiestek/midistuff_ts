@@ -132,7 +132,9 @@ export class Tokens {
   }
 
   getIdentifierName(token: number) {
-    if (this.types[token] !== TokenType.IDENTIFIER) {
+    if (
+      token >= this.types.length || this.types[token] !== TokenType.IDENTIFIER
+    ) {
       throw new Error("no identifier here");
     }
     let to = this.froms[token] + 1;
