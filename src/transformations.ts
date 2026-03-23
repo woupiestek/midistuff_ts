@@ -4,10 +4,12 @@ export function transform1({ timing, tracks }: MidiFile) {
   const content = [];
 
   // put events in one 'track' and count the number of pulses since start.
-  for (let track = 0; track < tracks.length; track++) {
+  for (const track of tracks) {
     let pulse = 0;
-    for (const { wait, event } of tracks[track]) {
-      pulse += wait;
+    let event;
+    for (let i = 0, l = track.waits.length; i < l; i++) {
+      event = track.events[i];
+      pulse += track.waits[i];
       if (event !== null) {
         content.push({
           event,

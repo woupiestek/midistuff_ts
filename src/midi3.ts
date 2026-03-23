@@ -12,7 +12,9 @@ for (let i = 0; i < 128; i++) {
 
 export class MidiPlanner {
   #transformer = new Transformer();
-  #messages: { time: number; event: MidiEvent }[] = [];
+  #times: number[] = [];
+  #events: MidiEvent[] = [];
+  #order: number[];
   #programs: (number | undefined)[] = Array(16);
   bpm = 120;
   time = 0;
@@ -31,7 +33,8 @@ export class MidiPlanner {
           break;
       }
     }
-    this.#messages.sort((x, y) => x.time - y.time);
+    this.#order = Array(this.#events.length).keys().toArray();
+    this.#order.sort((x, y) => this.#times[x] - this.#times[y]);
   }
 
   #channel = 0;
@@ -40,25 +43,21 @@ export class MidiPlanner {
   #event(_event: Event) {
     switch (_event.value) {
       case "sustain down":
-        this.#messages.push({
-          time: _event.time.value,
-          event: {
-            type: MessageType.controller,
-            channel: this.#channel,
-            controller: 0x40,
-            value: 0xff,
-          },
+        this.#times.push(_event.time.value);
+        this.#events.push({
+          type: MessageType.controller,
+          channel: this.#channel,
+          controller: 0x40,
+          value: 0xff,
         });
         return;
       case "sustain up":
-        this.#messages.push({
-          time: _event.time.value,
-          event: {
-            type: MessageType.controller,
-            channel: this.#channel,
-            controller: 0x40,
-            value: 0,
-          },
+        this.#times.push(_event.time.value);
+        this.#events.push({
+          type: MessageType.controller,
+          channel: this.#channel,
+          controller: 0x40,
+          value: 0,
         });
         return;
       default:
@@ -81,22 +80,20 @@ export class MidiPlanner {
     const channel = this.#channel;
     const note = _note.pyth.toMidi() + 60;
     const velocity = this.#velocity;
-    this.#messages.push({
-      time: _note.start.value,
-      event: { type: MessageType.noteOn, channel, note, velocity },
-    });
+    this.#times.push(_note.start.value);
+    this.#events.push({ type: MessageType.noteOn, channel, note, velocity });
     const time = _note.stop.value;
-    this.#messages.push({
-      time,
-      event: { type: MessageType.noteOff, channel, note, velocity },
-    });
+    this.#times.push(time);
+    this.#events.push({ type: MessageType.noteOff, channel, note, velocity });
     if (time > this.time) {
       this.time = time;
     }
   }
 
-  get messages() {
-    return this.#messages;
+  *messages() {
+    for (const i of this.#order) {
+      yield { time: this.#times[i], event: this.#events[i] };
+    }
   }
 
   #getChannel(program: number): number {
@@ -112,9 +109,11 @@ export class MidiPlanner {
     }
     if (free === 16) throw new Error("out of channels");
     this.#programs[free] = program;
-    this.#messages.push({
-      time: 0,
-      event: { type: MessageType.programChange, channel: free, program },
+    this.#times.push(0);
+    this.#events.push({
+      type: MessageType.programChange,
+      channel: free,
+      program,
     });
     return free;
   }

@@ -19,10 +19,11 @@ export class Filer {
   }
 
   static #differentiate(t: { time: number; event: MidiEvent }[]): Track {
-    const track: Track = [];
+    const track: Track = { waits: [], events: [] };
     let lastTime = 0;
     for (const { time, event } of t) {
-      track.push({ wait: (Filer.PPWN * (time - lastTime)) | 0, event });
+      track.waits.push((Filer.PPWN * (time - lastTime)) | 0);
+      track.events.push(event);
       lastTime = time;
     }
     return track;
@@ -48,7 +49,7 @@ export class Filer {
       EOT,
     ];
     const track1: { time: number; event: MidiEvent }[] = [];
-    for (const message of planner.messages) {
+    for (const message of planner.messages()) {
       track1.push(message);
     }
     track1.push(EOT);

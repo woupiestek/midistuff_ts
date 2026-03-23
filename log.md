@@ -6,8 +6,8 @@ This no longer works: `.\play.ps1 .\samples\jacob.txt`
 
 ### note durations
 
-In notation, it is always binary fractions. A point number, fixed or floating, will be fine.
-The trouble is with tuplets, which are not preserved properly.
+In notation, it is always binary fractions. A point number, fixed or floating,
+will be fine. The trouble is with tuplets, which are not preserved properly.
 
 ## 2025-05-07
 

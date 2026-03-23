@@ -89,16 +89,17 @@ export class Scanner {
       this.consume(c);
     }
     const stop = this.current + this.fixedLengthNumber(4) + 4;
-    const result = [];
+    const waits = [], events = [];
     try {
       while (this.current < stop) {
-        result.push({ wait: this.variableLengthNumber(), event: this.event() });
+        waits.push(this.variableLengthNumber());
+        events.push(this.event());
       }
     } catch (e) {
       console.error(e);
     }
     this.current = stop;
-    return result;
+    return { waits, events };
   }
 
   fixedLengthNumber(size: number): number {

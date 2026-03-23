@@ -116,9 +116,9 @@ export type Timing =
   | { type: "timecode"; fps: number; subdivisions: number };
 
 export type Track = {
-  wait: number;
-  event: MidiEvent;
-}[];
+  waits: number[];
+  events: MidiEvent[];
+};
 
 export type MidiFile = {
   format: 0 | 1 | 2;

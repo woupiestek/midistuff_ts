@@ -46,60 +46,77 @@ Deno.test(function parseSet() {
   );
 });
 
-// Deno.test(function parsePitchSet() {
-//   const { main: node } = new Parser(new Tokens("_5/16[ 0 2 4 ]"));
-//   if (node.type !== NodeType.ARRAY) {
-//     fail(`wrong type ${NodeType[node.type]}`);
-//   }
-//   assertEquals(node.children.length, 3);
-//   assertEquals(node.options?.duration?.numerator, 5);
-//   assertEquals(node.options?.duration?.denominator, 16);
-// });
+Deno.test(function parsePitchSet() {
+  assertEquals(
+    new Parser(new Tokens("_5/16[ 0 2 4 ]")).toString(),
+    "\
+0:DURATION\n\
+1:  LEFT_BRACKET\n\
+2:    INTEGER\n\
+3:    INTEGER\n\
+4:    INTEGER",
+  );
+});
 
-// Deno.test(function parseJoin() {
-//   const { main: node } = new Parser(new Tokens("_/2{ 0  2-  4 }"));
-//   if (node.type === NodeType.ERROR) throw node.error;
-//   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
-//   assertEquals(node.children.length, 3);
-// });
+Deno.test(function parseJoin() {
+  assertEquals(
+    new Parser(new Tokens("_/2{ 0  2-  4 }")).toString(),
+    "\
+0:DURATION\n\
+1:  LEFT_BRACE\n\
+2:    INTEGER\n\
+3:    INTEGER_MINUS\n\
+4:    INTEGER",
+  );
+});
 
-// Deno.test(function parseMark() {
-//   const { main: node, sections } = new Parser(
-//     new Tokens("$line_1 = _/4[ _/8 0 1 2 0 _/8 r ]"),
-//   );
-//   if (node.type !== NodeType.INSERT) fail(`wrong type ${NodeType[node.type]}`);
-//   assertEquals(node.index, 0);
-//   assertEquals(sections.length, 1);
-//   assertEquals(sections[0].mark, "$line_1");
-//   const child = sections[0].node;
-//   if (child.type !== NodeType.ARRAY) fail("wrong child type");
-// });
+Deno.test(function parseMark() {
+  const { indents, contents } = new Parser(
+    new Tokens("$line_1 = _/4[ _/8 0 1 2 0 _/8 r ]"),
+  ).test();
+  assertEquals(
+    indents,
+    [0, 1, 2, 3, 4, 3, 3, 3, 3, 4],
+  );
+  assertEquals(
+    contents,
+    [
+      "IDENTIFIER",
+      "DURATION",
+      "LEFT_BRACKET",
+      "DURATION",
+      "INTEGER",
+      "INTEGER",
+      "INTEGER",
+      "INTEGER",
+      "DURATION",
+      "REST",
+    ],
+  );
+});
 
-// Deno.test(function parseResolvedRepeat() {
-//   const { main: node, sections } = new Parser(new Tokens("[ C = 0 C ]"))
-//     ;
-//   assertEquals(sections.length, 1);
-//   assertEquals(sections[0].mark, "C");
-//   if (node.type !== NodeType.ARRAY) {
-//     fail(`wrong type ${NodeType[node.type]}`);
-//   }
-//   assertEquals(node.children.length, 2);
-//   for (const child of node.children) {
-//     if (child.type !== NodeType.INSERT) {
-//       fail(`wrong type ${NodeType[node.type]}`);
-//     }
-//     assertEquals(child.index, 0);
-//   }
-// });
+Deno.test(function parseResolvedRepeat() {
+  const { indents, contents } = new Parser(new Tokens("[ C = 0 C ]")).test();
+  assertEquals(indents, [0, 1, 2, 1]);
+  assertEquals(contents, [
+    "LEFT_BRACKET",
+    "IDENTIFIER",
+    "INTEGER",
+    "IDENTIFIER",
+  ]);
+});
 
-// Deno.test(function parseRepeat() {
-//   const { main: node } = new Parser(new Tokens("$line_1"));
-//   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
-//   assertEquals(
-//     node.error.message,
-//     "Error at [1;1] '…$li…': Could not resolve '$line_1'",
-//   );
-// });
+// FIXME: there is supposed to be a an error here
+Deno.test(function parseRepeat() {
+  const { indents, contents } = new Parser(new Tokens("$line_1")).test();
+  assertEquals(indents, [0]);
+  assertEquals(contents, ["IDENTIFIER"]);
+  // if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
+  // assertEquals(
+  //   node.error.message,
+  //   "Error at [1;1] '…$li…': Could not resolve '$line_1'",
+  // );
+});
 
 // Deno.test(function parseOperations() {
 //   const { main: node } = new Parser(

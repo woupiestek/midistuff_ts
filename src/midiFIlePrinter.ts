@@ -42,12 +42,12 @@ export class Printer {
     }
   }
 
-  track(track: Track): void {
+  track({ waits, events }: Track): void {
     this.#push(77, 84, 114, 107, 0, 0, 0, 0);
     const offset = this.#bytes.length;
-    for (const { wait, event } of track) {
-      this.variableLengthNumber(wait);
-      this.event(event);
+    for (let i = 0, l = waits.length; i < l; i++) {
+      this.variableLengthNumber(waits[i]);
+      this.event(events[i]);
     }
     this.fixedLengthNumber(this.#bytes.length - offset, 4, offset - 4);
   }

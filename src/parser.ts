@@ -166,4 +166,16 @@ export class Nodes {
     }
     return lines.join("\n");
   }
+
+  test() {
+    const depth: number[] = [-1];
+    const indents: number[] = [];
+    const contents: string[] = [];
+    for (let i = 0, l = this.types.length; i < l; i++) {
+      depth[i] = depth[this.parents[i]] + 1;
+      indents.push(depth[i]);
+      contents.push(TokenType[this.tokens.types[this.tokenIds[i]]]);
+    }
+    return { indents, contents };
+  }
 }

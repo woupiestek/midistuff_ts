@@ -13,7 +13,7 @@ export class Interpreter {
     const tempo = 2.4e5 / planner.bpm;
     let lastTime = from;
     let realTime = 0;
-    for (const { time, event } of planner.messages) {
+    for (const { time, event } of planner.messages()) {
       if (time < from) {
         continue;
       }
