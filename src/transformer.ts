@@ -1,4 +1,4 @@
-import { AST, Node, NodeType, Options } from "./parser3.ts";
+import { AST, Node, NodeType } from "./parser3.ts";
 import { Pyth } from "./pythagorean.ts";
 import { Ratio } from "./util.ts";
 
@@ -14,35 +14,10 @@ export type Event = {
   time: Ratio;
 };
 
-export class Params {
-  __duration?: Ratio;
-  __key?: number;
-  constructor(
-    duration?: Ratio,
-    key?: number,
-    readonly parent?: Params,
-  ) {
-    this.__duration = duration;
-    this.__key = key;
-  }
-
-  get duration(): Ratio {
-    if (!this.__duration) {
-      this.__duration = this.parent ? this.parent.duration : new Ratio(1, 4);
-    }
-    return this.__duration;
-  }
-
-  get key(): number {
-    if (!this.__key) {
-      this.__key = this.parent ? this.parent.key : 0;
-    }
-    return this.__key;
-  }
-}
-
 export class Transformer {
-  #sections: { node: Node; mark: string; __params?: Params }[] = [];
+  #sections: { nodes: Node[]; marks: string[] } = { nodes: [], marks: [] };
+  #keys: number[] = [];
+  #durations: Ratio[] = [];
   #buffer: (Event | Note)[] = [];
   #time: Ratio = new Ratio(0, 1);
   transform(ast: AST) {
@@ -50,16 +25,11 @@ export class Transformer {
     // todo: something with the metadata
     this.#buffer = [];
     this.#time = new Ratio(0, 1);
-    this.#node(ast.main, new Params());
+    this.#node(ast.main, 0, new Ratio(1, 4));
     return this.#buffer;
   }
 
-  #params(params: Params, options?: Options): Params {
-    if (!options) return params;
-    return new Params(options.duration, options.key, params);
-  }
-
-  #node(node: Node, params: Params) {
+  #node(node: Node, key: number, duration: Ratio) {
     switch (node.type) {
       case NodeType.ERROR:
         return console.error(node.error);
@@ -71,45 +41,54 @@ export class Transformer {
         });
         return;
       case NodeType.INSERT: {
-        const section = this.#sections[node.index];
-        if (!section) console.error(`section ${node.index} is missing`);
-        if (!section.__params) {
-          section.__params = params;
-        }
-        this.#node(section.node, section.__params);
-        return;
-      }
-      case NodeType.NOTE: {
-        const _params = this.#params(params, node.options);
-        this.#buffer.push({
-          type: "note",
-          start: this.#time,
-          stop: this.#time.plus(_params.duration),
-          pyth: Pyth.fromPitch(_params.key, node.degree, node.accident),
-        });
-        this.#time = this.#time.plus(_params.duration);
-        return;
-      }
-      case NodeType.REST: {
-        this.#time = this.#time.plus(
-          this.#params(params, node.options).duration,
+        const _node = this.#sections.nodes[node.index];
+        if (!_node) console.error(`section ${node.index} is missing`);
+        this.#node(
+          _node,
+          this.#keys[node.index] ||= key,
+          this.#durations[node.index] ||= duration,
         );
         return;
       }
+      case NodeType.NOTE: {
+        const stop = this.#time.plus(node.options?.duration ?? duration);
+        this.#buffer.push({
+          type: "note",
+          start: this.#time,
+          stop,
+          pyth: Pyth.fromPitch(
+            node.options?.key ?? key,
+            node.degree,
+            node.accident,
+          ),
+        });
+        this.#time = stop;
+        return;
+      }
+      case NodeType.REST: {
+        this.#time = this.#time.plus(node.options?.duration ?? duration);
+        return;
+      }
       case NodeType.ARRAY: {
-        const _params = this.#params(params, node.options);
         for (const child of node.children) {
-          this.#node(child, _params);
+          this.#node(
+            child,
+            node.options?.key ?? key,
+            node.options?.duration ?? duration,
+          );
         }
         return;
       }
       case NodeType.SET: {
-        const _params = this.#params(params, node.options);
         const start = this.#time;
         let end = start;
         for (const child of node.children) {
           this.#time = start;
-          this.#node(child, _params);
+          this.#node(
+            child,
+            node.options?.key ?? key,
+            node.options?.duration ?? duration,
+          );
           if (end.less(this.#time)) end = this.#time;
         }
         this.#time = end;

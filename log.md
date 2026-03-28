@@ -1,5 +1,80 @@
 # Midistuff logs
 
+## 2026-03-29
+
+Crazy idea maybe, but take data orientation up a level by using more inversions
+like the parent vector.
+
+Basically for every attribute of every node, have a pair of arrays for node ids
+and values. These are grouped by type if that makes sense ~ meaning, avoid
+copies of arrays of node ids to save space.
+
+Consider there is a data transform in two steps: one is the analysis of the
+source and one is synthesis of thet target.
+
+So the idea is an intermediate format what each type of entity get a table: the
+tabke has an entity number, and holds the properties for each type of entity.
+There may bot be a global list of entities, just a count, or maybe the parent
+vector that keeps the tree structure does all the work. Note how awkward it is
+to fetch details from parent nodes!
+
+For example: to determine the pitch of a note based on its number, the key of
+the collection of notes it belongs too is needed. So go down the tree to find
+the parent node that has the key signature attached. If key signatures are in
+their own table, then you won't find anything at a parent node, unless there is
+some good index into the table.
+
+This is all inspired by SQL: there are no coproduct types, and the obvious
+solution--storing table and mixed foreign key pairs--has to be added in user
+space. To check the type of a generic node an fetch a property, the whole
+database would have to be searched. Everything is an optimization here.
+
+I kind of see how the systhesis would work: there is a workbench that contains
+an array of unfinished entities, and by going through the property tables,
+details are filled in, including the position of the elements in the final
+document. However, in intermediate steps, some inversion would be done. For
+example, a column would be added to more easily find the key associated to a
+parent node.
+
+Note though, that if there are files at both ends, the source and the target are
+flatter than this collection of tables.
+
+In the analysis step, the tables are filled. Perhaps that is where the strength
+lies: the analyser has an entity counter, and simple records the relations
+between entity number and properties. Normalisation then answers the question of
+what to do with collections: store a parent vector, not a pointer toward
+children.
+
+Always be practical: during the analysis passes indices for fast synthesis, can
+already be built. There is just a data model in the background that does not
+need collections or coproduct types to represent the entire universe, as it
+simply ignores look up speeds.
+
+### a universal parser
+
+Ok, thore is already something to just giving each node just a type, parent and
+offset. You can always use the source to get data out of each token. What if you
+did not even record the type, though? Just use sets to hold the nodes of each
+type. The type vector already is an optimisation, to help find back the data
+that is recorded in collections of pointers anyway. Maybe a type vector is
+always strictly better, because it it easier to record
+
+Wait, the offset? Instead, selectively record pairs of node indices an source
+offsets. Offsets are only needed in cases where the type missing stuff, like for
+string literals, variable names, etc.
+
+This is more of a guidance to design:
+
+- the parser just extracts data from the source text. This data can be very
+  limited: what was matched were, and what are the relations in between.
+  obviously, if more data can be extracted cheaply, then that would be preferred
+  better option. For a generic parser, this is hard to do, and premature
+  optimisation can be a mistake.
+- for synthesizing the target, only optimize fetching often needed data.
+  Something to might otherwise take a number of passes through the entire data
+  set to find, only requires a single pass for creating all the indices, and can
+  then be found in constant or logarithmic time.
+
 ## 2025-08-04
 
 This no longer works: `.\play.ps1 .\samples\jacob.txt`

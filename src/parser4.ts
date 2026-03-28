@@ -4,18 +4,19 @@ import { Ratio } from "./util.ts";
 export type Dict = { [_: string]: Value };
 export type Value = Dict | number | string | Value[];
 
-export type Note = {
-  degree: number;
-  accident: -2 | -1 | 0 | 1 | 2;
+export type Notes = {
+  accidentals: { [_: number]: -2 | -1 | 1 | 2 };
+  degrees: number[];
+  durations: Ratio[];
+  keys: number[];
 };
 
-export type Node = {
-  type: number;
-  id: number;
-  duration: Ratio;
-  key: number;
+export type Nodes = {
+  types: number[];
+  ids: number[];
 };
 
+// encoding length into variable length node types. smart?
 export const NodeType = {
   ARRAY: 1,
   EVENT: 2,
@@ -48,11 +49,12 @@ export const NodeType = {
 };
 
 export type Data = {
-  errors: { token: number; error: Error }[];
+  errors: { tokens: number[]; errors: Error[] };
   events: string[];
   indices: number[];
-  nodes: Node[];
-  notes: Note[];
+  nodes: Nodes;
+  notes: Notes;
+  rests: Ratio[];
 };
 
 export type ParseResult = {
@@ -63,13 +65,25 @@ export type ParseResult = {
 export class Parser {
   tokens;
   #current = 0;
-  #bindings: { mark: string; index: number }[] = [];
+  #bindings: { marks: string[]; indices: number[] } = {
+    marks: [],
+    indices: [],
+  };
   #target: Data = {
-    errors: [],
+    errors: { tokens: [], errors: [] },
     events: [],
     indices: [],
-    notes: [],
-    nodes: [],
+    notes: {
+      degrees: [],
+      accidentals: {},
+      keys: [],
+      durations: [],
+    },
+    rests: [],
+    nodes: {
+      types: [],
+      ids: [],
+    },
   };
   constructor(private readonly source: string) {
     this.tokens = new Tokens(source);
@@ -91,7 +105,8 @@ export class Parser {
   }
 
   storeError(error: Error) {
-    this.#target.errors.push({ token: this.#current, error });
+    this.#target.errors.tokens.push(this.#current);
+    this.#target.errors.errors.push(error);
   }
 
   parse(): ParseResult {
@@ -167,16 +182,6 @@ export class Parser {
     return value;
   }
 
-  #resolve(mark: string): Node {
-    for (let i = this.#bindings.length - 1; i >= 0; i--) {
-      const binding = this.#bindings[i];
-      if (binding.mark === mark) {
-        return this.#target.nodes[binding.index];
-      }
-    }
-    throw this.#error(`Could not resolve '${mark}'`);
-  }
-
   #options(): { key?: number; duration?: Ratio } {
     let key, duration;
     a: for (;;) {
@@ -202,8 +207,11 @@ export class Parser {
     return { key, duration };
   }
 
-  #push(type: number, id: number, key: number, duration: Ratio): number {
-    return this.#target.nodes.push({ type, id, key, duration }) - 1;
+  #push(type: number, id: number): number {
+    const l = this.#target.nodes.ids.length;
+    this.#target.nodes.ids[l] = id;
+    this.#target.nodes.types[l] = type;
+    return l;
   }
 
   #note(accident: -2 | -1 | 0 | 1 | 2, key: number, duration: Ratio) {
@@ -212,9 +220,15 @@ export class Parser {
       throw this.#error(`Value ${degree} is out of range [-34, 38]`);
     }
     this.#current++;
-    const id = this.#target.notes.length;
-    this.#target.notes.push({ degree, accident });
-    return this.#push(NodeType.NOTE, id, key, duration);
+    // the note id
+    const id = this.#target.notes.degrees.length;
+    this.#target.notes.degrees[id] = degree;
+    this.#target.notes.keys[id] = key;
+    this.#target.notes.durations[id] = duration;
+    if (accident) {
+      this.#target.notes.accidentals[id] = accident;
+    }
+    return this.#push(NodeType.NOTE, id);
   }
 
   #node(key: number, duration: Ratio): number {
@@ -267,18 +281,16 @@ export class Parser {
         this.#advance();
         return this.#push(
           NodeType.REST,
-          0,
-          key,
-          duration,
+          // 'rest id'
+          this.#target.rests.push(duration) - 1,
         );
       case TokenType.TEXT: {
         const value = this.tokens.getText(this.#current);
         this.#advance();
         return this.#push(
           NodeType.EVENT,
+          // or the event id
           this.#target.events.push(value) - 1,
-          key,
-          duration,
         );
       }
       default:
@@ -286,16 +298,30 @@ export class Parser {
     }
   }
 
+  #copy(index: number): number {
+    return this.#push(
+      this.#target.nodes.types[index],
+      this.#target.nodes.ids[index],
+    );
+  }
+
+  #resolve(mark: string): number {
+    for (let i = this.#bindings.marks.length - 1; i >= 0; i--) {
+      if (this.#bindings.marks[i] === mark) {
+        return this.#bindings.indices[i];
+      }
+    }
+    throw this.#error(`Could not resolve '${mark}'`);
+  }
+
   #insert(key: number, duration: Ratio) {
     const mark = this.#mark();
     if (!this.#match(TokenType.IS)) {
-      return this.#target.nodes.push(this.#resolve(mark)) - 1;
+      return this.#copy(this.#resolve(mark));
     }
     const index = this.#node(key, duration);
-    this.#bindings.push({
-      mark,
-      index,
-    });
+    this.#bindings.marks.push(mark);
+    this.#bindings.indices.push(index);
     return index;
   }
 
@@ -329,9 +355,8 @@ export class Parser {
     key: number,
     duration: Ratio,
   ) {
-    const scope = this.#bindings.length;
-    const node = { type, key, duration, id: 0 };
-    const index = this.#target.nodes.push(node) - 1;
+    const scope = this.#bindings.marks.length;
+    const index = this.#push(type, 0);
     // the interleaving issue again!
     // when dealing with nested structures, a stack and a bump allocator are needed.
     try {
@@ -339,15 +364,17 @@ export class Parser {
       while (!this.#match(stop)) {
         indices.push(this.#node(key, duration));
       }
-      node.type = NodeType.multiply(type, indices.length);
-      node.id = this.#target.indices.length;
+      this.#target.nodes.types[index] = NodeType.multiply(type, indices.length);
+      // or in this case, the id of a vector...
+      this.#target.nodes.ids[index] = this.#target.indices.length;
       this.#target.indices.push(...indices);
     } catch (error) {
       this.storeError(error as Error);
       this.#panic();
     } finally {
       // bindings go out of scope
-      this.#bindings.length = scope;
+      this.#bindings.marks.length = scope;
+      this.#bindings.indices.length = scope;
     }
     return index;
   }

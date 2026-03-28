@@ -1,5 +1,6 @@
 import { Lilyponder } from "./src/lilyponder.ts";
 import { Parser } from "./src/parser3.ts";
+import { Tokens } from "./src/tokens.ts";
 import { Transformer } from "./src/transformer.ts";
 
 const sample = `key 1 "allegro" "f" _/8[
@@ -24,7 +25,7 @@ const sample = `key 1 "allegro" "f" _/8[
 ],
 { "bpm" = 140 }`;
 
-const ast = new Parser(sample).parse();
+const ast = new Parser(new Tokens(sample)).parse();
 
 // todo: voices
 const transformer = new Transformer();

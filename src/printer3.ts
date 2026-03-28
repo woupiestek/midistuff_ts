@@ -148,7 +148,7 @@ export class Printer {
   }
 
   #file(ast: AST): Doc {
-    const node = this.#node(ast.main, ast.sections, 0.25);
+    const node = this.#node(ast.main, ast.sections, {}, 0.25);
     if (Object.keys(ast.metadata).length === 0) {
       return node.doc;
     }
@@ -264,7 +264,8 @@ export class Printer {
 
   #node(
     node: Node,
-    sections: { mark: string; node: Node; duration?: number }[],
+    sections: { marks: string[]; nodes: Node[] },
+    durations: { [_: number]: number },
     currentDuration: number,
     key?: Doc,
   ): Combi {
@@ -274,19 +275,20 @@ export class Printer {
       case NodeType.EVENT:
         return { doc: this.#label(node.value), duration: 0 };
       case NodeType.INSERT: {
-        const section = sections[node.index];
-        const mark = Doc.text(section.mark);
-        if (section.duration === undefined) {
+        // const section = sections.marks[node.index];
+        const mark = Doc.text(sections.marks[node.index]);
+        if (durations[node.index] === undefined) {
           const y = this.#node(
-            section.node,
+            sections.nodes[node.index],
             sections,
+            durations,
             currentDuration,
-            Doc.text(section.mark),
+            mark,
           );
-          section.duration = y.duration;
+          durations[node.index] = y.duration;
           return y;
         }
-        return { doc: mark, duration: section.duration };
+        return { doc: mark, duration: durations[node.index] };
       }
       case NodeType.SET: {
         let duration = 0;
@@ -301,6 +303,7 @@ export class Printer {
             const { duration: d, doc } = this.#node(
               it,
               sections,
+              durations,
               node.options?.duration?.value || currentDuration,
             );
             if (d > duration) duration = d;
@@ -316,6 +319,7 @@ export class Printer {
             this.#node(
               child,
               sections,
+              durations,
               node.options?.duration?.value || currentDuration,
             )
           ),

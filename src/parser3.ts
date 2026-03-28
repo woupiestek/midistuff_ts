@@ -75,15 +75,22 @@ export type AST = {
   metadata: Dict;
   main: Node;
   sections: {
-    mark: string;
-    node: Node;
-  }[];
+    marks: string[];
+    nodes: Node[];
+  };
 };
+
+function sections() {
+  return { marks: [], nodes: [] };
+}
 
 export class Parser {
   #current = 0;
-  #sections: { mark: string; node: Node }[] = [];
-  #bindings: { mark: string; index: number }[] = [];
+  #sections: { marks: string[]; nodes: Node[] } = sections();
+  #bindings: { marks: string[]; indices: number[] } = {
+    marks: [],
+    indices: [],
+  };
   constructor(readonly tokens: Tokens) {}
 
   #done() {
@@ -107,7 +114,7 @@ export class Parser {
       main = this.#node();
     } catch (error) {
       main = Node.error(this.#current, error as Error);
-      return { metadata: {}, main, sections: [] };
+      return { metadata: {}, main, sections: sections() };
     }
     let metadata: Dict = {};
     if (this.#match(TokenType.COMMA) && this.#match(TokenType.LEFT_BRACE)) {
@@ -121,7 +128,7 @@ export class Parser {
             this.#current,
             this.#error("error parsing metadata"),
           ),
-          sections: [],
+          sections: sections(),
         };
       }
     }
@@ -129,7 +136,7 @@ export class Parser {
       return {
         metadata: {},
         main: Node.error(this.#current, this.#error("input left over")),
-        sections: [],
+        sections: sections(),
       };
     }
     return { metadata, main, sections: this.#sections };
@@ -186,8 +193,8 @@ export class Parser {
   }
 
   #resolve(mark: string): number {
-    for (let i = this.#bindings.length - 1; i >= 0; i--) {
-      if (this.#bindings[i].mark === mark) return this.#bindings[i].index;
+    for (let i = this.#bindings.marks.length - 1; i >= 0; i--) {
+      if (this.#bindings.marks[i] === mark) return this.#bindings.indices[i];
     }
     throw this.#error(`Could not resolve '${mark}'`);
   }
@@ -238,16 +245,20 @@ export class Parser {
     switch (this.#currentType()) {
       case TokenType.LEFT_BRACKET: {
         this.#advance();
-        const scope = this.#bindings.length;
+        const scope = this.#bindings.marks.length;
         const set = this.#set(NodeType.ARRAY, TokenType.RIGHT_BRACKET, options);
-        this.#bindings.length = scope; // bindings go out of scope
+        // bindings go out of scope
+        this.#bindings.marks.length = scope;
+        this.#bindings.indices.length = scope;
         return set;
       }
       case TokenType.LEFT_BRACE: {
         this.#advance();
-        const scope = this.#bindings.length;
+        const scope = this.#bindings.marks.length;
         const set = this.#set(NodeType.SET, TokenType.RIGHT_BRACE, options);
-        this.#bindings.length = scope; // bindings go out of scope
+        // bindings go out of scope
+        this.#bindings.marks.length = scope;
+        this.#bindings.indices.length = scope;
         return set;
       }
       case TokenType.INTEGER_MINUS:
@@ -285,8 +296,11 @@ export class Parser {
     if (!this.#match(TokenType.IS)) {
       return Node.insert(this.#resolve(mark));
     }
-    const index = this.#sections.push({ mark, node: this.#node() }) - 1;
-    this.#bindings.push({ mark, index });
+    const index = this.#sections.marks.length;
+    this.#sections.marks[index] = mark;
+    this.#sections.nodes[index] = this.#node();
+    this.#bindings.marks.push(mark);
+    this.#bindings.indices.push(index);
     return Node.insert(index);
   }
 

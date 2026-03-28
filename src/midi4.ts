@@ -76,24 +76,24 @@ class Transformer {
   }
 
   #node(index: number) {
-    const node = this.source.data.nodes[index];
-    switch (NodeType.base(node.type)) {
+    const id = this.source.data.nodes.ids[index];
+    const type = this.source.data.nodes.types[index];
+    switch (NodeType.base(type)) {
       case NodeType.ARRAY: {
-        const length = NodeType.length(node.type);
+        const length = NodeType.length(type);
         for (let i = 0; i < length; i++) {
-          this.#node(this.source.data.indices[node.id + i]);
+          this.#node(this.source.data.indices[id + i]);
         }
         break;
       }
       case NodeType.EVENT:
-        this.#event(node.id);
+        this.#event(id);
         break;
       case NodeType.NOTE: {
-        const tone = this.source.data.notes[node.id];
         const _pitch = pitch(
-          node.key,
-          tone.degree,
-          tone.accident,
+          this.source.data.notes.keys[id],
+          this.source.data.notes.degrees[id],
+          this.source.data.notes.accidentals[id] ?? 0,
         );
         this.target.push(
           this.#realTime(),
@@ -104,7 +104,7 @@ class Transformer {
             this.velocity,
           ],
         );
-        this.time = this.time.plus(node.duration);
+        this.time = this.time.plus(this.source.data.notes.durations[id]);
         this.target.push(
           this.#realTime(),
           [
@@ -117,7 +117,7 @@ class Transformer {
         break;
       }
       case NodeType.REST: {
-        this.time = this.time.plus(node.duration);
+        this.time = this.time.plus(this.source.data.rests[id]);
         break;
       }
       case NodeType.SET: {
@@ -125,9 +125,9 @@ class Transformer {
         const channel = this.channel;
         const velocity = this.velocity;
         let stop = start;
-        const length = NodeType.length(node.type);
+        const length = NodeType.length(type);
         for (let i = 0; i < length; i++) {
-          this.#node(this.source.data.indices[node.id + i]);
+          this.#node(this.source.data.indices[id + i]);
           if (stop.less(this.time)) {
             stop = this.time;
           }

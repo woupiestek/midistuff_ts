@@ -69,17 +69,17 @@ Deno.test(function parseMark() {
   ).parse();
   if (node.type !== NodeType.INSERT) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.index, 0);
-  assertEquals(sections.length, 1);
-  assertEquals(sections[0].mark, "$line_1");
-  const child = sections[0].node;
+  assertEquals(sections.marks.length, 1);
+  assertEquals(sections.marks[0], "$line_1");
+  const child = sections.nodes[0];
   if (child.type !== NodeType.ARRAY) fail("wrong child type");
 });
 
 Deno.test(function parseResolvedRepeat() {
   const { main: node, sections } = new Parser(new Tokens("[ C = 0 C ]"))
     .parse();
-  assertEquals(sections.length, 1);
-  assertEquals(sections[0].mark, "C");
+  assertEquals(sections.marks.length, 1);
+  assertEquals(sections.marks[0], "C");
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
@@ -139,7 +139,7 @@ Deno.test(function parseCombination() {
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
   }
-  assertEquals(sections.length, 4);
+  assertEquals(sections.marks.length, 4);
   assertEquals(node.options?.key, undefined);
   assertEquals(node.children[0], Node.event("allegro"));
   assertEquals(node.children[1], Node.event("f"));
