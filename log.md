@@ -1,5 +1,52 @@
 # Midistuff logs
 
+## 2026-03-30
+
+Review the current structure. Coming from exploring data orientation, but with
+limited experience.
+
+A linear scan of the source. Each of the composnets has it own visit method
+called on every line, though each only pick certain lines up. There is something
+to this, like interpreting a series of commands, that might just be very
+efficient.
+
+So new ideas:
+
+- SQL like tables for the file, like tags has parallel arrays of line numbers
+  and tags, and attributes the same, but with keys, values, and line numbers.
+- index over tags keys and values, to easily answer the question: on which line
+  numbers is this structure found.
+
+What could a non linear approach do for the code? It seems really easy to just
+create arrays of xml elements.
+
+Some line level parsing is missing:
+
+- nested structures in the json are related to specific lines
+- some attribute values in the end result depend on 'events' which exists on
+  earlier lines.
+- so a parent vector, where each line points to the line that determines its
+  context could help.
+
+These dependencies obviously exist:
+
+- positions -> durations
+- lyrics -> durations
+- durations -> parts
+- parts -> staves
+
+Each of these visit certain lines. So that is how the meaning of each line is
+connected to some line before it, and a typical parser would compute this tree.
+
+The map from the parent line number to the interesting value may not be
+convenient.
+
+Deep analysis:
+
+-> sometimes we need to get from the child to a parent element to quickly get
+data. -> sometimes it might be a sibling that holds the key -> a table doesn't
+necessarily make any of these easy.
+
 ## 2026-03-29
 
 Crazy idea maybe, but take data orientation up a level by using more inversions

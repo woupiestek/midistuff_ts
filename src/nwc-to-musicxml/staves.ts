@@ -37,7 +37,7 @@ export class Staves {
             1;
         }
         break;
-
+      // is this related to staves?
       case "SongInfo":
         for (const [k, v] of Object.entries(line.values)) {
           this.#songInfo.set(k, v[0]);
@@ -127,6 +127,7 @@ export class Staves {
     return create(
       "score-partwise",
       { version: "4.0" },
+      // not really!
       ...songInfo,
       create("part-list", undefined, ...scoreParts),
       ...parts,
