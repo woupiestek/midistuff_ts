@@ -1,7 +1,6 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { Durations, PER_WHOLE } from "./durations.ts";
-import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml.ts";
+import { Elements, MusicXML } from "./musicxml.ts";
 import { Positions } from "./positions.ts";
 import { NWCLine } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
@@ -100,7 +99,7 @@ export class Bars {
     to: number,
     durations: Durations,
     positions: Positions,
-    lyrics: Lyrics,
+    elements: Elements,
     xml: MusicXML,
   ) {
     const offsets = this.#staves.slice(from, to);
@@ -129,14 +128,16 @@ export class Bars {
           break;
         }
       }
-
       const nested = offsets.map((offset, k) =>
         durations.notes(
+          // which measure index
           i + offset,
+          // which voice
           (k + 1).toString(),
+          // on which musicxml staff
           xml.staff(staves[k]),
           positions,
-          lyrics,
+          elements,
           xml,
         )
       ).filter((it) => it.length);

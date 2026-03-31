@@ -104,33 +104,51 @@ export class Positions {
   }
 
   // a group is a set of simultaneous notes of equal duration
+  // this may be asking for a reversal, like
+  // give the parent element, and let me add the children...
   notes(group: number): number[] {
     const from = group && this.#groups[group - 1];
     const to = this.#groups[group];
     return Array.from({ length: to - from }, (_, i) => i + from);
   }
 
-  pitch(note: number, xml: MusicXML): Element {
-    return xml.pitch(this.#tones[note], this.#alters[note]);
+  pitches(xml: MusicXML): Element[] {
+    return this.#tones.map((t, i) => xml.pitch(t, this.#alters[i]));
   }
 
-  ties(note: number): ({ type: "start" | "stop"; number: string })[] {
-    const ties: ({ type: "start" | "stop"; number: string })[] = [];
-    const stopTie = this.#stopTie.get(note);
-    if (stopTie) {
-      ties.push({ type: "stop", number: stopTie.toString() });
-    }
-    const startTie = this.#startTie.get(note);
-    if (startTie) {
-      ties.push({ type: "start", number: startTie.toString() });
-    }
-    return ties;
+  ties(xml: MusicXML): {
+    stopTies: Map<number, Element>;
+    startTies: Map<number, Element>;
+    stopTieds: Map<number, Element>;
+    startTieds: Map<number, Element>;
+  } {
+    const startTieds: Map<number, Element> = new Map();
+    const startTies: Map<number, Element> = new Map();
+    const stopTieds: Map<number, Element> = new Map();
+    const stopTies: Map<number, Element> = new Map();
+    this.#startTie.entries().forEach(([note, number]) => {
+      startTies.set(note, xml.tie.start);
+      startTieds.set(
+        note,
+        xml.tied({ type: "start", number: number.toString() }),
+      );
+    });
+    this.#stopTie.entries().forEach(([note, number]) => {
+      stopTies.set(note, xml.tie.stop);
+      stopTieds.set(
+        note,
+        xml.tied({ type: "stop", number: number.toString() }),
+      );
+    });
+    return { startTieds, startTies, stopTieds, stopTies };
   }
 
-  accidental(note: number, xml: MusicXML): Element | null {
-    const alter = this.#altered.get(note);
-    if (!alter) return null;
-    return xml.accidental(alter);
+  accidentals(xml: MusicXML): Map<number, Element> {
+    return new Map(
+      this.#altered.entries().map((
+        [note, alter],
+      ) => [note, xml.accidental(alter)]),
+    );
   }
 
   backup(group: number): boolean {

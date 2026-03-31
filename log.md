@@ -1,5 +1,44 @@
 # Midistuff logs
 
+## 2026-03-31
+
+Everywhere, the current converter tries to keep track of relations from parent
+to children. So on teh seocnd round, this could be reversed. Dumb? Clearly,
+slices of an overal array of items workd fine, right?
+
+### result
+
+Yet a different way of thinking. Dense elements in arrays, sparse in maps.
+Element generation could be optimized this way.
+
+This is all happening on the synthesis side: instead of generating every type of
+element peicemeal, they are now batched.
+
+My trouble now is a difference between a 'part' and a 'staff': Noteworthy has a
+format with overlapping or connected staffs for polyphonic parts, which is
+different from what musixml does.
+
+### strange pathways
+
+What to pass up some table: {offsets:[],staves:[],voices:[]} because every part
+can conain multiple staffs, which can contain multiple voices, and each note
+must be able to say on which staff it belongs, and to which voice. Do generate
+the subdivision of nwc staffs the offsets just tell the start of every range for
+each voice. Although that is not entirely true, since an nwc-staff can have two
+voices.
+
+Voices and staffs are probably independent in muscxml, to let voice cross
+staves. This is not true in noteworthy. So what then?
+
+It is like a clock that has to tick over: when we increment the measure beyond a
+threshold, the voice can change when we increment the voice beyond a threshold,
+the staff can change when we increment the staff beyond a threshold, the part
+can change
+
+Voice is just a string and could just be the position of the staff in the nwc
+file, I don't think musicxml allows this for staves, so each voice needs a
+specific staff id, and an offset into the array of bars.
+
 ## 2026-03-30
 
 Review the current structure. Coming from exploring data orientation, but with
@@ -32,7 +71,8 @@ These dependencies obviously exist:
 
 - positions -> durations
 - lyrics -> durations
-- durations -> parts
+- durations -> bars
+- bars -> staves
 - parts -> staves
 
 Each of these visit certain lines. So that is how the meaning of each line is

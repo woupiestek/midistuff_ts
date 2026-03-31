@@ -51,7 +51,13 @@ export class Transformer {
         this.#bars,
         this.#durations,
         this.#positions,
-        this.#lyrics,
+        // the new way?
+        {
+          accidentals: this.#positions.accidentals(xml),
+          pitches: this.#positions.pitches(xml),
+          lyrics: this.#lyrics.get(),
+          ...this.#positions.ties(xml),
+        },
         xml,
       ),
     );

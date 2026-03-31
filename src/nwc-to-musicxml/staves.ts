@@ -1,6 +1,5 @@
 import { create, Element } from "./xml.ts";
-import { MusicXML } from "./musicxml.ts";
-import { Lyrics } from "./lyrics.ts";
+import { Elements, MusicXML } from "./musicxml.ts";
 import { Positions } from "./positions.ts";
 import { Durations } from "./durations.ts";
 import { NWCLine } from "./scanner.ts";
@@ -53,7 +52,7 @@ export class Staves {
     bars: Bars,
     durations: Durations,
     positions: Positions,
-    lyrics: Lyrics,
+    elements: Elements,
     xml: MusicXML,
   ): Element {
     const scoreParts = [];
@@ -91,7 +90,7 @@ export class Staves {
         create(
           "part",
           attributes,
-          ...bars.multiple(from, to, durations, positions, lyrics, xml),
+          ...bars.multiple(from, to, durations, positions, elements, xml),
         ),
       );
     }

@@ -1,5 +1,5 @@
 import { NWCLine } from "./scanner.ts";
-import { create } from "./xml.ts";
+import { create, Element } from "./xml.ts";
 
 export class Lyrics {
   #syllables: string[][] = Array.from({ length: 8 }, () => []);
@@ -113,20 +113,23 @@ export class Lyrics {
     }
   }
 
-  get(noteNumber: number) {
-    const lyrics = [];
-    for (let i = 0; i < 8; i++) {
-      const text = this.#lyrics[i].get(noteNumber);
-      const syllabic = this.#syllabilities[i].get(noteNumber);
-      if (!text || !syllabic) continue;
-      lyrics.push(
-        create(
-          "lyric",
-          { number: (i + 1).toString() },
-          create("syllabic", undefined, syllabic),
-          create("text", undefined, text),
-        ),
-      );
+  get() {
+    const lyrics: Element[][] = [];
+    for (let noteNumber = 0; noteNumber < this.#noteNumber; noteNumber++) {
+      lyrics[noteNumber] = [];
+      for (let i = 0; i < 8; i++) {
+        const text = this.#lyrics[i].get(noteNumber);
+        const syllabic = this.#syllabilities[i].get(noteNumber);
+        if (!text || !syllabic) continue;
+        lyrics[noteNumber].push(
+          create(
+            "lyric",
+            { number: (i + 1).toString() },
+            create("syllabic", undefined, syllabic),
+            create("text", undefined, text),
+          ),
+        );
+      }
     }
     return lyrics;
   }

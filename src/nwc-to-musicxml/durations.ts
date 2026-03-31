@@ -1,8 +1,7 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { create, Element } from "./xml.ts";
 import { Positions } from "./positions.ts";
-import { Lyrics } from "./lyrics.ts";
-import { MusicXML } from "./musicxml.ts";
+import { Elements, MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
 
 export const PER_WHOLE = 768;
@@ -234,7 +233,7 @@ export class Durations {
     voice: string,
     staff: Element,
     positions: Positions,
-    lyrics: Lyrics,
+    elements: Elements,
     xml: MusicXML,
   ): (Element | null)[] {
     const result: (Element | null)[] = [];
@@ -275,22 +274,23 @@ export class Durations {
         const stem = sv ? xml.stem(sv) : null;
         for (let j = 0; j < notes.length; j++) {
           const note = notes[j];
-          const ties = positions.ties(note);
           const notations = [
             ...notationContent,
-            ...ties.map((it) => xml.tied(it)),
+            elements.stopTieds.get(note) ?? null,
+            elements.startTieds.get(note) ?? null,
           ];
           result.push(
             xml.note(
               grace,
               j ? xml.chord : null, // no chord element in the first note
-              positions.pitch(note, xml),
+              elements.pitches[note],
               duration,
-              ...ties.map((it) => xml.tie[it.type]),
+              elements.startTies.get(note) ?? null,
+              elements.stopTies.get(note) ?? null,
               _voice,
               type,
               ...dots,
-              positions.accidental(note, xml),
+              elements.accidentals.get(note) ?? null,
               timeMod,
               stem,
               staff,
@@ -301,7 +301,7 @@ export class Durations {
                   ...notations,
                 )
                 : null,
-              ...lyrics.get(note),
+              ...elements.lyrics[note],
             ),
           );
         }

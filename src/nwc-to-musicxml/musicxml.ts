@@ -3,6 +3,16 @@ import { create, Element } from "./xml.ts";
 const HEADER =
   '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
 
+export type Elements = {
+  pitches: Element[];
+  accidentals: Map<number, Element>;
+  stopTies: Map<number, Element>;
+  startTies: Map<number, Element>;
+  stopTieds: Map<number, Element>;
+  startTieds: Map<number, Element>;
+  lyrics: Element[][];
+};
+
 export class MusicXML {
   readonly chord: Element;
   readonly rest: Element;
@@ -348,18 +358,6 @@ export class MusicXML {
       create("beat-type", undefined, d),
     );
   }
-
-  // create(
-  //   name: string,
-  //   attributes?: Record<string, string>,
-  //   ...Elements: (Element | string | null)[]
-  // ): Element {
-  //   return create(
-  //     name,
-  //     attributes,
-  //     ...Elements,
-  //   );
-  // }
 
   backup(duration: number): Element {
     return this.#cache["backup" + duration] ||= create(
