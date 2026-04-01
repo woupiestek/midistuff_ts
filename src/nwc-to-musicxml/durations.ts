@@ -228,6 +228,40 @@ export class Durations {
     assert(this.#types.length === this.#durations.length);
   }
 
+  allNotes(
+    staffOffsets: number[],
+    secondStaves: Set<number>,
+    positions: Positions,
+    elements: Elements,
+    xml: MusicXML,
+  ): (Element | null)[][] {
+    const staff1 = create("staff", undefined, "1");
+    const staff2 = create("staff", undefined, "2");
+    let staff = 1;
+    const result: (Element | null)[][] = [];
+    let result2: (Element | null)[] = [];
+    for (let i = 0, l = this.#durations.length; i < l; i++) {
+      while (this.#measure[result.length + 1] <= i) {
+        result.push(result2);
+        result2 = [];
+      }
+      while (staffOffsets[staff] <= result.length) {
+        staff++;
+      }
+      this.#forDuration(
+        i,
+        secondStaves.has(staff - 1) ? staff2 : staff1,
+        result2,
+        xml,
+        positions,
+        staff.toString(),
+        elements,
+      );
+    }
+    assert(result.length === this.#measure.length);
+    return result;
+  }
+
   notes(
     measure: number,
     voice: string,
@@ -239,79 +273,91 @@ export class Durations {
     const result: (Element | null)[] = [];
     const to = this.#measure[measure + 1];
     for (let i = this.#measure[measure]; i < to; i++) {
-      this.#directions(i, staff, result, xml);
-      const type = xml.type(this.#types[i]);
-      const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
-      const dots = this.#doubleDotted.has(i)
-        ? [xml.dot, xml.dot]
-        : this.#dotted.has(i)
-        ? [xml.dot]
-        : [];
-      const _voice = xml.voice(
-        positions.backup(i) ? voice + "'" : voice,
+      this.#forDuration(i, staff, result, xml, positions, voice, elements);
+    }
+    return result;
+  }
+
+  #forDuration(
+    i: number,
+    staff: Element,
+    result: (Element | null)[],
+    xml: MusicXML,
+    positions: Positions,
+    voice: string,
+    elements: Elements,
+  ) {
+    this.#directions(i, staff, result, xml);
+    const type = xml.type(this.#types[i]);
+    const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
+    const dots = this.#doubleDotted.has(i)
+      ? [xml.dot, xml.dot]
+      : this.#dotted.has(i)
+      ? [xml.dot]
+      : [];
+    const _voice = xml.voice(
+      positions.backup(i) ? voice + "'" : voice,
+    );
+    const duration = xml.duration(this.#durations[i]);
+    const notes = positions.notes(i);
+    if (notes.length === 0) {
+      result.push(
+        xml.note(
+          xml.rest,
+          duration,
+          _voice,
+          type,
+          ...dots,
+          timeMod,
+          staff,
+        ),
       );
-      const duration = xml.duration(this.#durations[i]);
-      const notes = positions.notes(i);
-      if (notes.length === 0) {
+    } else {
+      const grace = this.#grace.has(i) ? create("grace") : null;
+      const notationContent: (Element | null)[] = this.#notationContent(
+        i,
+        xml,
+      );
+      const sv = this.#stems.get(i);
+      const stem = sv ? xml.stem(sv) : null;
+      for (let j = 0; j < notes.length; j++) {
+        const note = notes[j];
+        const notations = [
+          ...notationContent,
+          elements.stopTieds.get(note) ?? null,
+          elements.startTieds.get(note) ?? null,
+        ];
         result.push(
           xml.note(
-            xml.rest,
+            grace,
+            j ? xml.chord : null, // no chord element in the first note
+            elements.pitches[note],
             duration,
+            elements.startTieds.has(note) ? xml.tie.start : null,
+            elements.stopTieds.has(note) ? xml.tie.stop : null,
             _voice,
             type,
             ...dots,
+            elements.accidentals.get(note) ?? null,
             timeMod,
+            stem,
             staff,
+            notations.length > 0
+              ? create(
+                "notations",
+                undefined,
+                ...notations,
+              )
+              : null,
+            ...elements.lyrics[note],
           ),
         );
-      } else {
-        const grace = this.#grace.has(i) ? create("grace") : null;
-        const notationContent: (Element | null)[] = this.#notationContent(
-          i,
-          xml,
-        );
-        const sv = this.#stems.get(i);
-        const stem = sv ? xml.stem(sv) : null;
-        for (let j = 0; j < notes.length; j++) {
-          const note = notes[j];
-          const notations = [
-            ...notationContent,
-            elements.stopTieds.get(note) ?? null,
-            elements.startTieds.get(note) ?? null,
-          ];
-          result.push(
-            xml.note(
-              grace,
-              j ? xml.chord : null, // no chord element in the first note
-              elements.pitches[note],
-              duration,
-              elements.startTies.get(note) ?? null,
-              elements.stopTies.get(note) ?? null,
-              _voice,
-              type,
-              ...dots,
-              elements.accidentals.get(note) ?? null,
-              timeMod,
-              stem,
-              staff,
-              notations.length > 0
-                ? create(
-                  "notations",
-                  undefined,
-                  ...notations,
-                )
-                : null,
-              ...elements.lyrics[note],
-            ),
-          );
-        }
-      }
-      if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain(staff));
-      if (positions.backup(i)) {
-        result.push(xml.backup(this.#durations[i]));
       }
     }
-    return result;
+    if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain(staff));
+    if (positions.backup(i)) {
+      result.push(xml.backup(this.#durations[i]));
+    }
   }
 
   #notationContent(i: number, xml: MusicXML) {

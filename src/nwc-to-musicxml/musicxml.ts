@@ -6,8 +6,6 @@ const HEADER =
 export type Elements = {
   pitches: Element[];
   accidentals: Map<number, Element>;
-  stopTies: Map<number, Element>;
-  startTies: Map<number, Element>;
   stopTieds: Map<number, Element>;
   startTieds: Map<number, Element>;
   lyrics: Element[][];

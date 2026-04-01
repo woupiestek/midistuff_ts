@@ -17,8 +17,6 @@ export class Bars {
   #clefOctaveChanges: Map<number, number> = new Map();
   #keys: Map<number, number> = new Map();
 
-  #layered: Set<number> = new Set();
-
   visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
@@ -31,10 +29,6 @@ export class Bars {
       case "StaffProperties":
         if (line.values.EndingBar) {
           this.#endingBar = line.values.EndingBar[0].replaceAll(" ", "");
-        }
-        if (new Set(line.values.WithNextStaff).has("Layer")) {
-          // technically the next staff
-          this.#layered.add(this.#staves.length);
         }
         break;
       case "Bar":
@@ -94,9 +88,11 @@ export class Bars {
     this.#barStyles.set(this.#measures, this.#endingBar);
   }
 
+  // this is here to deal with the issue that the data in a musicxml measure may be spread out in the nwc file
   multiple(
     from: number,
     to: number,
+    secondStaves: Set<number>,
     durations: Durations,
     positions: Positions,
     elements: Elements,
@@ -104,11 +100,9 @@ export class Bars {
   ) {
     const offsets = this.#staves.slice(from, to);
     const length = this.#staves[from + 1] - this.#staves[from];
-    const staves: number[] = [];
-    for (let i = from, staff = 0; i < to; i++) {
-      if (!this.#layered.has(i)) staff++;
-      staves.push(staff);
-    }
+    const staves: number[] = Array(to - from).keys().map((i) =>
+      secondStaves.has(i) ? 2 : 1
+    ).toArray();
 
     for (let j = from + 1; j < to; j++) {
       const l2 = this.#staves[j + 1] - this.#staves[j];

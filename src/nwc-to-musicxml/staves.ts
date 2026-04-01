@@ -5,28 +5,41 @@ import { Durations } from "./durations.ts";
 import { NWCLine } from "./scanner.ts";
 import { Bars } from "./bars.ts";
 
+// noteworthy can layer staffs, musicxml cannot
+// moreover, the notion of a part is different.
+// the layer property is a mystery...
+
 export class Staves {
   #parts: number[] = [];
   #names: string[] = [];
   #midiPrograms: number[] = [];
   #merge = false;
   #songInfo: Map<string, string> = new Map();
+  #onSecondStaff = false;
+  // a part may have a second staff, which must be kept track of
+  #secondStaves: Set<number> = new Set();
+
   visit(line: NWCLine): boolean {
     switch (line.tag) {
       case "AddStaff":
-        if (!this.#merge) {
-          this.#parts.push(this.#names.length);
-        } else {
+        if (this.#merge) {
           this.#merge = false;
+          if (this.#onSecondStaff) {
+            this.#secondStaves.add(this.#names.length);
+          }
+        } else {
+          this.#parts.push(this.#names.length);
+          this.#onSecondStaff = false;
         }
         this.#names.push(line.values.Name[0].slice(1, -1));
         break;
       case "StaffProperties": {
         const withNextStaff = new Set(line.values.WithNextStaff);
-        if (
-          withNextStaff.has("Brace") || withNextStaff.has("Layer")
-        ) {
+        if (withNextStaff.has("Brace")) {
           this.#merge = true;
+          if (!withNextStaff.has("Layer")) {
+            this.#onSecondStaff = true;
+          }
         }
         break;
       }
@@ -90,7 +103,15 @@ export class Staves {
         create(
           "part",
           attributes,
-          ...bars.multiple(from, to, durations, positions, elements, xml),
+          ...bars.multiple(
+            from,
+            to,
+            this.#secondStaves,
+            durations,
+            positions,
+            elements,
+            xml,
+          ),
         ),
       );
     }

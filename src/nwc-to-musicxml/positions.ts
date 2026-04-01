@@ -117,30 +117,24 @@ export class Positions {
   }
 
   ties(xml: MusicXML): {
-    stopTies: Map<number, Element>;
-    startTies: Map<number, Element>;
     stopTieds: Map<number, Element>;
     startTieds: Map<number, Element>;
   } {
     const startTieds: Map<number, Element> = new Map();
-    const startTies: Map<number, Element> = new Map();
     const stopTieds: Map<number, Element> = new Map();
-    const stopTies: Map<number, Element> = new Map();
     this.#startTie.entries().forEach(([note, number]) => {
-      startTies.set(note, xml.tie.start);
       startTieds.set(
         note,
         xml.tied({ type: "start", number: number.toString() }),
       );
     });
     this.#stopTie.entries().forEach(([note, number]) => {
-      stopTies.set(note, xml.tie.stop);
       stopTieds.set(
         note,
         xml.tied({ type: "stop", number: number.toString() }),
       );
     });
-    return { startTieds, startTies, stopTieds, stopTies };
+    return { startTieds, stopTieds };
   }
 
   accidentals(xml: MusicXML): Map<number, Element> {
