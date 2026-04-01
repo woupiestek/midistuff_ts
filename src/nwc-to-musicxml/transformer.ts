@@ -46,18 +46,22 @@ export class Transformer {
     this.#bars.visitEnd();
     this.#durations.visitEnd();
     const xml = new MusicXML();
+    const allNotes = this.#durations.allNotes(
+      this.#bars.staves,
+      this.#staves.secondStaves,
+      this.#positions,
+      {
+        accidentals: this.#positions.accidentals(xml),
+        pitches: this.#positions.pitches(xml),
+        lyrics: this.#lyrics.get(),
+        ...this.#positions.ties(xml),
+      },
+      xml,
+    );
     return xml.stringify(
       this.#staves.parts(
         this.#bars,
-        this.#durations,
-        this.#positions,
-        // the new way?
-        {
-          accidentals: this.#positions.accidentals(xml),
-          pitches: this.#positions.pitches(xml),
-          lyrics: this.#lyrics.get(),
-          ...this.#positions.ties(xml),
-        },
+        allNotes,
         xml,
       ),
     );

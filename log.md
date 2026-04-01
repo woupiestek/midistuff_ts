@@ -1,5 +1,14 @@
 # Midistuff logs
 
+## 2026-04-01
+
+Note what this new level of data orientation forces: generte the leafs first,
+then the nodes just below the leaves etc. Interesting to consider what this
+means for generating machine code.
+
+Found a bug: to many copies of the word 'legato' in sarabande, due to
+aggregating over layered parts.
+
 ## 2026-03-31
 
 Everywhere, the current converter tries to keep track of relations from parent

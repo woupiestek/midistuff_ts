@@ -237,43 +237,34 @@ export class Durations {
   ): (Element | null)[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
+    let measure = 0;
     let staff = 1;
-    const result: (Element | null)[][] = [];
-    let result2: (Element | null)[] = [];
+    const result: (Element | null)[][] = this.#measure.map(() => []);
+    let voice = staff.toString();
+    let voice1 = create("voice", undefined, voice);
+    let voice2 = create("voice", undefined, voice + "'");
     for (let i = 0, l = this.#durations.length; i < l; i++) {
-      while (this.#measure[result.length + 1] <= i) {
-        result.push(result2);
-        result2 = [];
+      while (this.#measure[measure + 1] <= i) {
+        measure++;
       }
-      while (staffOffsets[staff] <= result.length) {
+      while (staffOffsets[staff] <= measure) {
         staff++;
+        voice = staff.toString();
+        voice1 = create("voice", undefined, voice);
+        voice2 = create("voice", undefined, voice + "'");
       }
       this.#forDuration(
         i,
         secondStaves.has(staff - 1) ? staff2 : staff1,
-        result2,
+        result[measure],
         xml,
-        positions,
-        staff.toString(),
+        positions.notes(i),
+        positions.backup.has(i) ? voice2 : voice1,
         elements,
       );
-    }
-    assert(result.length === this.#measure.length);
-    return result;
-  }
-
-  notes(
-    measure: number,
-    voice: string,
-    staff: Element,
-    positions: Positions,
-    elements: Elements,
-    xml: MusicXML,
-  ): (Element | null)[] {
-    const result: (Element | null)[] = [];
-    const to = this.#measure[measure + 1];
-    for (let i = this.#measure[measure]; i < to; i++) {
-      this.#forDuration(i, staff, result, xml, positions, voice, elements);
+      if (positions.backup.has(i)) {
+        result[measure].push(xml.backup(this.#durations[i]));
+      }
     }
     return result;
   }
@@ -283,8 +274,8 @@ export class Durations {
     staff: Element,
     result: (Element | null)[],
     xml: MusicXML,
-    positions: Positions,
-    voice: string,
+    notes: number[],
+    voice: Element,
     elements: Elements,
   ) {
     this.#directions(i, staff, result, xml);
@@ -295,17 +286,13 @@ export class Durations {
       : this.#dotted.has(i)
       ? [xml.dot]
       : [];
-    const _voice = xml.voice(
-      positions.backup(i) ? voice + "'" : voice,
-    );
     const duration = xml.duration(this.#durations[i]);
-    const notes = positions.notes(i);
     if (notes.length === 0) {
       result.push(
         xml.note(
           xml.rest,
           duration,
-          _voice,
+          voice,
           type,
           ...dots,
           timeMod,
@@ -335,7 +322,7 @@ export class Durations {
             duration,
             elements.startTieds.has(note) ? xml.tie.start : null,
             elements.stopTieds.has(note) ? xml.tie.stop : null,
-            _voice,
+            voice,
             type,
             ...dots,
             elements.accidentals.get(note) ?? null,
@@ -355,9 +342,6 @@ export class Durations {
       }
     }
     if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain(staff));
-    if (positions.backup(i)) {
-      result.push(xml.backup(this.#durations[i]));
-    }
   }
 
   #notationContent(i: number, xml: MusicXML) {

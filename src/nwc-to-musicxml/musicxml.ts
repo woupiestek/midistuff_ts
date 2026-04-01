@@ -223,14 +223,6 @@ export class MusicXML {
     );
   }
 
-  voice(name: string): Element {
-    return this.#cache["voice" + name] ||= create(
-      "voice",
-      undefined,
-      name,
-    );
-  }
-
   direction(type: Element, staff: Element) {
     return create(
       "direction",

@@ -20,7 +20,7 @@ export class Positions {
   #tone = 34;
   #signature = [...N7];
   #altersByTone = [...N7];
-  #backup: Set<number> = new Set();
+  backup: Set<number> = new Set();
 
   visit(line: NWCLine): boolean {
     switch (line.tag) {
@@ -59,7 +59,7 @@ export class Positions {
       case "RestChord":
         if (line.values.Pos2) {
           for (const pos of line.values.Pos2) this.#pitch(pos);
-          this.#backup.add(this.#groups.length);
+          this.backup.add(this.#groups.length);
           this.#groups.push(this.#tones.length);
         }
         if (line.values.Pos) {
@@ -143,9 +143,5 @@ export class Positions {
         [note, alter],
       ) => [note, xml.accidental(alter)]),
     );
-  }
-
-  backup(group: number): boolean {
-    return this.#backup.has(group);
   }
 }

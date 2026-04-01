@@ -1,7 +1,5 @@
 import { create, Element } from "./xml.ts";
-import { Elements, MusicXML } from "./musicxml.ts";
-import { Positions } from "./positions.ts";
-import { Durations } from "./durations.ts";
+import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
 import { Bars } from "./bars.ts";
 
@@ -17,7 +15,7 @@ export class Staves {
   #songInfo: Map<string, string> = new Map();
   #onSecondStaff = false;
   // a part may have a second staff, which must be kept track of
-  #secondStaves: Set<number> = new Set();
+  secondStaves: Set<number> = new Set();
 
   visit(line: NWCLine): boolean {
     switch (line.tag) {
@@ -25,7 +23,7 @@ export class Staves {
         if (this.#merge) {
           this.#merge = false;
           if (this.#onSecondStaff) {
-            this.#secondStaves.add(this.#names.length);
+            this.secondStaves.add(this.#names.length);
           }
         } else {
           this.#parts.push(this.#names.length);
@@ -63,9 +61,7 @@ export class Staves {
 
   parts(
     bars: Bars,
-    durations: Durations,
-    positions: Positions,
-    elements: Elements,
+    allNotes: (Element | null)[][],
     xml: MusicXML,
   ): Element {
     const scoreParts = [];
@@ -106,10 +102,8 @@ export class Staves {
           ...bars.multiple(
             from,
             to,
-            this.#secondStaves,
-            durations,
-            positions,
-            elements,
+            this.secondStaves,
+            allNotes,
             xml,
           ),
         ),

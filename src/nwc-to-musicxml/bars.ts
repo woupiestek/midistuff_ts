@@ -1,12 +1,11 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
-import { Durations, PER_WHOLE } from "./durations.ts";
-import { Elements, MusicXML } from "./musicxml.ts";
-import { Positions } from "./positions.ts";
+import { PER_WHOLE } from "./durations.ts";
+import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 export class Bars {
-  #staves: number[] = [];
+  staves: number[] = [];
   #measures = -1;
   #barStyles: Map<number, string> = new Map();
   #endings: Map<number, string[]> = new Map();
@@ -21,7 +20,7 @@ export class Bars {
     switch (line.tag) {
       case "AddStaff":
         this.#measures++;
-        this.#staves.push(this.#measures);
+        this.staves.push(this.#measures);
         if (this.#measures > 1) {
           this.#barStyles.set(this.#measures, this.#endingBar);
         }
@@ -84,7 +83,7 @@ export class Bars {
 
   visitEnd() {
     this.#measures++;
-    this.#staves.push(this.#measures);
+    this.staves.push(this.#measures);
     this.#barStyles.set(this.#measures, this.#endingBar);
   }
 
@@ -93,19 +92,17 @@ export class Bars {
     from: number,
     to: number,
     secondStaves: Set<number>,
-    durations: Durations,
-    positions: Positions,
-    elements: Elements,
+    allNotes: (Element | null)[][],
     xml: MusicXML,
   ) {
-    const offsets = this.#staves.slice(from, to);
-    const length = this.#staves[from + 1] - this.#staves[from];
+    const offsets = this.staves.slice(from, to);
+    const length = this.staves[from + 1] - this.staves[from];
     const staves: number[] = Array(to - from).keys().map((i) =>
       secondStaves.has(i) ? 2 : 1
     ).toArray();
 
     for (let j = from + 1; j < to; j++) {
-      const l2 = this.#staves[j + 1] - this.#staves[j];
+      const l2 = this.staves[j + 1] - this.staves[j];
       assert(
         length === l2,
         `combined staves must have the same length ${length} !== ${l2}`,
@@ -122,19 +119,9 @@ export class Bars {
           break;
         }
       }
-      const nested = offsets.map((offset, k) =>
-        durations.notes(
-          // which measure index
-          i + offset,
-          // which voice
-          (k + 1).toString(),
-          // on which musicxml staff
-          xml.staff(staves[k]),
-          positions,
-          elements,
-          xml,
-        )
-      ).filter((it) => it.length);
+      const nested = offsets.map((offset) => allNotes[i + offset]).filter((
+        it,
+      ) => it.length);
       if (!nested.length) continue;
       measure++;
       nested.forEach((it) => it.push(backup));
