@@ -1,4 +1,3 @@
-import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { PER_WHOLE } from "./durations.ts";
 import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
@@ -89,115 +88,149 @@ export class Bars {
 
   // this is here to deal with the issue that the data in a musicxml measure may be spread out in the nwc file
   multiple(
-    from: number,
-    to: number,
+    parts: number[],
     secondStaves: Set<number>,
     allNotes: (Element | null)[][],
     xml: MusicXML,
-  ) {
-    const offsets = this.staves.slice(from, to);
-    const length = this.staves[from + 1] - this.staves[from];
-    const staves: number[] = Array(to - from).keys().map((i) =>
-      secondStaves.has(i) ? 2 : 1
-    ).toArray();
+  ): Element[][] {
+    const allAttributes = this.#allAttributes(parts, secondStaves, xml);
 
-    for (let j = from + 1; j < to; j++) {
-      const l2 = this.staves[j + 1] - this.staves[j];
-      assert(
-        length === l2,
-        `combined staves must have the same length ${length} !== ${l2}`,
-      );
-    }
-    let backup = xml.backup(PER_WHOLE);
-    const result: Element[] = [];
-    for (let i = 0, measure = 0; i < length; i++) {
-      for (const j of offsets) {
-        const time = this.#times.get(i + j);
-        if (time) {
-          const [n, d] = time.split("/");
-          backup = xml.backup(PER_WHOLE * +n / +d);
-          break;
+    // notes per part per measure
+    const groupedNotes: Element[][][] = parts.map(() => []);
+    const endings: Map<number, string[]>[] = [];
+    const leftBarstyles: Map<number, string>[] = [];
+    const rightBarstyles: Map<number, string>[] = [];
+    // only keep measures with notes in the end
+    // soemthing that noteworthy does.
+    const keep = new Set<number>();
+
+    for (let part = 0; part < parts.length - 1; part++) {
+      const gns: Element[][] = [];
+      const es = new Map<number, string[]>();
+      const lbss = new Map<number, string>();
+      const rbss = new Map<number, string>();
+      for (let staff = parts[part]; staff < parts[part + 1]; staff++) {
+        let backup = xml.backup(PER_WHOLE);
+        for (
+          let measure = this.staves[staff];
+          measure < this.staves[staff + 1];
+          measure++
+        ) {
+          const time = this.#times.get(measure);
+          if (time) {
+            const [n, d] = time.split("/");
+            backup = xml.backup(PER_WHOLE * +n / +d);
+            // break;
+          }
+          const m = measure - this.staves[staff];
+          gns[m] ||= [];
+          const notesM: Element[] = allNotes[measure].filter((it) =>
+            it !== null
+          );
+          if (notesM.length) {
+            gns[m].push(...notesM, backup);
+            keep.add(m);
+          }
+
+          const ending = this.#endings.get(measure);
+          if (ending) {
+            es.set(m, ending);
+          }
+          const leftBarstyle = this.#barStyles.get(measure);
+          if (leftBarstyle) {
+            lbss.set(m, leftBarstyle);
+          }
+          const rightBarstyle = this.#barStyles.get(measure + 1);
+          if (rightBarstyle) {
+            rbss.set(m, rightBarstyle);
+          }
         }
       }
-      const nested = offsets.map((offset) => allNotes[i + offset]).filter((
-        it,
-      ) => it.length);
-      if (!nested.length) continue;
-      measure++;
-      nested.forEach((it) => it.push(backup));
-      const notes = nested.flat();
-      notes.pop();
 
-      let endings, leftBarstyle, rightBarstyle;
-      for (const j of offsets) {
-        endings ||= this.#endings.get(i + j);
-        leftBarstyle ||= this.#barStyles.get(i + j);
-        rightBarstyle ||= this.#barStyles.get(i + j + 1);
-        if (endings && leftBarstyle && rightBarstyle) break;
+      gns.forEach((measure) => measure.pop());
+      groupedNotes[part] = gns;
+      endings[part] = es;
+      leftBarstyles[part] = lbss;
+      rightBarstyles[part] = rbss;
+    }
+
+    const result: Element[][] = [];
+    for (let part = 0; part < parts.length - 1; part++) {
+      result[part] = [];
+      for (let measure = 0; measure < groupedNotes[part].length; measure++) {
+        if (!keep.has(measure)) continue;
+        result[part].push(
+          create(
+            "measure",
+            { number: measure.toString() },
+            xml.leftBarline(
+              leftBarstyles[part].get(measure),
+              endings[part].get(measure),
+            ),
+            allAttributes[part].get(measure) ?? null,
+            ...groupedNotes[part][measure],
+            xml.rightBarline(
+              rightBarstyles[part].get(measure),
+              endings[part].get(measure),
+            ),
+          ),
+        );
       }
-      result.push(
-        create(
-          "measure",
-          { number: measure.toString() },
-          xml.leftBarline(
-            leftBarstyle,
-            endings,
-          ),
-          this.#attributes(xml, i, offsets, staves),
-          ...notes,
-          xml.rightBarline(
-            rightBarstyle,
-            endings,
-          ),
-        ),
-      );
     }
     return result;
   }
 
-  #attributes(xml: MusicXML, i: number, offsets: number[], staves: number[]) {
-    const content: (Element)[] = [];
-    if (i === 0) {
-      content.push(
-        create(
-          "divisions",
-          undefined,
-          (PER_WHOLE / 4).toString(),
-        ),
-      );
-    }
-
-    let key, time;
-    const clefs = new Map();
-
-    for (let k = 0, l = offsets.length; k < l; k++) {
-      const j = i + offsets[k];
-      key ||= this.#keys.get(j);
-      time ||= this.#times.get(j);
-      const clef = this.#clefs.get(j);
-      if (clef) {
-        clefs.set(
-          staves[k],
-          xml.clef(clef, this.#clefOctaveChanges.get(j) ?? 0, staves[k]),
-        );
+  #allAttributes(
+    parts: number[],
+    secondStaves: Set<number>,
+    xml: MusicXML,
+  ): Map<number, Element>[] {
+    // part, measure, cumulative array of attributes
+    const result: Map<number, Element>[] = parts.map(() => new Map());
+    const twoStaves = create(
+      "staves",
+      undefined,
+      "2",
+    );
+    const divisions = create(
+      "divisions",
+      undefined,
+      (PER_WHOLE / 4).toString(),
+    );
+    for (let part = 0; part < parts.length - 1; part++) {
+      for (let j = parts[part]; j < parts[part + 1]; j++) {
+        // secondStaves.has(j)
+        const staff = secondStaves.has(j) ? 2 : 1;
+        for (let k = this.staves[j]; k < this.staves[j + 1]; k++) {
+          const measure = k - this.staves[j];
+          // take note
+          const attrs: Element[] = [];
+          if (measure === 0) attrs.push(divisions);
+          const key = this.#keys.get(k);
+          if (key !== undefined) attrs.push(xml.key(key));
+          const time = this.#times.get(k);
+          if (time) {
+            const [beats, beatType] = time.split("/");
+            attrs.push(xml.time(beats, beatType));
+          }
+          const clef = this.#clefs.get(k);
+          if (clef) {
+            attrs.push(
+              xml.clef(clef, this.#clefOctaveChanges.get(k) ?? 0, staff),
+            );
+          }
+          if (staff === 2) {
+            attrs.push(twoStaves);
+          }
+          if (attrs.length) {
+            result[part].set(
+              measure,
+              create("attributes", undefined, ...attrs),
+            );
+          }
+        }
       }
     }
-    if (key !== undefined) content.push(xml.key(key));
-    if (time) {
-      const [beats, beatType] = time.split("/");
-      content.push(xml.time(beats, beatType));
-    }
-    if (offsets.length > 1) {
-      content.push(
-        create(
-          "staves",
-          undefined,
-          staves[staves.length - 1].toString(),
-        ),
-      );
-    }
-    content.push(...clefs.values());
-    if (content.length === 0) return null;
-    return create("attributes", undefined, ...content);
+    return result;
   }
 }

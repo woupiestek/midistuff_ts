@@ -79,7 +79,7 @@ export class Positions {
   // track explicit accidentals
   #altered: Map<number, string> = new Map();
 
-  // this is what musicians must do in their heads while reading sheet music
+  // this is what musicians must do in their heads while reading sheet music?
   #pitch(pos: string) {
     const altered = ALTSTR.includes(pos[0]);
     const startTie = pos[pos.length - 1] === "^";

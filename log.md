@@ -1,5 +1,27 @@
 # Midistuff logs
 
+## 2026-04-02
+
+Bars survived a huge refactor.
+
+- It is easier to just create a for loop over all measures and get the data back
+  out of the maps, then it is to go through the maps and modify them to fit the
+  measure.
+- Perhaps it would have been smarter to first create a thing to determine part,
+  staff, voice, and measure, then immediately put all data in the right place.
+- It might actually be easier to go time wise... the fact that musicxml allows
+  both suggests that it only supports cases in which all parts have the same
+  measures, or measure that have the same number of parts.
+- it is easy to imagine better cache locality due to applying operations on a
+  few arrays at the time. Of course loops are slow, but combining tasks in a
+  loop to have fewer loops overal is not necessarily helping, due to caching
+  overhead.
+- the pattern is indeed: first generate leaf elements in the xml, then those in
+  the layer below it, then those below those, etc.
+
+I think the code is simpler despite the multiplying loops, because of simpler
+dependencies, arrays and collections being passed around instead of functions.
+
 ## 2026-04-01
 
 Note what this new level of data orientation forces: generte the leafs first,
@@ -8,6 +30,17 @@ means for generating machine code.
 
 Found a bug: to many copies of the word 'legato' in sarabande, due to
 aggregating over layered parts.
+
+### next refactor
+
+There is a big reorg of data, because
+
+1. musicxml doesn't have layered staffs.
+2. muscixml parts can contain multiple staffs.
+
+it feels like it would be good to take the data structures that are now indexed
+by 'measure' and merge them--adding staff and voice ids as needed--before
+generating the end results.
 
 ## 2026-03-31
 

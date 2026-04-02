@@ -215,14 +215,6 @@ export class MusicXML {
     );
   }
 
-  staff(number: number): Element {
-    return this.#cache["staff" + number] ||= create(
-      "staff",
-      undefined,
-      number.toString(),
-    );
-  }
-
   direction(type: Element, staff: Element) {
     return create(
       "direction",

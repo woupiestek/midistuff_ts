@@ -1,21 +1,19 @@
 import { create, Element } from "./xml.ts";
-import { MusicXML } from "./musicxml.ts";
 import { NWCLine } from "./scanner.ts";
-import { Bars } from "./bars.ts";
 
 // noteworthy can layer staffs, musicxml cannot
 // moreover, the notion of a part is different.
 // the layer property is a mystery...
 
 export class Staves {
-  #parts: number[] = [];
+  parts: number[] = [];
   #names: string[] = [];
   #midiPrograms: number[] = [];
   #merge = false;
   #songInfo: Map<string, string> = new Map();
   #onSecondStaff = false;
   // a part may have a second staff, which must be kept track of
-  secondStaves: Set<number> = new Set();
+  seconds: Set<number> = new Set();
 
   visit(line: NWCLine): boolean {
     switch (line.tag) {
@@ -23,10 +21,10 @@ export class Staves {
         if (this.#merge) {
           this.#merge = false;
           if (this.#onSecondStaff) {
-            this.secondStaves.add(this.#names.length);
+            this.seconds.add(this.#names.length);
           }
         } else {
-          this.#parts.push(this.#names.length);
+          this.parts.push(this.#names.length);
           this.#onSecondStaff = false;
         }
         this.#names.push(line.values.Name[0].slice(1, -1));
@@ -59,17 +57,19 @@ export class Staves {
     return true;
   }
 
-  parts(
-    bars: Bars,
-    allNotes: (Element | null)[][],
-    xml: MusicXML,
+  visitEnd() {
+    this.parts.push(this.#names.length);
+  }
+
+  allParts(
+    allMeasures: Element[][],
   ): Element {
     const scoreParts = [];
     const parts = [];
-    for (let id = 1; id <= this.#parts.length; id++) {
+    for (let id = 1; id < this.parts.length; id++) {
       const attributes = { id: `P${id}` };
-      const from = this.#parts[id - 1];
-      const to = this.#parts[id] ?? this.#names.length;
+      const from = this.parts[id - 1];
+      const to = this.parts[id];
       const program = this.#midiPrograms.slice(from, to).find((it) =>
         it !== undefined
       );
@@ -95,17 +95,12 @@ export class Staves {
             : null,
         ),
       );
+
       parts.push(
         create(
           "part",
           attributes,
-          ...bars.multiple(
-            from,
-            to,
-            this.secondStaves,
-            allNotes,
-            xml,
-          ),
+          ...allMeasures[id - 1],
         ),
       );
     }

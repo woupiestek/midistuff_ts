@@ -43,12 +43,13 @@ export class Transformer {
         console.warn("Unused line", line);
       }
     }
+    this.#staves.visitEnd();
     this.#bars.visitEnd();
     this.#durations.visitEnd();
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(
       this.#bars.staves,
-      this.#staves.secondStaves,
+      this.#staves.seconds,
       this.#positions,
       {
         accidentals: this.#positions.accidentals(xml),
@@ -58,12 +59,12 @@ export class Transformer {
       },
       xml,
     );
-    return xml.stringify(
-      this.#staves.parts(
-        this.#bars,
-        allNotes,
-        xml,
-      ),
+    const allMeasures = this.#bars.multiple(
+      this.#staves.parts,
+      this.#staves.seconds,
+      allNotes,
+      xml,
     );
+    return xml.stringify(this.#staves.allParts(allMeasures));
   }
 }
