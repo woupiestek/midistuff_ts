@@ -15,10 +15,9 @@ for (const fileName of list) {
       `.\\target\\${fileName}.json`,
       JSON.stringify(scan(source), null, 2),
     );
-    const simpler = new Transformer().transform(source).toString();
     await Deno.writeTextFile(
       `.\\target\\${fileName}.xml`,
-      simpler,
+      new Transformer().transform(source),
     );
   } catch (e) {
     console.error("Something went wrong", e);

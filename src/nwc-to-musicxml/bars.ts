@@ -157,14 +157,21 @@ export class Bars {
     }
 
     const result: Element[][] = [];
+
     for (let part = 0; part < parts.length - 1; part++) {
       result[part] = [];
-      for (let measure = 0; measure < groupedNotes[part].length; measure++) {
+
+      for (
+        let measure = 0, number = 1;
+        measure < groupedNotes[part].length;
+        measure++
+      ) {
         if (!keep.has(measure)) continue;
+        number++;
         result[part].push(
           create(
             "measure",
-            { number: measure.toString() },
+            { number: number.toString() },
             xml.leftBarline(
               leftBarstyles[part].get(measure),
               endings[part].get(measure),

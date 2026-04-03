@@ -76,8 +76,8 @@ export class Positions {
   }
 
   #open: (string | null)[] = Array.from({ length: 68 }, () => null);
-  #startTie: Map<number, string> = new Map();
-  #stopTie: Map<number, string> = new Map();
+  #startTie: Set<number> = new Set();
+  #stopTie: Set<number> = new Set();
   // track explicit accidentals
   #altered: Map<number, string> = new Map();
 
@@ -87,10 +87,9 @@ export class Positions {
     const startTie = pos[pos.length - 1] === "^";
     const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
     const index = this.#tones.length;
+    this.#tones.push(tone);
     const stopTie = this.#open[tone];
-
-    if (stopTie) this.#stopTie.set(index, (tone % 16 + 1).toString());
-
+    if (stopTie) this.#stopTie.add(index);
     if (altered) {
       this.#altered.set(index, pos[0]);
       this.#altersByTone[tone % 7] = pos[0];
@@ -100,9 +99,8 @@ export class Positions {
 
     if (startTie) {
       this.#open[tone] = this.#alters[index];
-      this.#startTie.set(index, (tone % 16 + 1).toString());
+      this.#startTie.add(index);
     } else this.#open[tone] = null;
-    this.#tones.push(tone);
   }
 
   // a group is a set of simultaneous notes of equal duration
@@ -124,16 +122,22 @@ export class Positions {
   } {
     const startTieds: Map<number, Element> = new Map();
     const stopTieds: Map<number, Element> = new Map();
-    this.#startTie.entries().forEach(([note, number]) => {
+    this.#startTie.forEach((note) => {
       startTieds.set(
         note,
-        xml.tied({ type: "start", number: number.toString() }),
+        xml.tied({
+          type: "start",
+          number: (this.#tones[note] % 16 + 1).toString(),
+        }),
       );
     });
-    this.#stopTie.entries().forEach(([note, number]) => {
+    this.#stopTie.forEach((note) => {
       stopTieds.set(
         note,
-        xml.tied({ type: "stop", number: number.toString() }),
+        xml.tied({
+          type: "stop",
+          number: (this.#tones[note] % 16 + 1).toString(),
+        }),
       );
     });
     return { startTieds, stopTieds };

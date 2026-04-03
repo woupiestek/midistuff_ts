@@ -1,5 +1,30 @@
 # Midistuff logs
 
+## 2026-04-03
+
+I feel oddly uninspired after another big refactor.
+
+### mass coversions
+
+C:\Users\woupi\OneDrive\Documents\NoteWorthy\Wouter
+`& "C:\Program Files (x86)\Noteworthy Software\NoteWorthy Composer 2\nwc-conv.exe"`
+
+Copilot gave me this:
+
+`Get-ChildItem *.nwc | ForEach-Object { & "C:\Program Files (x86)\Noteworthy Software\NoteWorthy Composer 2\nwc-conv.exe" $_.Name NWCTXT > ($_.BaseName + ".nwctxt") }`
+
+Seems to do the trick.
+
+encoding issue?
+`Get-ChildItem *.nwctxt | ForEach-Object { $content = Get-Content $_.FullName -Encoding Unicode; Set-Content $_.FullName -Value $content -Encoding UTF8 }`
+
+Solved
+
+So a have two ways forward:
+
+1 use this to migrate to musescore 2 use this to find cases my script cannot yet
+handle
+
 ## 2026-04-02
 
 Bars survived a huge refactor.
