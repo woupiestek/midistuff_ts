@@ -1,6 +1,6 @@
 import { PER_WHOLE } from "./durations.ts";
 import { MusicXML } from "./musicxml.ts";
-import { NWCLine } from "./scanner.ts";
+import { NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 export class Bars {
@@ -15,69 +15,71 @@ export class Bars {
   #clefOctaveChanges: Map<number, number> = new Map();
   #keys: Map<number, number> = new Map();
 
-  visit(line: NWCLine): boolean {
-    switch (line.tag) {
-      case "AddStaff":
-        this.#measures++;
-        this.staves.push(this.#measures);
-        if (this.#measures > 1) {
-          this.#barStyles.set(this.#measures, this.#endingBar);
+  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+    for (let i = 0; i < tags.length; i++) {
+      switch (tags[i]) {
+        case "AddStaff":
+          this.#measures++;
+          this.staves.push(this.#measures);
+          if (this.#measures > 1) {
+            this.#barStyles.set(this.#measures, this.#endingBar);
+          }
+          break;
+        case "StaffProperties":
+          if (values[i].EndingBar) {
+            this.#endingBar = values[i].EndingBar[0].replaceAll(" ", "");
+          }
+          break;
+        case "Bar":
+          this.#measures++;
+          if (values[i].Style) {
+            this.#barStyles.set(this.#measures, values[i].Style[0]);
+          }
+          break;
+        case "Ending":
+          this.#endings.set(this.#measures, values[i].Endings);
+          break;
+        case "TimeSig":
+          switch (values[i].Signature[0]) {
+            case "Common":
+              this.#times.set(this.#measures, "4/4");
+              break;
+            case "AllaBreve":
+              this.#times.set(this.#measures, "2/2");
+              break;
+            default:
+              this.#times.set(this.#measures, values[i].Signature[0]);
+              break;
+          }
+          break;
+        case "Clef":
+          this.#clefs.set(this.#measures, values[i].Type[0]);
+          if (!values[i].OctaveShift) break;
+          switch (values[i].OctaveShift[0]) {
+            case "Octave Up":
+              this.#clefOctaveChanges.set(this.#measures, 1);
+              break;
+            case "Octave Down":
+              this.#clefOctaveChanges.set(this.#measures, -1);
+              break;
+            default:
+              break;
+          }
+          break;
+        case "Key": {
+          let fifths = 0;
+          for (const x of values[i].Signature) {
+            if (x[1] === "#") fifths++;
+            else fifths--;
+          }
+          this.#keys.set(this.#measures, fifths);
+          break;
         }
-        break;
-      case "StaffProperties":
-        if (line.values.EndingBar) {
-          this.#endingBar = line.values.EndingBar[0].replaceAll(" ", "");
-        }
-        break;
-      case "Bar":
-        this.#measures++;
-        if (line.values.Style) {
-          this.#barStyles.set(this.#measures, line.values.Style[0]);
-        }
-        break;
-      case "Ending":
-        this.#endings.set(this.#measures, line.values.Endings);
-        break;
-      case "TimeSig":
-        switch (line.values.Signature[0]) {
-          case "Common":
-            this.#times.set(this.#measures, "4/4");
-            break;
-          case "AllaBreve":
-            this.#times.set(this.#measures, "2/2");
-            break;
-          default:
-            this.#times.set(this.#measures, line.values.Signature[0]);
-            break;
-        }
-        break;
-      case "Clef":
-        this.#clefs.set(this.#measures, line.values.Type[0]);
-        if (!line.values.OctaveShift) break;
-        switch (line.values.OctaveShift[0]) {
-          case "Octave Up":
-            this.#clefOctaveChanges.set(this.#measures, 1);
-            break;
-          case "Octave Down":
-            this.#clefOctaveChanges.set(this.#measures, -1);
-            break;
-          default:
-            break;
-        }
-        break;
-      case "Key": {
-        let fifths = 0;
-        for (const x of line.values.Signature) {
-          if (x[1] === "#") fifths++;
-          else fifths--;
-        }
-        this.#keys.set(this.#measures, fifths);
-        break;
+        default:
+          continue;
       }
-      default:
-        return false;
+      visited.add(i);
     }
-    return true;
   }
 
   visitEnd() {

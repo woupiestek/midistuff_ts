@@ -30,19 +30,25 @@ export class Transformer {
 
   transform(source: string): string {
     const lines = scan(source);
-    for (const line of lines) {
-      if (TECHNICAL_TAGS.has(line.tag)) continue;
-      let visited = false;
-      // no short-circuiting here
-      if (this.#positions.visit(line)) visited = true;
-      if (this.#bars.visit(line)) visited = true;
-      if (this.#staves.visit(line)) visited = true;
-      if (this.#durations.visit(line)) visited = true;
-      if (this.#lyrics.visit(line)) visited = true;
-      if (!visited) {
-        console.warn("Unused line", line);
-      }
+    const length = lines.tags.length;
+    const visited: Set<number> = new Set(
+      Array(length).keys().filter((i) => TECHNICAL_TAGS.has(lines.tags[i])),
+    );
+    lines.tags.forEach((it, ix) => {
+      if (TECHNICAL_TAGS.has(it)) visited.add(ix);
+    });
+    this.#positions.visit(lines, visited);
+    this.#bars.visit(lines, visited);
+    this.#staves.visit(lines, visited);
+    this.#durations.visit(lines, visited);
+    this.#lyrics.visit(lines, visited);
+    const notVisited = new Set(
+      Array(length).keys().filter((i) => !visited.has(i)),
+    );
+    if (notVisited.size) {
+      console.warn("Unused lines:", ...notVisited);
     }
+
     this.#staves.visitEnd();
     this.#bars.visitEnd();
     this.#durations.visitEnd();

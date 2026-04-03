@@ -1,4 +1,4 @@
-import { NWCLine } from "./scanner.ts";
+import { NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 export class Lyrics {
@@ -39,61 +39,63 @@ export class Lyrics {
     }
   }
 
-  visit(line: NWCLine) {
-    switch (line.tag) {
-      case "Lyrics":
-        for (let i = 0; i < 8; i++) {
-          this.#syllables[i].length = 0;
-          this.#starts[i].clear();
-          this.#stops[i].clear();
-        }
-        // maybe do somthing with placement?
-        // needed at every note, however.
-        break;
-      case "Lyric1":
-        this.#setStaffLyrics(1, line.values.Text[0]);
-        break;
-      case "Lyric2":
-        this.#setStaffLyrics(2, line.values.Text[0]);
-        break;
-      case "Lyric3":
-        this.#setStaffLyrics(3, line.values.Text[0]);
-        break;
-      case "Lyric4":
-        this.#setStaffLyrics(4, line.values.Text[0]);
-        break;
-      case "Lyric5":
-        this.#setStaffLyrics(5, line.values.Text[0]);
-        break;
-      case "Lyric6":
-        this.#setStaffLyrics(6, line.values.Text[0]);
-        break;
-      case "Lyric7":
-        this.#setStaffLyrics(7, line.values.Text[0]);
-        break;
-      case "Lyric8":
-        this.#setStaffLyrics(8, line.values.Text[0]);
-        break;
-      case "Note":
-      case "Chord":
-      case "RestChord":
-        if (line.values.Pos2) {
-          this.#noteNumber += line.values.Pos2.length;
-        }
-        if (line.values.Pos) {
-          // don't add a lyric if this note is slurred or tied to the next
-          if (!this.#continue) {
-            this.#moveLyrics(this.#noteNumber);
+  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+    for (let i = 0; i < tags.length; i++) {
+      switch (tags[i]) {
+        case "Lyrics":
+          for (let i = 0; i < 8; i++) {
+            this.#syllables[i].length = 0;
+            this.#starts[i].clear();
+            this.#stops[i].clear();
           }
-          this.#continue = line.values.Dur.includes("Slur") ||
-            line.values.Pos.some((pos) => pos.endsWith("^"));
-          this.#noteNumber += line.values.Pos.length;
-        }
-        break;
-      default:
-        return false;
+          // maybe do somthing with placement?
+          // needed at every note, however.
+          break;
+        case "Lyric1":
+          this.#setStaffLyrics(1, values[i].Text[0]);
+          break;
+        case "Lyric2":
+          this.#setStaffLyrics(2, values[i].Text[0]);
+          break;
+        case "Lyric3":
+          this.#setStaffLyrics(3, values[i].Text[0]);
+          break;
+        case "Lyric4":
+          this.#setStaffLyrics(4, values[i].Text[0]);
+          break;
+        case "Lyric5":
+          this.#setStaffLyrics(5, values[i].Text[0]);
+          break;
+        case "Lyric6":
+          this.#setStaffLyrics(6, values[i].Text[0]);
+          break;
+        case "Lyric7":
+          this.#setStaffLyrics(7, values[i].Text[0]);
+          break;
+        case "Lyric8":
+          this.#setStaffLyrics(8, values[i].Text[0]);
+          break;
+        case "Note":
+        case "Chord":
+        case "RestChord":
+          if (values[i].Pos2) {
+            this.#noteNumber += values[i].Pos2.length;
+          }
+          if (values[i].Pos) {
+            // don't add a lyric if this note is slurred or tied to the next
+            if (!this.#continue) {
+              this.#moveLyrics(this.#noteNumber);
+            }
+            this.#continue = values[i].Dur.includes("Slur") ||
+              values[i].Pos.some((pos) => pos.endsWith("^"));
+            this.#noteNumber += values[i].Pos.length;
+          }
+          break;
+        default:
+          continue;
+      }
+      visited.add(i);
     }
-    return true;
   }
 
   static #SYLLABILITIES = ["middle", "begin", "end", "single"];

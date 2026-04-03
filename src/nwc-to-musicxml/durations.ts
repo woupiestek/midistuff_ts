@@ -2,7 +2,7 @@ import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { create, Element } from "./xml.ts";
 import { Positions } from "./positions.ts";
 import { Elements, MusicXML } from "./musicxml.ts";
-import { NWCLine } from "./scanner.ts";
+import { NWCLines } from "./scanner.ts";
 
 export const PER_WHOLE = 768;
 
@@ -16,64 +16,69 @@ export class Durations {
   #tempo: Map<number, number> = new Map();
   #tempoBase: Map<number, string> = new Map();
 
-  visit(line: NWCLine): boolean {
-    switch (line.tag) {
-      case "AddStaff":
-      case "Bar":
-        this.#measure.push(this.#durations.length);
-        if (this.#slurred) {
-          this.#continueSlur.set(this.#durations.length - 1, this.#slurNumber);
-          this.#continueSlur.set(this.#durations.length, this.#slurNumber);
+  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+    for (let i = 0; i < tags.length; i++) {
+      switch (tags[i]) {
+        case "AddStaff":
+        case "Bar":
+          this.#measure.push(this.#durations.length);
+          if (this.#slurred) {
+            this.#continueSlur.set(
+              this.#durations.length - 1,
+              this.#slurNumber,
+            );
+            this.#continueSlur.set(this.#durations.length, this.#slurNumber);
+          }
+          break;
+        case "Note":
+        case "Rest":
+        case "Chord":
+        case "RestChord":
+          if (values[i].Dur2) {
+            this.#duration(values[i].Dur2);
+          }
+          this.#options(values[i].Opts);
+          this.#duration(values[i].Dur);
+          break;
+        case "SustainPedal":
+          if (values[i].Status?.[0] === "Released") {
+            this.#stopSustain.add(this.#durations.length);
+          } else {
+            this.#startSustain.add(this.#durations.length);
+          }
+          break;
+        case "Dynamic":
+        case "DynamicVariance":
+          this.#dynamic(this.#durations.length, values[i].Style[0]);
+          break;
+        case "Tempo":
+          this.#tempo.set(this.#durations.length, +values[i].Tempo[0]);
+          if (values[i].Base) {
+            this.#tempoBase.set(this.#durations.length, values[i].Base[0]);
+          }
+          break;
+        case "TempoVariance": {
+          const style = values[i].Style[0];
+          switch (style) {
+            case "Breath Mark":
+            case "Caesura":
+            case "Fermata":
+              this.#addNotation(style);
+              break;
+            default:
+              this.#addWord(style.toLowerCase());
+              break;
+          }
+          break;
         }
-        break;
-      case "Note":
-      case "Rest":
-      case "Chord":
-      case "RestChord":
-        if (line.values.Dur2) {
-          this.#duration(line.values.Dur2);
-        }
-        this.#options(line.values.Opts);
-        this.#duration(line.values.Dur);
-        break;
-      case "SustainPedal":
-        if (line.values.Status?.[0] === "Released") {
-          this.#stopSustain.add(this.#durations.length);
-        } else {
-          this.#startSustain.add(this.#durations.length);
-        }
-        break;
-      case "Dynamic":
-      case "DynamicVariance":
-        this.#dynamic(this.#durations.length, line.values.Style[0]);
-        break;
-      case "Tempo":
-        this.#tempo.set(this.#durations.length, +line.values.Tempo[0]);
-        if (line.values.Base) {
-          this.#tempoBase.set(this.#durations.length, line.values.Base[0]);
-        }
-        break;
-      case "TempoVariance": {
-        const style = line.values.Style[0];
-        switch (style) {
-          case "Breath Mark":
-          case "Caesura":
-          case "Fermata":
-            this.#addNotation(style);
-            break;
-          default:
-            this.#addWord(style.toLowerCase());
-            break;
-        }
-        break;
+        case "PerformanceStyle":
+          this.#addWord(values[i].Style[0].toLowerCase());
+          break;
+        default:
+          continue;
       }
-      case "PerformanceStyle":
-        this.#addWord(line.values.Style[0].toLowerCase());
-        break;
-      default:
-        return false;
+      visited.add(i);
     }
-    return true;
   }
 
   visitEnd() {

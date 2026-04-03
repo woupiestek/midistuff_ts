@@ -1,24 +1,23 @@
-export type NWCLine = {
-  tag: string;
-  values: Record<string, string[]>;
+export type NWCLines = {
+  tags: string[];
+  values: Record<string, string[]>[];
 };
 
-export function scan(source: string): NWCLine[] {
+export function scan(source: string): NWCLines {
   const lines = source.split("\n").map((line) => line.trim()).filter((line) =>
     line.length > 0
   );
-  const result = [];
+  const result: NWCLines = { tags: [], values: [] };
   for (const line of lines) {
     const columns = line.split("|");
     if (columns[0] !== "") continue;
-    const tag = columns[1].trim();
-    const values = Object.fromEntries(
+    result.tags.push(columns[1].trim());
+    result.values.push(Object.fromEntries(
       columns.slice(2).map((value) => {
         const [k, v] = value.split(":");
         return [k, v.split(",")];
       }),
-    );
-    result.push({ tag, values });
+    ));
   }
   return result;
 }

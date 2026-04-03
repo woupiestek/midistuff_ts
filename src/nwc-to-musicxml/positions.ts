@@ -1,5 +1,5 @@
 import { MusicXML } from "./musicxml.ts";
-import { NWCLine } from "./scanner.ts";
+import { NWCLines } from "./scanner.ts";
 import { Element } from "./xml.ts";
 
 const ALTSTR = "vbn#x";
@@ -22,55 +22,57 @@ export class Positions {
   #altersByTone = [...N7];
   backup: Set<number> = new Set();
 
-  visit(line: NWCLine): boolean {
-    switch (line.tag) {
-      case "AddStaff":
-        this.#signature = [...N7];
-        this.#altersByTone = [...N7];
-        break;
-      case "Clef":
-        this.#tone = CLEF_TONE.get(line.values.Type[0]) ?? 34;
-        if (!line.values.OctaveShift) break;
-        switch (line.values.OctaveShift[0]) {
-          case "Octave Up":
-            this.#tone += 7;
-            break;
-          case "Octave Down":
-            this.#tone -= 7;
-            break;
-          default:
-            break;
-        }
-        break;
-      case "Key":
-        this.#signature = [...N7];
-        this.#altersByTone = [...N7];
-        for (const x of line.values.Signature) {
-          const index = "CDEFGAB".indexOf(x[0]);
-          this.#signature[index] = this.#altersByTone[index] = x[1];
-        }
-        break;
-      case "Bar":
-        this.#altersByTone = [...this.#signature];
-        break;
-      case "Note":
-      case "Rest":
-      case "Chord":
-      case "RestChord":
-        if (line.values.Pos2) {
-          for (const pos of line.values.Pos2) this.#pitch(pos);
-          this.backup.add(this.#groups.length);
+  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+    for (let i = 0; i < tags.length; i++) {
+      switch (tags[i]) {
+        case "AddStaff":
+          this.#signature = [...N7];
+          this.#altersByTone = [...N7];
+          break;
+        case "Clef":
+          this.#tone = CLEF_TONE.get(values[i].Type[0]) ?? 34;
+          if (!values[i].OctaveShift) break;
+          switch (values[i].OctaveShift[0]) {
+            case "Octave Up":
+              this.#tone += 7;
+              break;
+            case "Octave Down":
+              this.#tone -= 7;
+              break;
+            default:
+              break;
+          }
+          break;
+        case "Key":
+          this.#signature = [...N7];
+          this.#altersByTone = [...N7];
+          for (const x of values[i].Signature) {
+            const index = "CDEFGAB".indexOf(x[0]);
+            this.#signature[index] = this.#altersByTone[index] = x[1];
+          }
+          break;
+        case "Bar":
+          this.#altersByTone = [...this.#signature];
+          break;
+        case "Note":
+        case "Rest":
+        case "Chord":
+        case "RestChord":
+          if (values[i].Pos2) {
+            for (const pos of values[i].Pos2) this.#pitch(pos);
+            this.backup.add(this.#groups.length);
+            this.#groups.push(this.#tones.length);
+          }
+          if (values[i].Pos) {
+            for (const pos of values[i].Pos) this.#pitch(pos);
+          }
           this.#groups.push(this.#tones.length);
-        }
-        if (line.values.Pos) {
-          for (const pos of line.values.Pos) this.#pitch(pos);
-        }
-        this.#groups.push(this.#tones.length);
-        break;
-      default:
-        return false;
+          break;
+        default:
+          continue;
+      }
+      visited.add(i);
     }
-    return true;
   }
 
   #open: (string | null)[] = Array.from({ length: 68 }, () => null);
