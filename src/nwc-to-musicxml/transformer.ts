@@ -2,7 +2,7 @@ import { MusicXML } from "./musicxml.ts";
 import { Lyrics } from "./lyrics.ts";
 import { Positions } from "./positions.ts";
 import { Durations } from "./durations.ts";
-import { NWCLines, scan } from "./scanner.ts";
+import { scan } from "./scanner.ts";
 import { Bars } from "./bars.ts";
 import { Staves } from "./staves.ts";
 
@@ -13,13 +13,6 @@ const TECHNICAL_TAGS = new Set([
   "PgSetup",
   "Spacer",
 ]);
-
-type Structure = {
-  bars: number[][];
-  parts: number[];
-  secondStaves: Set<number>;
-  visited: Set<number>;
-};
 
 export class Transformer {
   #positions: Positions;
@@ -34,51 +27,6 @@ export class Transformer {
     this.#bars = new Bars();
     this.#staves = new Staves();
     this.#lyrics = new Lyrics();
-  }
-
-  #structure(nwcLines: NWCLines): Structure {
-    const bars: number[][] = [];
-    const parts: number[] = [];
-    const secondStaves: Set<number> = new Set();
-    const visited: Set<number> = new Set();
-    for (
-      let i = 0, l = nwcLines.tags.length, measure = 0, part = 0, staff = 0;
-      i < l;
-      i++
-    ) {
-      switch (nwcLines.tags[i]) {
-        case "AddStaff":
-          bars[staff++] = [i];
-          parts.push(part++);
-          break;
-        case "StaffProperties": {
-          const withNextStaff = new Set(nwcLines.values[i].WithNextStaff);
-          if (withNextStaff.has("Brace")) {
-            part--;
-            if (!withNextStaff.has("Layer")) {
-              secondStaves.add(staff);
-            }
-          }
-          break;
-        }
-        case "Bar":
-          bars[staff][measure++] = i;
-          break;
-        default:
-          continue;
-      }
-      visited.add(i);
-    }
-    const staffLength = bars.reduce((i, j) => j.length > i ? j.length : i, 0);
-    const filler = Array(bars.length).keys().map((k) =>
-      k < bars.length ? bars[k + 1][0] : nwcLines.tags.length
-    ).toArray();
-    bars.forEach((part, i) => {
-      while (part.length < staffLength) {
-        part.push(filler[i]);
-      }
-    });
-    return { bars, parts, secondStaves, visited };
   }
 
   transform(source: string): string {

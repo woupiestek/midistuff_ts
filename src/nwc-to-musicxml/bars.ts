@@ -92,7 +92,7 @@ export class Bars {
   multiple(
     parts: number[],
     secondStaves: Set<number>,
-    allNotes: (Element | null)[][],
+    allNotes: Element[][],
     xml: MusicXML,
   ): Element[][] {
     const allAttributes = this.#allAttributes(parts, secondStaves, xml);

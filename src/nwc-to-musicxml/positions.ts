@@ -162,7 +162,7 @@ export class Positions {
       const number = (this.#tones[note] % 16 + 1).toString();
       stopTieds.set(
         note,
-        stopXmls[number] ??= create("tied", { type: "start", number }),
+        stopXmls[number] ??= create("tied", { type: "stop", number }),
       );
     });
     return { startTieds, stopTieds };

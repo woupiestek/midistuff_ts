@@ -1,5 +1,13 @@
 # Midistuff logs
 
+## 2026-04-06
+
+XML templates, because of this terrible logistics problem: every note is to be
+assigned to a staff and a voice. A better strategy may be just to create arrays
+of voices and staffs and pass them down. Just the array of staffs may do? Just
+think: the xml are arrays being copied over anyway. What is the gain of
+templates, vs the loss of just generating that staffs array?
+
 ## 2026-04-05
 
 Dimensions: staves, bars, and lines. Could just start there.
@@ -19,6 +27,13 @@ tone in a different way.
 
 Term position is Pos in notheworthy, and duration is dur, but technially we are
 dealing with chords, including chords of zero or one notes.
+
+### refactoring
+
+Looking back, I see some pretty good ideas actually, and don't feel like
+iimposing a structure after the fact will help much. I guess there is tech debt
+cause by unforseen problems, just things I stuck in to make them work, but that
+are not in their proper place now.
 
 ## 2026-04-03
 

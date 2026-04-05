@@ -1,6 +1,5 @@
 import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { create, Element } from "./xml.ts";
-import { Positions } from "./positions.ts";
 import { Elements, MusicXML } from "./musicxml.ts";
 import { NWCLines } from "./scanner.ts";
 
@@ -15,19 +14,20 @@ export class Durations {
   #dynamics: Map<number, string> = new Map();
   #tempo: Map<number, number> = new Map();
   #tempoBase: Map<number, string> = new Map();
+  #currentStaff: number = -1;
+  #staff: number[] = [];
 
   visit({ tags, values }: NWCLines, visited: Set<number>): void {
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":
+          this.#currentStaff++;
+          // fall through
         case "Bar":
           this.#measure.push(this.#durations.length);
           if (this.#slurred) {
-            this.#continueSlur.set(
-              this.#durations.length - 1,
-              this.#slurNumber,
-            );
-            this.#continueSlur.set(this.#durations.length, this.#slurNumber);
+            this.#slurTypes.set(this.#durations.length - 1, "continue");
+            this.#slurTypes.set(this.#durations.length, "continue");
           }
           break;
         case "Note":
@@ -91,10 +91,10 @@ export class Durations {
     (this.#notations[this.#durations.length] ||= new Set()).add(style);
   }
 
-  #words: { [_: number]: Set<string> } = {};
+  #words: { word: string; duration: number }[] = [];
 
   #addWord(word: string) {
-    (this.#words[this.#durations.length] ||= new Set()).add(word);
+    this.#words.push({ word, duration: this.#durations.length });
   }
 
   #wedged: boolean = false;
@@ -139,15 +139,12 @@ export class Durations {
   }
 
   #slurred: boolean = false;
-  #startSlur: Map<number, number> = new Map();
-  #continueSlur: Map<number, number> = new Map();
-  #stopSlur: Map<number, number> = new Map();
-  #slurNumber: number = 16;
+  #slurTypes: Map<number, "continue" | "start" | "stop"> = new Map();
   #grace: Set<number> = new Set();
   #triplet: Set<number> = new Set();
   #dotted: Set<number> = new Set();
   #doubleDotted: Set<number> = new Set();
-  #stems: Map<number, string> = new Map();
+  #stems: Map<number, "down" | "up"> = new Map();
 
   #options(opts?: string[]) {
     if (!opts) return;
@@ -158,6 +155,7 @@ export class Durations {
   }
 
   #duration(dur: string[]) {
+    this.#staff.push(this.#currentStaff);
     const index = this.#durations.length;
     let duration = PER_WHOLE;
     let slurred = false;
@@ -222,10 +220,9 @@ export class Durations {
     }
     if (slurred !== this.#slurred) {
       if (slurred) {
-        this.#slurNumber = this.#slurNumber % 16 + 1;
-        this.#startSlur.set(index, ++this.#slurNumber);
+        this.#slurTypes.set(index, "start");
       } else {
-        this.#stopSlur.set(index, this.#slurNumber);
+        this.#slurTypes.set(index, "stop");
       }
       this.#slurred = slurred;
     }
@@ -234,54 +231,66 @@ export class Durations {
   }
 
   allNotes(
+    // measures
     staffOffsets: number[],
+    // which ones change.
     secondStaves: Set<number>,
     elements: Elements,
     xml: MusicXML,
-  ): (Element | null)[][] {
+  ): Element[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
-    let measure = 0;
-    let staff = 1;
-    const result: (Element | null)[][] = this.#measure.map(() => []);
-    let voice = staff.toString();
-    let voice1 = create("voice", undefined, voice);
-    let voice2 = create("voice", undefined, voice + "'");
-    for (let i = 0, l = this.#durations.length; i < l; i++) {
-      while (this.#measure[measure + 1] <= i) {
-        measure++;
-      }
-      while (staffOffsets[staff] <= measure) {
-        staff++;
-        voice = staff.toString();
-        voice1 = create("voice", undefined, voice);
-        voice2 = create("voice", undefined, voice + "'");
-      }
-      this.#forDuration(
-        i,
-        secondStaves.has(staff - 1) ? staff2 : staff1,
-        result[measure],
-        xml,
-        elements.positions.backup.has(i) ? voice2 : voice1,
-        elements,
-      );
-      if (elements.positions.backup.has(i)) {
-        result[measure].push(xml.backup(this.#durations[i]));
+    const notationContent = this.#notationContent();
+    const directionTypes = this.#directionTypes();
+    const result: Element[][] = this.#measure.map(() => []);
+
+    for (let staff = 0; staff < staffOffsets.length; staff++) {
+      const voice1 = create("voice", undefined, `${2 * staff + 1}`);
+      const voice2 = create("voice", undefined, `${2 * (staff + 1)}`);
+      const staffElement = secondStaves.has(staff) ? staff2 : staff1;
+      for (
+        let m = staffOffsets[staff];
+        m < (staffOffsets[staff + 1] ?? this.#measure.length);
+        m++
+      ) {
+        for (
+          let i = this.#measure[m];
+          i < (this.#measure[m + 1] ?? this.#durations.length);
+          i++
+        ) {
+          for (const directionType of directionTypes[i]) {
+            result[m].push(xml.direction(directionType, staffElement));
+          }
+          this.#forDuration(
+            i,
+            staffElement,
+            result[m],
+            xml,
+            elements.positions.backup.has(i) ? voice2 : voice1,
+            elements,
+            notationContent[i],
+          );
+          if (this.#stopSustain.has(i + 1)) {
+            result[m].push(xml.stopSustain(staffElement));
+          }
+          if (elements.positions.backup.has(i)) {
+            result[m].push(xml.backup(this.#durations[i]));
+          }
+        }
       }
     }
     return result;
   }
 
-  // enough to refactor
   #forDuration(
     i: number,
     staff: Element,
-    result: (Element | null)[],
+    result: Element[],
     xml: MusicXML,
     voice: Element,
     elements: Elements,
+    notationContent: Element[],
   ) {
-    this.#directions(i, staff, result, xml);
     const type = xml.type(this.#types[i]);
     const timeMod = this.#triplet.has(i) ? xml.timeMod : null;
     const dots = this.#doubleDotted.has(i)
@@ -306,18 +315,14 @@ export class Durations {
       );
     } else {
       const grace = this.#grace.has(i) ? create("grace") : null;
-      const notationContent: (Element | null)[] = this.#notationContent(
-        i,
-        xml,
-      );
       const sv = this.#stems.get(i);
-      const stem = sv ? xml.stem(sv) : null;
+      const stem = sv ? xml.stem[sv] : null;
       for (let note = from; note < to; note++) {
         const notations = [
           ...notationContent,
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
-        ];
+        ].filter((it) => it != null);
         result.push(
           xml.note(
             grace,
@@ -326,13 +331,13 @@ export class Durations {
             duration,
             elements.positions.startTieds.has(note) ? xml.tie.start : null,
             elements.positions.stopTieds.has(note) ? xml.tie.stop : null,
-            voice,
+            voice, // in the middle!
             type,
             ...dots,
             elements.positions.accidentals.get(note) ?? null,
             timeMod,
             stem,
-            staff,
+            staff, // in the middle!
             notations.length > 0
               ? create(
                 "notations",
@@ -345,55 +350,81 @@ export class Durations {
         );
       }
     }
-    if (this.#stopSustain.has(i + 1)) result.push(xml.stopSustain(staff));
   }
 
-  #notationContent(i: number, xml: MusicXML) {
-    const notations: Element[] = [];
-    if (this.#notations[i]) {
-      const articulations: Element[] = [...this.#notations[i]]
-        .map((it) => xml.atriculations.get(it))
-        .filter((it) => it !== undefined);
-      if (articulations.length > 0) {
-        notations.push(
-          create("articulations", undefined, ...articulations),
+  #notationContent() {
+    const fermata = create("fermata");
+    const atriculations = new Map([
+      ["Accent", create("accent")],
+      ["Breath Mark", create("breath-mark", undefined, "comma")],
+      ["Caesura", create("caesura")],
+      ["Staccato", create("staccato")],
+      ["Tenuto", create("tenuto")],
+    ]);
+    const slur: {
+      stop: { [_: string]: Element };
+      start: { [_: string]: Element };
+      continue: { [_: string]: Element };
+    } = { stop: {}, start: {}, continue: {} };
+    const notations: Element[][] = [];
+    let slurNumber = 1;
+    for (let i = 0; i < this.#durations.length; i++) {
+      notations[i] = [];
+      if (this.#notations[i]) {
+        const articulations: Element[] = [...this.#notations[i]]
+          .map((it) => atriculations.get(it))
+          .filter((it) => it !== undefined);
+        if (articulations.length > 0) {
+          notations[i].push(
+            create("articulations", undefined, ...articulations),
+          );
+        }
+        if (this.#notations[i].has("Fermata")) {
+          notations[i].push(fermata);
+        }
+      }
+      const slurType = this.#slurTypes.get(i);
+      if (slurType) {
+        notations[i].push(
+          slur[slurType][slurNumber] ??= create("slur", {
+            type: slurType,
+            number: slurNumber.toString(),
+          }),
         );
+        if (slurType === "stop") {
+          slurNumber %= 16;
+          slurNumber += 1;
+        }
       }
-      if (this.#notations[i].has("Fermata")) {
-        notations.push(xml.fermata);
-      }
-    }
-    if (this.#stopSlur.has(i)) {
-      notations.push(xml.slur("stop", this.#stopSlur.get(i) ?? 0));
-    } else if (this.#startSlur.has(i)) {
-      notations.push(xml.slur("start", this.#startSlur.get(i) ?? 0));
-    } else if (this.#continueSlur.has(i)) {
-      notations.push(xml.slur("continue", this.#continueSlur.get(i) ?? 0));
     }
     return notations;
   }
 
-  #directions(
-    i: number,
-    staff: Element,
-    result: (Element | null)[],
-    xml: MusicXML,
-  ) {
-    const tempo = this.#tempo.get(i);
-    if (tempo) result.push(xml.metronome(tempo, this.#tempoBase.get(i), staff));
-    if (this.#startSustain.has(i)) result.push(xml.startSustain(staff));
-    const dynamic = this.#dynamics.get(i);
-    if (dynamic) result.push(xml.direction(xml.dynamics[dynamic], staff));
-    const wedge = this.#wedge.get(i);
-    if (wedge) result.push(xml.wedge(wedge, staff));
-    const words = this.#words[i];
-    if (words) {
-      for (const word of words) {
-        result.push(xml.direction(
-          create("words", undefined, word),
-          staff,
-        ));
-      }
-    }
+  #directionTypes() {
+    const dynamics = Object.fromEntries(
+      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
+        d,
+      ) => [d, create("dynamics", undefined, create(d))]),
+    );
+    const results: Element[][] = this.#durations.map(() => []);
+    this.#tempo.forEach((tempo, i) => {
+      const [type, dotted] = (this.#tempoBase.get(i) ?? "Quarter").split(" ");
+      results[i].push(create(
+        "metronome",
+        undefined,
+        create("beat-unit", undefined, type.toLowerCase()),
+        dotted ? create("beat-unit-dot") : null,
+        create("per-minute", undefined, tempo.toString()),
+      ));
+    });
+    this.#startSustain.forEach((i) =>
+      results[i].push(create("pedal", { type: "start" }))
+    );
+    this.#dynamics.forEach((dynamic, i) => results[i].push(dynamics[dynamic]));
+    this.#wedge.forEach((wedge, i) => results[i].push(create("wedge", wedge)));
+    this.#words.forEach(({ word, duration }) =>
+      results[duration].push(create("words", undefined, word))
+    );
+    return results;
   }
 }

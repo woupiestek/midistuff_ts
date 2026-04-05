@@ -16,59 +16,32 @@ export type Elements = {
 };
 
 export class MusicXML {
-  readonly chord: Element;
-  readonly rest: Element;
-  readonly timeMod: Element;
-  readonly tie: { start: Element; stop: Element };
-  readonly dot: Element;
-  readonly dynamics: Record<string, Element>;
-  readonly atriculations: Map<string, Element>;
-  readonly fermata: Element;
+  readonly chord: Element = create("chord");
+  readonly rest: Element = create("rest");
+  readonly timeMod: Element = create(
+    "time-modification",
+    undefined,
+    create("actual-notes", undefined, "3"),
+    create("normal-notes", undefined, "2"),
+  );
+  readonly tie: { start: Element; stop: Element } = {
+    start: create("tie", { type: "start" }),
+    stop: create("tie", { type: "stop" }),
+  };
+  readonly dot: Element = create("dot");
+  readonly dynamics: Record<string, Element> = Object.fromEntries(
+    ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
+      d,
+    ) => [
+      d,
+      create("dynamics", undefined, create(d)),
+    ]),
+  );
 
-  constructor() {
-    this.chord = create("chord");
-    this.rest = create("rest");
-    this.timeMod = create(
-      "time-modification",
-      undefined,
-      create("actual-notes", undefined, "3"),
-      create("normal-notes", undefined, "2"),
-    );
-    this.tie = {
-      start: create("tie", { type: "start" }),
-      stop: create("tie", { type: "stop" }),
-    };
-
-    this.dot = create("dot");
-
-    this.dynamics = Object.fromEntries(
-      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
-        d,
-      ) => [
-        d,
-        create("dynamics", undefined, create(d)),
-      ]),
-    );
-    this.atriculations = new Map([
-      ["Accent", create("accent")],
-      ["Breath Mark", create("breath-mark", undefined, "comma")],
-      ["Caesura", create("caesura")],
-      ["Staccato", create("staccato")],
-      ["Tenuto", create("tenuto")],
-    ]);
-    this.fermata = create("fermata");
-  }
-
-  stem(sv: string) {
-    return this.#cache["stem" + sv] ||= create("stem", undefined, sv);
-  }
-
-  slur(type: string, number: number): Element {
-    return this.#cache["slur" + type + number] ||= create(
-      "slur",
-      { type, number: number.toString() },
-    );
-  }
+  readonly stem = {
+    up: create("stem", undefined, "up"),
+    down: create("stem", undefined, "down"),
+  };
 
   #barStyles: Record<string, string> = {
     Double: "light-light",
