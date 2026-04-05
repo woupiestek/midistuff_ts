@@ -236,7 +236,6 @@ export class Durations {
   allNotes(
     staffOffsets: number[],
     secondStaves: Set<number>,
-    positions: Positions,
     elements: Elements,
     xml: MusicXML,
   ): (Element | null)[][] {
@@ -263,23 +262,22 @@ export class Durations {
         secondStaves.has(staff - 1) ? staff2 : staff1,
         result[measure],
         xml,
-        positions.notes(i),
-        positions.backup.has(i) ? voice2 : voice1,
+        elements.positions.backup.has(i) ? voice2 : voice1,
         elements,
       );
-      if (positions.backup.has(i)) {
+      if (elements.positions.backup.has(i)) {
         result[measure].push(xml.backup(this.#durations[i]));
       }
     }
     return result;
   }
 
+  // enough to refactor
   #forDuration(
     i: number,
     staff: Element,
     result: (Element | null)[],
     xml: MusicXML,
-    notes: number[],
     voice: Element,
     elements: Elements,
   ) {
@@ -292,7 +290,9 @@ export class Durations {
       ? [xml.dot]
       : [];
     const duration = xml.duration(this.#durations[i]);
-    if (notes.length === 0) {
+    const from = i && elements.positions.groups[i - 1];
+    const to = elements.positions.groups[i];
+    if (to === from) {
       result.push(
         xml.note(
           xml.rest,
@@ -312,25 +312,24 @@ export class Durations {
       );
       const sv = this.#stems.get(i);
       const stem = sv ? xml.stem(sv) : null;
-      for (let j = 0; j < notes.length; j++) {
-        const note = notes[j];
+      for (let note = from; note < to; note++) {
         const notations = [
           ...notationContent,
-          elements.stopTieds.get(note) ?? null,
-          elements.startTieds.get(note) ?? null,
+          elements.positions.stopTieds.get(note) ?? null,
+          elements.positions.startTieds.get(note) ?? null,
         ];
         result.push(
           xml.note(
             grace,
-            j ? xml.chord : null, // no chord element in the first note
-            elements.pitches[note],
+            note > from ? xml.chord : null, // no chord element in the first note
+            elements.positions.pitches[note],
             duration,
-            elements.startTieds.has(note) ? xml.tie.start : null,
-            elements.stopTieds.has(note) ? xml.tie.stop : null,
+            elements.positions.startTieds.has(note) ? xml.tie.start : null,
+            elements.positions.stopTieds.has(note) ? xml.tie.stop : null,
             voice,
             type,
             ...dots,
-            elements.accidentals.get(note) ?? null,
+            elements.positions.accidentals.get(note) ?? null,
             timeMod,
             stem,
             staff,

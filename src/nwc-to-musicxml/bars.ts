@@ -5,7 +5,7 @@ import { create, Element } from "./xml.ts";
 
 export class Bars {
   staves: number[] = [];
-  #measures = -1;
+  #measure = -1;
   #barStyles: Map<number, string> = new Map();
   #endings: Map<number, string[]> = new Map();
   #endingBar: string = "SectionClose";
@@ -19,10 +19,10 @@ export class Bars {
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":
-          this.#measures++;
-          this.staves.push(this.#measures);
-          if (this.#measures > 1) {
-            this.#barStyles.set(this.#measures, this.#endingBar);
+          this.#measure++;
+          this.staves.push(this.#measure);
+          if (this.#measure > 1) {
+            this.#barStyles.set(this.#measure, this.#endingBar);
           }
           break;
         case "StaffProperties":
@@ -31,36 +31,36 @@ export class Bars {
           }
           break;
         case "Bar":
-          this.#measures++;
+          this.#measure++;
           if (values[i].Style) {
-            this.#barStyles.set(this.#measures, values[i].Style[0]);
+            this.#barStyles.set(this.#measure, values[i].Style[0]);
           }
           break;
         case "Ending":
-          this.#endings.set(this.#measures, values[i].Endings);
+          this.#endings.set(this.#measure, values[i].Endings);
           break;
         case "TimeSig":
           switch (values[i].Signature[0]) {
             case "Common":
-              this.#times.set(this.#measures, "4/4");
+              this.#times.set(this.#measure, "4/4");
               break;
             case "AllaBreve":
-              this.#times.set(this.#measures, "2/2");
+              this.#times.set(this.#measure, "2/2");
               break;
             default:
-              this.#times.set(this.#measures, values[i].Signature[0]);
+              this.#times.set(this.#measure, values[i].Signature[0]);
               break;
           }
           break;
         case "Clef":
-          this.#clefs.set(this.#measures, values[i].Type[0]);
+          this.#clefs.set(this.#measure, values[i].Type[0]);
           if (!values[i].OctaveShift) break;
           switch (values[i].OctaveShift[0]) {
             case "Octave Up":
-              this.#clefOctaveChanges.set(this.#measures, 1);
+              this.#clefOctaveChanges.set(this.#measure, 1);
               break;
             case "Octave Down":
-              this.#clefOctaveChanges.set(this.#measures, -1);
+              this.#clefOctaveChanges.set(this.#measure, -1);
               break;
             default:
               break;
@@ -72,7 +72,7 @@ export class Bars {
             if (x[1] === "#") fifths++;
             else fifths--;
           }
-          this.#keys.set(this.#measures, fifths);
+          this.#keys.set(this.#measure, fifths);
           break;
         }
         default:
@@ -83,9 +83,9 @@ export class Bars {
   }
 
   visitEnd() {
-    this.#measures++;
-    this.staves.push(this.#measures);
-    this.#barStyles.set(this.#measures, this.#endingBar);
+    this.#measure++;
+    this.staves.push(this.#measure);
+    this.#barStyles.set(this.#measure, this.#endingBar);
   }
 
   // this is here to deal with the issue that the data in a musicxml measure may be spread out in the nwc file

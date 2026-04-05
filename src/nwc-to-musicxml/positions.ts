@@ -1,6 +1,6 @@
-import { MusicXML } from "./musicxml.ts";
+import { Elements } from "./musicxml.ts";
 import { NWCLines } from "./scanner.ts";
-import { Element } from "./xml.ts";
+import { create, Element } from "./xml.ts";
 
 const ALTSTR = "vbn#x";
 
@@ -20,7 +20,7 @@ export class Positions {
   #tone = 34;
   #signature = [...N7];
   #altersByTone = [...N7];
-  backup: Set<number> = new Set();
+  #backup: Set<number> = new Set();
 
   visit({ tags, values }: NWCLines, visited: Set<number>): void {
     for (let i = 0; i < tags.length; i++) {
@@ -60,7 +60,7 @@ export class Positions {
         case "RestChord":
           if (values[i].Pos2) {
             for (const pos of values[i].Pos2) this.#pitch(pos);
-            this.backup.add(this.#groups.length);
+            this.#backup.add(this.#groups.length);
             this.#groups.push(this.#tones.length);
           }
           if (values[i].Pos) {
@@ -75,14 +75,30 @@ export class Positions {
     }
   }
 
+  build(): Elements["positions"] {
+    return {
+      accidentals: this.#accidentals,
+      backup: this.#backup,
+      groups: this.#groups,
+      pitches: this.#pitches(),
+      ...this.#ties(),
+    };
+  }
+
   #open: (string | null)[] = Array.from({ length: 68 }, () => null);
   #startTie: Set<number> = new Set();
   #stopTie: Set<number> = new Set();
-  // track explicit accidentals
-  #altered: Map<number, string> = new Map();
+  // explicit accidentals
+  #accidentals: Map<number, Element> = new Map();
 
   // this is what musicians must do in their heads while reading sheet music?
   #pitch(pos: string) {
+    const accidentals = Object.fromEntries(
+      ["flat-flat", "flat", "natural", "sharp", "double-sharp"].map((
+        type,
+        i,
+      ) => [ALTSTR[i], create("accidental", undefined, type)]),
+    );
     const altered = ALTSTR.includes(pos[0]);
     const startTie = pos[pos.length - 1] === "^";
     const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
@@ -91,63 +107,64 @@ export class Positions {
     const stopTie = this.#open[tone];
     if (stopTie) this.#stopTie.add(index);
     if (altered) {
-      this.#altered.set(index, pos[0]);
+      this.#accidentals.set(index, accidentals[pos[0]]);
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
     } else if (stopTie) this.#alters.push(stopTie);
     else this.#alters.push(this.#altersByTone[tone % 7]);
-
     if (startTie) {
       this.#open[tone] = this.#alters[index];
       this.#startTie.add(index);
     } else this.#open[tone] = null;
   }
 
-  // a group is a set of simultaneous notes of equal duration
-  // this may be asking for a reversal, like
-  // give the parent element, and let me add the children...
-  notes(group: number): number[] {
-    const from = group && this.#groups[group - 1];
-    const to = this.#groups[group];
-    return Array.from({ length: to - from }, (_, i) => i + from);
+  #pitches(): Element[] {
+    const steps = [..."CDEFGAB"].map((step) => create("step", undefined, step));
+    const alters = Object.fromEntries(
+      [..."vbn#x"].map((
+        alter,
+        i,
+      ) => [alter, create("alter", undefined, (i - 2).toString())]),
+    );
+    const octaves = Array(10).keys().map((octave) =>
+      create("octave", undefined, octave.toString())
+    ).toArray();
+    const xmls: { [_: string]: Element }[] = [];
+    return this.#tones.map((tone, i) => {
+      const alter = this.#alters[i];
+      xmls[tone] ??= {};
+      return xmls[tone][i] ??= create(
+        "pitch",
+        undefined,
+        steps[tone % 7],
+        alter === "n" ? null : alters[alter],
+        octaves[(tone / 7) | 0],
+      );
+    });
   }
 
-  pitches(xml: MusicXML): Element[] {
-    return this.#tones.map((t, i) => xml.pitch(t, this.#alters[i]));
-  }
-
-  ties(xml: MusicXML): {
+  #ties(): {
     stopTieds: Map<number, Element>;
     startTieds: Map<number, Element>;
   } {
     const startTieds: Map<number, Element> = new Map();
     const stopTieds: Map<number, Element> = new Map();
+    const startXmls: { [_: string]: Element } = {};
     this.#startTie.forEach((note) => {
+      const number = (this.#tones[note] % 16 + 1).toString();
       startTieds.set(
         note,
-        xml.tied({
-          type: "start",
-          number: (this.#tones[note] % 16 + 1).toString(),
-        }),
+        startXmls[number] ??= create("tied", { type: "start", number }),
       );
     });
+    const stopXmls: { [_: string]: Element } = {};
     this.#stopTie.forEach((note) => {
+      const number = (this.#tones[note] % 16 + 1).toString();
       stopTieds.set(
         note,
-        xml.tied({
-          type: "stop",
-          number: (this.#tones[note] % 16 + 1).toString(),
-        }),
+        stopXmls[number] ??= create("tied", { type: "start", number }),
       );
     });
     return { startTieds, stopTieds };
-  }
-
-  accidentals(xml: MusicXML): Map<number, Element> {
-    return new Map(
-      this.#altered.entries().map((
-        [note, alter],
-      ) => [note, xml.accidental(alter)]),
-    );
   }
 }

@@ -1,10 +1,30 @@
 # Midistuff logs
 
+## 2026-04-05
+
+Dimensions: staves, bars, and lines. Could just start there.
+
+Is this going to a beter version of this script?
+
+Many operation on trees beneift from a two pass approach where the tree is truns
+inside out, then back again. So what does this mean e.g. at the level of
+positions? A position could point to the durations it is in, the duration to its
+measure and maybe its voice.
+
+One idea: automatic correction. Like musicxml seems to really want key
+signatures at the start of each measure. Also, key are much more limited than
+NWC technically allows. This raises the issue of ad hoc accidentals: since
+multiple staffs can be layered in noteworthy, each could modify the mening of a
+tone in a different way.
+
+Term position is Pos in notheworthy, and duration is dur, but technially we are
+dealing with chords, including chords of zero or one notes.
+
 ## 2026-04-03
 
 I feel oddly uninspired after another big refactor.
 
-### mass coversions
+### mass conversions
 
 C:\Users\woupi\OneDrive\Documents\NoteWorthy\Wouter
 `& "C:\Program Files (x86)\Noteworthy Software\NoteWorthy Composer 2\nwc-conv.exe"`

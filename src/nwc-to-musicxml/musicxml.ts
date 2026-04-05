@@ -4,10 +4,14 @@ const HEADER =
   '<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 4.0 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">';
 
 export type Elements = {
-  pitches: Element[];
-  accidentals: Map<number, Element>;
-  stopTieds: Map<number, Element>;
-  startTieds: Map<number, Element>;
+  positions: {
+    accidentals: Map<number, Element>;
+    backup: Set<number>;
+    groups: number[];
+    pitches: Element[];
+    startTieds: Map<number, Element>;
+    stopTieds: Map<number, Element>;
+  };
   lyrics: Element[][];
 };
 
@@ -57,13 +61,6 @@ export class MusicXML {
 
   stem(sv: string) {
     return this.#cache["stem" + sv] ||= create("stem", undefined, sv);
-  }
-
-  tied(attributes: { type: string; number: string }) {
-    return this.#cache["tied" + attributes.type + attributes.number] ||= create(
-      "tied",
-      attributes,
-    );
   }
 
   slur(type: string, number: number): Element {
@@ -229,55 +226,6 @@ export class MusicXML {
       "key",
       undefined,
       create("fifths", undefined, fifths.toString()),
-    );
-  }
-
-  #steps = [..."CDEFGAB"].map((step) => create("step", undefined, step));
-  #octaves = Array(10).keys().map((octave) =>
-    create("octave", undefined, octave.toString())
-  ).toArray();
-
-  alter(number: number): Element {
-    return this.#cache["A" + number] ||= create(
-      "alter",
-      undefined,
-      number.toString(),
-    );
-  }
-
-  // todo: don't use nwc alter names, use the xml ones
-  // v = flat-flat, b = flat, n = natural, # = sharp, x = double-sharp
-
-  #alters = Object.fromEntries(
-    [..."vbn#x"].map((
-      alter,
-      i,
-    ) => [alter, create("alter", undefined, (i - 2).toString())]),
-  );
-
-  static readonly accidentalType: Record<string, string> = {
-    v: "flat-flat",
-    b: "flat",
-    n: "natural",
-    "#": "sharp",
-    x: "double-sharp",
-  };
-
-  accidental(alter: string): Element {
-    return this.#cache["accidental" + alter] ||= create(
-      "accidental",
-      undefined,
-      MusicXML.accidentalType[alter],
-    );
-  }
-
-  pitch(tone: number, alter: string): Element {
-    return this.#cache[alter + tone] ||= create(
-      "pitch",
-      undefined,
-      this.#steps[tone % 7],
-      alter === "n" ? null : this.#alters[alter],
-      this.#octaves[(tone / 7) | 0],
     );
   }
 
