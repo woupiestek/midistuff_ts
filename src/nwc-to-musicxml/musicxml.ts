@@ -16,29 +16,21 @@ export type Elements = {
 };
 
 export class MusicXML {
-  readonly chord: Element = create("chord");
-  readonly rest: Element = create("rest");
-  readonly timeMod: Element = create(
+  static readonly chord: Element = create("chord");
+  static readonly rest: Element = create("rest");
+  static readonly timeMod: Element = create(
     "time-modification",
     undefined,
     create("actual-notes", undefined, "3"),
     create("normal-notes", undefined, "2"),
   );
-  readonly tie: { start: Element; stop: Element } = {
+  static readonly tie: { start: Element; stop: Element } = {
     start: create("tie", { type: "start" }),
     stop: create("tie", { type: "stop" }),
   };
-  readonly dot: Element = create("dot");
-  readonly dynamics: Record<string, Element> = Object.fromEntries(
-    ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"].map((
-      d,
-    ) => [
-      d,
-      create("dynamics", undefined, create(d)),
-    ]),
-  );
+  static readonly dot: Element = create("dot");
 
-  readonly stem = {
+  static readonly stem = {
     up: create("stem", undefined, "up"),
     down: create("stem", undefined, "down"),
   };
@@ -72,20 +64,6 @@ export class MusicXML {
     "MasterRepeatClose",
     "LocalRepeatClose",
   ]);
-
-  startSustain(staff: Element) {
-    return this.#cache["startSustain" + staff] ||= this.direction(
-      create("pedal", { type: "start" }),
-      staff,
-    );
-  }
-
-  stopSustain(staff: Element) {
-    return this.#cache["stopSustain" + staff] ||= this.direction(
-      create("pedal", { type: "stop" }),
-      staff,
-    );
-  }
 
   leftBarline(
     type: string = "Single",
@@ -140,10 +118,6 @@ export class MusicXML {
         })
         : null,
     );
-  }
-
-  wedge(wegde: { type: string; number: string }, staff: Element): Element {
-    return this.direction(create("wedge", wegde), staff);
   }
 
   clef(type: string, octaveChange: number, number: number): Element {
@@ -232,24 +206,6 @@ export class MusicXML {
       "duration",
       undefined,
       duration.toString(),
-    );
-  }
-
-  metronome(
-    tempo: number,
-    base: string = "Quarter",
-    staff: Element,
-  ): Element {
-    const [type, dotted] = base.split(" ");
-    return this.#cache["M" + tempo + base + staff] ||= this.direction(
-      create(
-        "metronome",
-        undefined,
-        create("beat-unit", undefined, type.toLowerCase()),
-        dotted ? create("beat-unit-dot") : null,
-        create("per-minute", undefined, tempo.toString()),
-      ),
-      staff,
     );
   }
 
