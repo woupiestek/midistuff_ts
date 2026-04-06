@@ -246,8 +246,6 @@ export class Durations {
   }
 
   allNotes(
-    // measures
-    staffOffsets: number[],
     // which ones change.
     secondStaves: Set<number>,
     elements: Elements,
@@ -256,113 +254,97 @@ export class Durations {
     const stopSustain = create("pedal", { type: "stop" });
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
-    const notationContent = this.#notationContent();
+    const staves = this.#staff.map((s) =>
+      secondStaves.has(s) ? staff2 : staff1
+    );
+    const notes = this.#notes(staves, xml, elements);
     const result: Element[][] = this.#measure.map(() => []);
-
-    for (let staff = 0; staff < staffOffsets.length; staff++) {
-      const voice1 = create("voice", undefined, `${2 * staff + 1}`);
-      const voice2 = create("voice", undefined, `${2 * (staff + 1)}`);
-      const staffElement = secondStaves.has(staff) ? staff2 : staff1;
-      for (
-        let m = staffOffsets[staff];
-        m < (staffOffsets[staff + 1] ?? this.#measure.length);
-        m++
-      ) {
-        for (
-          let i = this.#measure[m];
-          i < (this.#measure[m + 1] ?? this.#durations.length);
-          i++
-        ) {
-          for (const directionType of this.#directionTypes[i] ?? []) {
-            result[m].push(xml.direction(directionType, staffElement));
-          }
-          this.#forDuration(
-            i,
-            staffElement,
-            result[m],
-            xml,
-            elements.positions.backup.has(i) ? voice2 : voice1,
-            elements,
-            notationContent[i],
-          );
-          if (this.#stopSustain.has(i + 1)) {
-            result[m].push(xml.direction(stopSustain, staffElement));
-          }
-          if (elements.positions.backup.has(i)) {
-            result[m].push(xml.backup(this.#durations[i]));
-          }
+    for (let m = 0, l = this.#measure.length - 1; m < l; m++) {
+      for (let i = this.#measure[m]; i < this.#measure[m + 1]; i++) {
+        for (const directionType of this.#directionTypes[i] ?? []) {
+          result[m].push(xml.direction(directionType, staves[i]));
+        }
+        result[m].push(...notes[i]);
+        if (this.#stopSustain.has(i + 1)) {
+          result[m].push(xml.direction(stopSustain, staves[i]));
+        }
+        if (elements.positions.backup.has(i)) {
+          result[m].push(xml.backup(this.#durations[i]));
         }
       }
     }
     return result;
   }
 
-  #forDuration(
-    i: number,
-    staff: Element,
-    result: Element[],
+  #notes(
+    staves: Element[],
     xml: MusicXML,
-    voice: Element,
     elements: Elements,
-    notationContent: Element[],
-  ) {
-    const type = xml.type(this.#types[i]);
-    const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
-    const dots = this.#doubleDotted.has(i)
-      ? [MusicXML.dot, MusicXML.dot]
-      : this.#dotted.has(i)
-      ? [MusicXML.dot]
-      : [];
-    const duration = xml.duration(this.#durations[i]);
-    const from = i && elements.positions.groups[i - 1];
-    const to = elements.positions.groups[i];
-    if (to === from) {
-      result.push(
-        xml.note(
+  ): Element[][] {
+    const voices = Array((this.#currentStaff + 1) * 2).keys().map((k) =>
+      create("voice", undefined, `${k + 1}`)
+    ).toArray();
+    const notationContent = this.#notationContent();
+    const notes: Element[][] = [];
+    for (let i = 0; i < this.#durations.length; i++) {
+      notes[i] = [];
+      const voice =
+        voices[2 * this.#staff[i] + (elements.positions.backup.has(i) ? 1 : 0)];
+      const type = xml.type(this.#types[i]);
+      const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
+      const dots = this.#doubleDotted.has(i)
+        ? [MusicXML.dot, MusicXML.dot]
+        : this.#dotted.has(i)
+        ? [MusicXML.dot]
+        : [];
+      const duration = xml.duration(this.#durations[i]);
+      const from = i && elements.positions.groups[i - 1];
+      const to = elements.positions.groups[i];
+      if (to === from) {
+        notes[i].push(xml.note(
           MusicXML.rest,
           duration,
           voice,
           type,
           ...dots,
           timeMod,
-          staff,
-        ),
-      );
-    } else {
+          staves[i],
+        ));
+        continue;
+      }
       const grace = this.#grace.has(i) ? create("grace") : null;
       for (let note = from; note < to; note++) {
         const notations = [
-          ...notationContent,
+          ...notationContent[i],
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
         ].filter((it) => it != null);
-        result.push(
-          xml.note(
-            grace,
-            note > from ? MusicXML.chord : null, // no chord element in the first note
-            elements.positions.pitches[note],
-            duration,
-            elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
-            elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
-            voice, // in the middle!
-            type,
-            ...dots,
-            elements.positions.accidentals.get(note) ?? null,
-            timeMod,
-            this.#stems.get(i) ?? null,
-            staff, // in the middle!
-            notations.length > 0
-              ? create(
-                "notations",
-                undefined,
-                ...notations,
-              )
-              : null,
-            ...elements.lyrics[note],
-          ),
-        );
+        notes[i].push(xml.note(
+          grace,
+          note > from ? MusicXML.chord : null, // no chord element in the first note
+          elements.positions.pitches[note],
+          duration,
+          elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
+          elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
+          voice,
+          type,
+          ...dots,
+          elements.positions.accidentals.get(note) ?? null,
+          timeMod,
+          this.#stems.get(i) ?? null,
+          staves[i],
+          notations.length > 0
+            ? create(
+              "notations",
+              undefined,
+              ...notations,
+            )
+            : null,
+          ...elements.lyrics[note],
+        ));
       }
     }
+    return notes;
   }
 
   #notationContent() {
