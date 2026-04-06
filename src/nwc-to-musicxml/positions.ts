@@ -20,7 +20,6 @@ export class Positions {
   #tone = 34;
   #signature = [...N7];
   #altersByTone = [...N7];
-  #backup: Set<number> = new Set();
 
   visit({ tags, values }: NWCLines, visited: Set<number>): void {
     for (let i = 0; i < tags.length; i++) {
@@ -60,7 +59,6 @@ export class Positions {
         case "RestChord":
           if (values[i].Pos2) {
             for (const pos of values[i].Pos2) this.#pitch(pos);
-            this.#backup.add(this.#groups.length);
             this.#groups.push(this.#tones.length);
           }
           if (values[i].Pos) {
@@ -78,7 +76,6 @@ export class Positions {
   build(): Elements["positions"] {
     return {
       accidentals: this.#accidentals,
-      backup: this.#backup,
       groups: this.#groups,
       pitches: this.#pitches(),
       ...this.#ties(),

@@ -16,6 +16,7 @@ export class Durations {
   #directionTypes: Element[][] = [];
   // special directions that must occur at a different place.
   #stopSustain: Set<number> = new Set();
+  #backup: Set<number> = new Set();
 
   #pushDirection(type: Element) {
     (this.#directionTypes[this.#durations.length] ??= []).push(type);
@@ -39,6 +40,7 @@ export class Durations {
         case "Chord":
         case "RestChord":
           if (values[i].Dur2) {
+            this.#backup.add(this.#durations.length);
             this.#duration(values[i].Dur2);
           }
           this.#options(values[i].Opts);
@@ -102,7 +104,7 @@ export class Durations {
   }
 
   #addWord(word: string) {
-    this.#pushDirection(create("word", undefined, word));
+    this.#pushDirection(create("words", undefined, word));
   }
 
   #wedged: boolean = false;
@@ -268,7 +270,7 @@ export class Durations {
         if (this.#stopSustain.has(i + 1)) {
           result[m].push(xml.direction(stopSustain, staves[i]));
         }
-        if (elements.positions.backup.has(i)) {
+        if (this.#backup.has(i)) {
           result[m].push(xml.backup(this.#durations[i]));
         }
       }
@@ -288,8 +290,7 @@ export class Durations {
     const notes: Element[][] = [];
     for (let i = 0; i < this.#durations.length; i++) {
       notes[i] = [];
-      const voice =
-        voices[2 * this.#staff[i] + (elements.positions.backup.has(i) ? 1 : 0)];
+      const voice = voices[2 * this.#staff[i] + (this.#backup.has(i) ? 1 : 0)];
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
       const dots = this.#doubleDotted.has(i)

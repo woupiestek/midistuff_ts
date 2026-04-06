@@ -6,7 +6,6 @@ const HEADER =
 export type Elements = {
   positions: {
     accidentals: Map<number, Element>;
-    backup: Set<number>;
     groups: number[];
     pitches: Element[];
     startTieds: Map<number, Element>;

@@ -96,7 +96,6 @@
 |Note|Dur:4th|Pos:-3|Opts:Stem=Down
 |TempoVariance|Style:Fermata|Pause:0|Pos:9|Justify:Center|Placement:AtNextNote
 |Chord|Dur:Half|Pos:#-4,1
-|Tempo|Tempo:40|Pos:12
 |Bar
 |Tempo|Tempo:70|Pos:11
 |Chord|Dur:Half,Dotted|Pos:n-4,-1
