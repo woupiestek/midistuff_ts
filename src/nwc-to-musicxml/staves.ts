@@ -107,8 +107,9 @@ export class Staves {
       );
     }
 
-    const songInfo: (Element)[] = [];
-    const identification: (Element)[] = [];
+    const songInfo: Element[] = [];
+    const identification = create("identification");
+    const rights: string[] = [];
     for (const [k, v] of this.#songInfo) {
       switch (k) {
         case "Title":
@@ -116,25 +117,28 @@ export class Staves {
             create(
               "work",
               undefined,
-              create("work-title", undefined, v),
+              create("work-title", undefined, JSON.parse(v)),
             ),
           );
           break;
         case "Author":
         case "Lyricist":
-          identification.push(
-            create("creator", { type: k.toLowerCase() }, v),
+          identification.addElement(
+            create("creator", { type: k.toLowerCase() }, JSON.parse(v)),
           );
           break;
         case "Copyright1":
         case "Copyright2":
-          identification.push(create("rights", undefined, v));
+          rights.push(JSON.parse(v));
           break;
         default:
           console.warn("song data ignored:", k, v);
       }
     }
-    songInfo.push(create("identification", undefined, ...identification));
+    if (rights.length) {
+      identification.addElement(create("rights", undefined, rights.join("\n")));
+    }
+    songInfo.push(identification);
     return create(
       "score-partwise",
       { version: "4.0" },

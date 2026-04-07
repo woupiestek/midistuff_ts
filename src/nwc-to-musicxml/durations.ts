@@ -93,10 +93,12 @@ export class Durations {
     }
   }
 
-  #notations: { [_: number]: Set<string> } = {};
+  #notationsX: number[] = [];
+  #notationsY: string[] = [];
 
   #addNotation(style: string) {
-    (this.#notations[this.#durations.length] ||= new Set()).add(style);
+    this.#notationsX.push(this.#durations.length);
+    this.#notationsY.push(style);
   }
 
   #addWord(word: string) {
@@ -321,9 +323,10 @@ export class Durations {
         continue;
       }
       const grace = this.#grace.has(i) ? create("grace") : null;
+      const shared = notationContent[i] ?? [];
       for (let note = from; note < to; note++) {
         const notations = [
-          ...notationContent[i],
+          ...shared,
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
         ].filter((it) => it != null);
@@ -355,7 +358,7 @@ export class Durations {
     return notes;
   }
 
-  #notationContent() {
+  #notationContent(): { [_: number]: Element[] } {
     const fermata = create("fermata");
     const atriculations = new Map([
       ["Accent", create("accent")],
@@ -364,42 +367,42 @@ export class Durations {
       ["Staccato", create("staccato")],
       ["Tenuto", create("tenuto")],
     ]);
-    const slur: {
-      stop: { [_: string]: Element };
-      start: { [_: string]: Element };
-      continue: { [_: string]: Element };
-    } = { stop: {}, start: {}, continue: {} };
-    const notations: Element[][] = [];
-    let slurNumber = 1;
-    for (let i = 0; i < this.#durations.length; i++) {
-      notations[i] = [];
-      if (this.#notations[i]) {
-        const articulations: Element[] = [...this.#notations[i]]
-          .map((it) => atriculations.get(it))
-          .filter((it) => it !== undefined);
-        if (articulations.length > 0) {
-          notations[i].push(
-            create("articulations", undefined, ...articulations),
-          );
-        }
-        if (this.#notations[i].has("Fermata")) {
-          notations[i].push(fermata);
-        }
+
+    const artix: { [_: number]: Element[] } = {};
+    const frm: Set<number> = new Set();
+    for (let i = 0; i < this.#notationsX.length; i++) {
+      const style = this.#notationsY[i];
+      if (style === "Fermata") {
+        frm.add(this.#notationsX[i]);
+        continue;
       }
-      const slurType = this.#slurTypes.get(i);
-      if (slurType) {
-        notations[i].push(
-          slur[slurType][slurNumber] ??= create("slur", {
-            type: slurType,
-            number: slurNumber.toString(),
-          }),
-        );
-        if (slurType === "stop") {
-          slurNumber %= 16;
-          slurNumber += 1;
-        }
+      const element = atriculations.get(style);
+      if (element) {
+        (artix[this.#notationsX[i]] ||= []).push(element);
       }
     }
+
+    const notations: { [_: number]: Element[] } = {};
+    for (const [k, v] of Object.entries(artix)) {
+      (notations[+k] ||= []).push(create("articulations", undefined, ...v));
+    }
+    frm.forEach((i) => (notations[i] ||= []).push(fermata));
+    let slurNumber = 1;
+    const slur: {
+      [_: string]: { [_: number]: Element };
+    } = { stop: {}, start: {}, continue: {} };
+    this.#slurTypes.forEach((slurType, i) => {
+      (notations[i] ||= []).push(
+        slur[slurType][slurNumber] ??= create("slur", {
+          type: slurType,
+          number: slurNumber.toString(),
+        }),
+      );
+      if (slurType === "stop") {
+        slurNumber %= 16;
+        slurNumber += 1;
+      }
+    });
     return notations;
   }
 }
