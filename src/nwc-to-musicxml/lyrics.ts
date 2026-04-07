@@ -116,13 +116,14 @@ export class Lyrics {
   }
 
   get() {
-    const lyrics: Element[][] = [];
-    for (let noteNumber = 0; noteNumber < this.#noteNumber; noteNumber++) {
-      lyrics[noteNumber] = [];
-      for (let i = 0; i < 8; i++) {
-        const text = this.#lyrics[i].get(noteNumber);
+    const lyrics: Element[][] = Array.from(
+      { length: this.#noteNumber },
+      () => [],
+    );
+    for (let i = 0; i < 8; i++) {
+      this.#lyrics[i].forEach((text, noteNumber) => {
         const syllabic = this.#syllabilities[i].get(noteNumber);
-        if (!text || !syllabic) continue;
+        if (!syllabic) return;
         lyrics[noteNumber].push(
           create(
             "lyric",
@@ -131,7 +132,7 @@ export class Lyrics {
             create("text", undefined, text),
           ),
         );
-      }
+      });
     }
     return lyrics;
   }

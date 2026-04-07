@@ -103,7 +103,7 @@ export class Bars {
     const leftBarstyles: Map<number, string>[] = [];
     const rightBarstyles: Map<number, string>[] = [];
     // only keep measures with notes in the end
-    // soemthing that noteworthy does.
+    // something that noteworthy does.
     const keep = new Set<number>();
 
     for (let part = 0; part < parts.length - 1; part++) {
@@ -126,11 +126,8 @@ export class Bars {
           }
           const m = measure - this.staves[staff];
           gns[m] ||= [];
-          const notesM: Element[] = allNotes[measure].filter((it) =>
-            it !== null
-          );
-          if (notesM.length) {
-            gns[m].push(...notesM, backup);
+          if (allNotes[measure].length) {
+            gns[m].push(...allNotes[measure], backup);
             keep.add(m);
           }
 
