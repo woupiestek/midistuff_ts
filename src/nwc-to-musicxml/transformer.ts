@@ -52,7 +52,6 @@ export class Transformer {
 
     this.#staves.visitEnd();
     this.#bars.visitEnd();
-    this.#durations.visitEnd();
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(
       this.#staves.seconds,

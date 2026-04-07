@@ -9,9 +9,7 @@ export class Durations {
   #measure: number[] = [];
   #durations: number[] = [];
   #types: string[] = [];
-  // not yet used
-  #currentStaff: number = -1;
-  #staff: number[] = [];
+  #staffOffsets: number[] = [];
 
   #directionTypes: Element[][] = [];
   // special directions that must occur at a different place.
@@ -23,10 +21,12 @@ export class Durations {
   }
 
   visit({ tags, values }: NWCLines, visited: Set<number>): void {
+    const startSustain = create("pedal", { type: "start" });
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":
-          this.#currentStaff++;
+          // this.#currentStaff++;
+          this.#staffOffsets.push(this.#durations.length);
           // fall through
         case "Bar":
           this.#measure.push(this.#durations.length);
@@ -51,7 +51,7 @@ export class Durations {
             // what about insert before?
             this.#stopSustain.add(this.#durations.length);
           } else {
-            this.#pushDirection(create("pedal", { type: "start" }));
+            this.#pushDirection(startSustain);
           }
           break;
         case "Dynamic":
@@ -91,10 +91,6 @@ export class Durations {
       }
       visited.add(i);
     }
-  }
-
-  visitEnd() {
-    this.#measure.push(this.#durations.length);
   }
 
   #notations: { [_: number]: Set<string> } = {};
@@ -172,7 +168,6 @@ export class Durations {
   }
 
   #duration(dur: string[]) {
-    this.#staff.push(this.#currentStaff);
     const index = this.#durations.length;
     let duration = PER_WHOLE;
     let slurred = false;
@@ -253,29 +248,34 @@ export class Durations {
     elements: Elements,
     xml: MusicXML,
   ): Element[][] {
-    const stopSustain = create("pedal", { type: "stop" });
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
-    const staves = this.#staff.map((s) =>
-      secondStaves.has(s) ? staff2 : staff1
+    const staves = this.#staffOffsets.flatMap((offset, index, offsets) =>
+      Array.from({
+        length: (offsets[index + 1] ?? this.#durations.length) - offset,
+      }, () => secondStaves.has(index) ? staff2 : staff1)
     );
-    const notes = this.#notes(staves, xml, elements);
-    const result: Element[][] = this.#measure.map(() => []);
-    for (let m = 0, l = this.#measure.length - 1; m < l; m++) {
-      for (let i = this.#measure[m]; i < this.#measure[m + 1]; i++) {
-        for (const directionType of this.#directionTypes[i] ?? []) {
-          result[m].push(xml.direction(directionType, staves[i]));
-        }
-        result[m].push(...notes[i]);
-        if (this.#stopSustain.has(i + 1)) {
-          result[m].push(xml.direction(stopSustain, staves[i]));
-        }
-        if (this.#backup.has(i)) {
-          result[m].push(xml.backup(this.#durations[i]));
-        }
-      }
-    }
-    return result;
+
+    // start with putting in most directions
+    const byDuration: Element[][] = this.#durations.map((_, i) =>
+      (this.#directionTypes[i] ?? []).map((type) =>
+        xml.direction(type, staves[i])
+      )
+    );
+    // then the notes
+    this.#notes(staves, xml, elements).forEach((ns, i) =>
+      byDuration[i].push(...ns)
+    );
+    // then the stop sustain direction
+    const stopSustain = create("pedal", { type: "stop" });
+    this.#stopSustain.forEach((i) =>
+      byDuration[i - 1].push(xml.direction(stopSustain, staves[i - 1]))
+    );
+    // then the back up instruction, which tells musicxml to set the next note sooner, in case the chord contained two simultaneous durations.
+    this.#backup.forEach((i) =>
+      byDuration[i].push(xml.backup(this.#durations[i]))
+    );
+    return this.#measure.map((m, i, a) => byDuration.slice(m, a[i + 1]).flat());
   }
 
   #notes(
@@ -283,14 +283,21 @@ export class Durations {
     xml: MusicXML,
     elements: Elements,
   ): Element[][] {
-    const voices = Array((this.#currentStaff + 1) * 2).keys().map((k) =>
+    const voices = Array((this.#staffOffsets.length) * 2).keys().map((k) =>
       create("voice", undefined, `${k + 1}`)
     ).toArray();
+
+    const byIndex = this.#staffOffsets.flatMap((offset, index, offsets) =>
+      Array.from({
+        length: (offsets[index + 1] ?? this.#durations.length) - offset,
+      }, (_) => 2 * index)
+    );
+    this.#backup.forEach((i) => byIndex[i]++);
+
     const notationContent = this.#notationContent();
     const notes: Element[][] = [];
     for (let i = 0; i < this.#durations.length; i++) {
       notes[i] = [];
-      const voice = voices[2 * this.#staff[i] + (this.#backup.has(i) ? 1 : 0)];
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
       const dots = this.#doubleDotted.has(i)
@@ -305,7 +312,7 @@ export class Durations {
         notes[i].push(xml.note(
           MusicXML.rest,
           duration,
-          voice,
+          voices[byIndex[i]],
           type,
           ...dots,
           timeMod,
@@ -327,7 +334,7 @@ export class Durations {
           duration,
           elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
           elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
-          voice,
+          voices[byIndex[i]],
           type,
           ...dots,
           elements.positions.accidentals.get(note) ?? null,
