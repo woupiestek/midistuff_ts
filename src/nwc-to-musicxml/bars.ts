@@ -173,7 +173,7 @@ export class Bars {
               leftBarstyles[part].get(measure),
               endings[part].get(measure),
             ),
-            allAttributes[part].get(measure) ?? null,
+            allAttributes[part][measure] ?? null,
             ...groupedNotes[part][measure],
             xml.rightBarline(
               rightBarstyles[part].get(measure),
@@ -190,9 +190,8 @@ export class Bars {
     parts: number[],
     secondStaves: Set<number>,
     xml: MusicXML,
-  ): Map<number, Element>[] {
+  ): { [_: number]: Element }[] {
     // part, measure, cumulative array of attributes
-    const result: Map<number, Element>[] = parts.map(() => new Map());
     const twoStaves = create(
       "staves",
       undefined,
@@ -203,40 +202,52 @@ export class Bars {
       undefined,
       (PER_WHOLE / 4).toString(),
     );
-    for (let part = 0; part < parts.length - 1; part++) {
-      for (let j = parts[part]; j < parts[part + 1]; j++) {
-        // secondStaves.has(j)
-        const staff = secondStaves.has(j) ? 2 : 1;
-        for (let k = this.staves[j]; k < this.staves[j + 1]; k++) {
-          const measure = k - this.staves[j];
-          // take note
-          const attrs: Element[] = [];
-          if (measure === 0) attrs.push(divisions);
-          const key = this.#keys.get(k);
-          if (key !== undefined) attrs.push(xml.key(key));
-          const time = this.#times.get(k);
-          if (time) {
-            const [beats, beatType] = time.split("/");
-            attrs.push(xml.time(beats, beatType));
-          }
-          const clef = this.#clefs.get(k);
-          if (clef) {
-            attrs.push(
-              xml.clef(clef, this.#clefOctaveChanges.get(k) ?? 0, staff),
-            );
-          }
-          if (staff === 2) {
-            attrs.push(twoStaves);
-          }
-          if (attrs.length) {
-            result[part].set(
-              measure,
-              create("attributes", undefined, ...attrs),
-            );
-          }
+
+    // from k to part & measure?
+    const X = parts.map((s) => this.staves[s]).flatMap((m, i, a) =>
+      Array.from({ length: (a[i + 1] ?? this.#measure) - m }, () => i)
+    );
+    let length = 0;
+    const Y = this.staves.flatMap((m, i) => {
+      const l = (this.staves[i + 1] ?? this.#measure) - m;
+      if (l > length) length = l;
+      return Array(l).keys().toArray();
+    });
+    // by part & measure?
+    const attrs: { [_: number]: Element }[] = Array.from(
+      { length: parts.length - 1 },
+      () => ({ 0: create("attributes", undefined, divisions) }),
+    );
+
+    function add(element: Element, k: number) {
+      (attrs[X[k]][Y[k]] ??= create("attributes")).addElement(element);
+    }
+
+    this.#keys.forEach((key, k) => add(xml.key(key), k));
+    this.#times.forEach((time, k) => {
+      const [beats, beatType] = time.split("/");
+      add(xml.time(beats, beatType), k);
+    });
+    const staves = this.staves.flatMap((offset, index, offsets) =>
+      Array.from({
+        length: (offsets[index + 1] ?? this.#measure) - offset,
+      }, () => secondStaves.has(index) ? 2 : 1)
+    );
+    this.#clefs.forEach((clef, k) =>
+      add(
+        xml.clef(clef, this.#clefOctaveChanges.get(k) ?? 0, staves[k]),
+        k,
+      )
+    );
+    // for all parts that have two staves
+    parts.slice(1).forEach((s, X) => {
+      if (secondStaves.has(s - 1)) {
+        for (let Y = 0; Y < length; Y++) {
+          (attrs[X][Y] ??= create("attributes")).addElement(twoStaves);
         }
       }
-    }
-    return result;
+    });
+
+    return attrs;
   }
 }

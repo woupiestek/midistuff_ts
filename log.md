@@ -1,5 +1,22 @@
 # Midistuff logs
 
+## 2026-05-28
+
+### Try with AI
+
+- collect more nice compositions to convert
+- get musescore to pick up the instrument choices somehow
+
+Codex spotted a typo, that actually broke the transformer rather badly.
+
+- jazzy is corrupt...
+- 2021-2-21 2 lukt ook niet
+- 2006-07-05 heeft het helemaal niet gered
+
+### adding more samples
+
+`Copy-Item "C:\Users\woupi\OneDrive\Documents\NoteWorthy\Wouter\*\2006-4-20 Requiem.nwc" .\samples`
+
 ## 2026-04-06
 
 XML templates, because of this terrible logistics problem: every note is to be

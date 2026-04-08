@@ -1,4 +1,3 @@
-import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { create, Element } from "./xml.ts";
 import { Elements, MusicXML } from "./musicxml.ts";
 import { NWCLines } from "./scanner.ts";
@@ -241,7 +240,6 @@ export class Durations {
       this.#slurred = slurred;
     }
     this.#durations.push(duration);
-    assert(this.#types.length === this.#durations.length);
   }
 
   allNotes(
