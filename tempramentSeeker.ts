@@ -1,4 +1,4 @@
-import { assert } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { assert } from "@std/assert";
 
 function approximateLog(b: number, a: number) {
   assert(a > b);

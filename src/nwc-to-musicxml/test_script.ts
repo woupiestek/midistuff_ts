@@ -66,6 +66,7 @@ for await (const entry of Deno.readDir(samplesDir)) {
 }
 
 for (const fileName of list) {
+  console.log("Processing", fileName);
   const source = await Deno.readTextFile(`${samplesDir}\\${fileName}.nwctxt`);
   try {
     await Deno.writeTextFile(
@@ -77,6 +78,6 @@ for (const fileName of list) {
       new Transformer().transform(source),
     );
   } catch (e) {
-    console.error("Something went wrong", e);
+    console.error("Something went wrong", fileName, e);
   }
 }

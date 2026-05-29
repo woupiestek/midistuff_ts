@@ -7,6 +7,47 @@
 Along the way I installed go as well. Could be interesting to port to
 eventually...
 
+2006-7-5! has some ofthe unwanted qurter rests, like jazzy btw. no corruption
+warning. refused to convert before, but the reason remains unclear.
+
+It looks like 2007-10-19! has many unused lines, but why?
+
+ok jazzy doesn't have the quarter rests, that is the creative pedeling.
+
+I refactors some local vars into static varibale, though it should not matter on
+a typical run. Just lambda lifted out of habit.
+
+I makes me the most sad in 2010-2-21 2! Constant interruptions.
+
+### codex discussion
+
+'musical event' with time 'tick' and staff... I guess I fell for premature
+optimisation: there is a solution that does not store the data, but that is not
+doing is any favors, because it is not actually faster, and makes the algorithms
+much harder to understand and debug.
+
+both systems do works with accumulative time. i.e. no coordinates for the time
+of a note, but the assumption that because one note follows another, it follows
+in time. for nwc this is natural: bar lines are just events that occur between
+the notes. for musicxml this is obviously add odds with the struct subdivision
+in measures. Well, it is like a hashmap where every bucket has a list of
+element. but elements cannot be reordered freely. I guess technically each note
+or chord should point to its predecessor.
+
+note or chord: that is also a difference. nws has rest, note and chord. music
+xml has rest and note, and again comes with an awkward encoding of chords.
+Conceptually is see a duration of time, that can be filled with any number of
+notes.
+
+Once again an issue of time: each note could have a pitch, and a time, this time
+is in a measure and may follow another time in that meassure.
+
+## two strategies
+
+- give more feedback if NWC is weird. perhaps the user should adjust the source.
+- learn more about musicxml: measure can apparently be subdivided to support mid
+  measure key changes for example.
+
 ## 2026-05-28
 
 ### Try with AI

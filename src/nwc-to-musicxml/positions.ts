@@ -116,16 +116,23 @@ export class Positions {
   }
 
   #pitches(): Element[] {
+    // this method is only called once
+    // so it actually saves memory to allocate these structures on the stack
+    // I know that doesn't happen, because typescript does not work that way
+    // But it could work that way in rust, or zig or c++ for example
+
     const steps = [..."CDEFGAB"].map((step) => create("step", undefined, step));
-    const alters = Object.fromEntries(
-      [..."vbn#x"].map((
-        alter,
-        i,
-      ) => [alter, create("alter", undefined, (i - 2).toString())]),
-    );
+
+    // technically _ is n, the neutral alteration, but that result in no (null) xml elements
+    const alters = new Map([..."vb_#x"].map((
+      alter,
+      i,
+    ) => [alter, create("alter", undefined, (i - 2).toString())]));
+
     const octaves = Array(10).keys().map((octave) =>
       create("octave", undefined, octave.toString())
     ).toArray();
+
     const xmls: { [_: string]: Element }[] = [];
     return this.#tones.map((tone, i) => {
       const alter = this.#alters[i];
@@ -134,7 +141,7 @@ export class Positions {
         "pitch",
         undefined,
         steps[tone % 7],
-        alter === "n" ? null : alters[alter],
+        alters.get(alter) ?? null,
         octaves[(tone / 7) | 0],
       );
     });
