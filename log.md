@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2026-05-29
+
+### codex & beads
+
+Along the way I installed go as well. Could be interesting to port to
+eventually...
+
 ## 2026-05-28
 
 ### Try with AI
@@ -11,7 +18,7 @@ Codex spotted a typo, that actually broke the transformer rather badly.
 
 - jazzy is corrupt...
 - 2021-2-21 2 lukt ook niet
-- 2006-07-05 heeft het helemaal niet gered
+- 2006-7-5 heeft het helemaal niet gered
 
 ### adding more samples
 
