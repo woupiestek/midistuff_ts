@@ -12,6 +12,10 @@ notes.
 
 Whole notes can fill 3/4 rests. this requires special treatment in
 
+### tests
+
+I wrote few for the converter because a) I judge the end results, and b)
+
 ## 2026-05-29
 
 ### codex & beads

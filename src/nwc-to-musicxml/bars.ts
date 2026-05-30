@@ -1,91 +1,130 @@
 import { PER_WHOLE } from "./durations.ts";
 import { MusicXML } from "./musicxml.ts";
-import { NWCLines } from "./scanner.ts";
+import { countLessThan, NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 export class Bars {
-  staves: number[] = [];
-  #measure = -1;
+  firstMeasureForNWCStaff: number[] = [0];
+  #measureCount = 0;
   #barStyles: Map<number, string> = new Map();
   #endings: Map<number, string[]> = new Map();
-  #endingBar: string = "SectionClose";
 
   #times: Map<number, string> = new Map();
   #clefs: Map<number, string> = new Map();
   #clefOctaveChanges: Map<number, number> = new Map();
   #keys: Map<number, number> = new Map();
 
-  visit({ tags, values }: NWCLines, visited: Set<number>): void {
-    for (let i = 0; i < tags.length; i++) {
-      switch (tags[i]) {
-        case "AddStaff":
-          this.#measure++;
-          this.staves.push(this.#measure);
-          if (this.#measure > 1) {
-            this.#barStyles.set(this.#measure, this.#endingBar);
-          }
-          break;
-        case "StaffProperties":
-          if (values[i].EndingBar) {
-            this.#endingBar = values[i].EndingBar[0].replaceAll(" ", "");
-          }
-          break;
-        case "Bar":
-          this.#measure++;
-          if (values[i].Style) {
-            this.#barStyles.set(this.#measure, values[i].Style[0]);
-          }
-          break;
-        case "Ending":
-          this.#endings.set(this.#measure, values[i].Endings);
-          break;
-        case "TimeSig":
-          switch (values[i].Signature[0]) {
-            case "Common":
-              this.#times.set(this.#measure, "4/4");
-              break;
-            case "AllaBreve":
-              this.#times.set(this.#measure, "2/2");
-              break;
-            default:
-              this.#times.set(this.#measure, values[i].Signature[0]);
-              break;
-          }
-          break;
-        case "Clef":
-          this.#clefs.set(this.#measure, values[i].Type[0]);
-          if (!values[i].OctaveShift) break;
-          switch (values[i].OctaveShift[0]) {
+  // warning: NWC does not put bar lines at the ends of the staves,
+  // so counting Bars is not enough to know where measures start and end.
+  // below an implicit Bar is therefore added between each staff.
+  visit(
+    { values, lineNumbersByTag }: NWCLines,
+    visited: Set<number>,
+  ): void {
+    const { AddStaff, Bar } = lineNumbersByTag;
+    if (!AddStaff || !Bar) {
+      return;
+    }
+    this.firstMeasureForNWCStaff = lineNumbersByTag.AddStaff.map(
+      (lineNumber, staffNumber) => {
+        visited.add(lineNumber);
+        return countLessThan(lineNumber, Bar) + staffNumber;
+      },
+    );
+    this.#measureCount = AddStaff.length + Bar.length;
+    this.firstMeasureForNWCStaff.push(this.#measureCount);
+
+    for (let i = 0; i < Bar.length; i++) {
+      const lineNumber = Bar[i];
+      const style = values[lineNumber].Style;
+      if (style) {
+        const staff = countLessThan(lineNumber, AddStaff);
+        this.#barStyles.set(staff + i, style[0]);
+      }
+      visited.add(lineNumber);
+    }
+
+    if (lineNumbersByTag.Ending) {
+      for (const lineNumber of lineNumbersByTag.Ending) {
+        const measure = countLessThan(lineNumber, AddStaff) +
+          countLessThan(lineNumber, Bar) - 1;
+        this.#endings.set(measure, values[lineNumber].Endings);
+        visited.add(lineNumber);
+      }
+    }
+
+    if (lineNumbersByTag.TimeSig) {
+      for (const lineNumber of lineNumbersByTag.TimeSig) {
+        const measure = countLessThan(lineNumber, AddStaff) +
+          countLessThan(lineNumber, Bar) - 1;
+        switch (values[lineNumber].Signature[0]) {
+          case "Common":
+            this.#times.set(measure, "4/4");
+            break;
+          case "AllaBreve":
+            this.#times.set(measure, "2/2");
+            break;
+          default:
+            this.#times.set(measure, values[lineNumber].Signature[0]);
+            break;
+        }
+        visited.add(lineNumber);
+      }
+    }
+
+    if (lineNumbersByTag.Clef) {
+      for (const lineNumber of lineNumbersByTag.Clef) {
+        const measure = countLessThan(lineNumber, AddStaff) +
+          countLessThan(lineNumber, Bar) - 1;
+        this.#clefs.set(measure, values[lineNumber].Type[0]);
+        if (values[lineNumber].OctaveShift) {
+          switch (values[lineNumber].OctaveShift[0]) {
             case "Octave Up":
-              this.#clefOctaveChanges.set(this.#measure, 1);
+              this.#clefOctaveChanges.set(measure, 1);
               break;
             case "Octave Down":
-              this.#clefOctaveChanges.set(this.#measure, -1);
+              this.#clefOctaveChanges.set(measure, -1);
               break;
             default:
               break;
           }
-          break;
-        case "Key": {
-          let fifths = 0;
-          for (const x of values[i].Signature) {
-            if (x[1] === "#") fifths++;
-            else fifths--;
-          }
-          this.#keys.set(this.#measure, fifths);
-          break;
         }
-        default:
-          continue;
+        visited.add(lineNumber);
       }
-      visited.add(i);
     }
-  }
 
-  visitEnd() {
-    this.#measure++;
-    this.staves.push(this.#measure);
-    this.#barStyles.set(this.#measure, this.#endingBar);
+    if (lineNumbersByTag.Key) {
+      for (const lineNumber of lineNumbersByTag.Key) {
+        const measure = countLessThan(lineNumber, AddStaff) +
+          countLessThan(lineNumber, Bar) - 1;
+        let fifths = 0;
+        for (const x of values[lineNumber].Signature) {
+          if (x[1] === "#") fifths++;
+          else fifths--;
+        }
+        this.#keys.set(measure, fifths);
+        visited.add(lineNumber);
+      }
+    }
+
+    for (let i = 1; i < this.firstMeasureForNWCStaff.length; i++) {
+      const measure = this.firstMeasureForNWCStaff[i];
+      this.#barStyles.set(measure, "SectionClose");
+    }
+
+    if (lineNumbersByTag.StaffProperties) {
+      for (const lineNumber of lineNumbersByTag.StaffProperties) {
+        if (values[lineNumber].EndingBar) {
+          const endingBar = values[lineNumber].EndingBar[0].replaceAll(" ", "");
+          const staff = countLessThan(lineNumber, lineNumbersByTag.AddStaff);
+          this.#barStyles.set(
+            this.firstMeasureForNWCStaff[staff + 1],
+            endingBar,
+          );
+          visited.add(lineNumber);
+        }
+      }
+    }
   }
 
   // this is here to deal with the issue that the data in a musicxml measure may be spread out in the nwc file
@@ -114,8 +153,8 @@ export class Bars {
       for (let staff = parts[part]; staff < parts[part + 1]; staff++) {
         let backup = xml.backup(PER_WHOLE);
         for (
-          let measure = this.staves[staff];
-          measure < this.staves[staff + 1];
+          let measure = this.firstMeasureForNWCStaff[staff];
+          measure < this.firstMeasureForNWCStaff[staff + 1];
           measure++
         ) {
           const time = this.#times.get(measure);
@@ -124,7 +163,7 @@ export class Bars {
             backup = xml.backup(PER_WHOLE * +n / +d);
             // break;
           }
-          const m = measure - this.staves[staff];
+          const m = measure - this.firstMeasureForNWCStaff[staff];
           gns[m] ||= [];
           if (allNotes[measure].length) {
             gns[m].push(...allNotes[measure], backup);
@@ -204,12 +243,14 @@ export class Bars {
     );
 
     // from k to part & measure?
-    const X = parts.map((s) => this.staves[s]).flatMap((m, i, a) =>
-      Array.from({ length: (a[i + 1] ?? this.#measure) - m }, () => i)
-    );
+    const X = parts.map((s) => this.firstMeasureForNWCStaff[s]).flatMap((
+      m,
+      i,
+      a,
+    ) => Array.from({ length: (a[i + 1] ?? this.#measureCount) - m }, () => i));
     let length = 0;
-    const Y = this.staves.flatMap((m, i) => {
-      const l = (this.staves[i + 1] ?? this.#measure) - m;
+    const Y = this.firstMeasureForNWCStaff.flatMap((m, i) => {
+      const l = (this.firstMeasureForNWCStaff[i + 1] ?? this.#measureCount) - m;
       if (l > length) length = l;
       return Array(l).keys().toArray();
     });
@@ -228,9 +269,13 @@ export class Bars {
       const [beats, beatType] = time.split("/");
       add(xml.time(beats, beatType), k);
     });
-    const staves = this.staves.flatMap((offset, index, offsets) =>
+    const staves = this.firstMeasureForNWCStaff.flatMap((
+      offset,
+      index,
+      offsets,
+    ) =>
       Array.from({
-        length: (offsets[index + 1] ?? this.#measure) - offset,
+        length: (offsets[index + 1] ?? this.#measureCount) - offset,
       }, () => secondStaves.has(index) ? 2 : 1)
     );
     this.#clefs.forEach((clef, k) =>

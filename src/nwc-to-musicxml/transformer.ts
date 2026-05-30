@@ -49,8 +49,6 @@ export class Transformer {
     if (notVisited.size) {
       console.warn("Unused lines:", ...notVisited);
     }
-
-    this.#bars.visitEnd();
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(
       this.#staves.seconds,

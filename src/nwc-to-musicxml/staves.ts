@@ -26,16 +26,20 @@ export class Staves {
       }
     }
 
-    if(lineNumbersByTag.StaffInstrument) {
-    // still not picked up by musescore, alas
-    for (const lineNumber of lineNumbersByTag.StaffInstrument) {
-      if (values[lineNumber].Patch) {
-        const staffIndex = countLessThan(lineNumber, lineNumbersByTag.AddStaff);
-        this.#midiPrograms[staffIndex] = +values[lineNumber].Patch[0] +
-          1;
+    if (lineNumbersByTag.StaffInstrument) {
+      // still not picked up by musescore, alas
+      for (const lineNumber of lineNumbersByTag.StaffInstrument) {
+        if (values[lineNumber].Patch) {
+          const staffIndex = countLessThan(
+            lineNumber,
+            lineNumbersByTag.AddStaff,
+          );
+          this.#midiPrograms[staffIndex] = +values[lineNumber].Patch[0] +
+            1;
           visited.add(lineNumber);
+        }
       }
-    }}
+    }
 
     this.#names = lineNumbersByTag.AddStaff.map((lineNumber) =>
       values[lineNumber].Name[0].slice(1, -1)
@@ -47,8 +51,10 @@ export class Staves {
       if (values[lineNumber].WithNextStaff) {
         const withNextStaff = new Set(values[lineNumber].WithNextStaff);
         if (withNextStaff.has("Brace")) {
-          const nextStaffIndex =
-            countLessThan(lineNumber, lineNumbersByTag.AddStaff) + 1;
+          const nextStaffIndex = countLessThan(
+            lineNumber,
+            lineNumbersByTag.AddStaff,
+          );
           merge.add(nextStaffIndex);
           if (!withNextStaff.has("Layer")) {
             this.seconds.add(
