@@ -38,11 +38,11 @@ export class Transformer {
     lines.tags.forEach((it, ix) => {
       if (TECHNICAL_TAGS.has(it)) visited.add(ix);
     });
-    this.#positions.visit(lines, visited);
-    this.#bars.visit(lines, visited);
     this.#staves.visit(lines, visited);
+    this.#bars.visit(lines, visited);
     this.#durations.visit(lines, visited);
     this.#lyrics.visit(lines, visited);
+    this.#positions.visit(lines, visited);
     const notVisited = new Set(
       Array(length).keys().filter((i) => !visited.has(i)),
     );
@@ -50,7 +50,6 @@ export class Transformer {
       console.warn("Unused lines:", ...notVisited);
     }
 
-    this.#staves.visitEnd();
     this.#bars.visitEnd();
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(
@@ -62,7 +61,7 @@ export class Transformer {
       xml,
     );
     const allMeasures = this.#bars.multiple(
-      this.#staves.parts,
+      this.#staves.firstNWCStaffByPart,
       this.#staves.seconds,
       allNotes,
       xml,

@@ -1,66 +1,69 @@
 import { create, Element } from "./xml.ts";
-import { NWCLines } from "./scanner.ts";
+import { countLessThan, NWCLines } from "./scanner.ts";
 
 // noteworthy can layer staffs, musicxml cannot
 // moreover, the notion of a part is different.
 // the layer property is a mystery...
 
 export class Staves {
-  parts: number[] = [];
+  firstNWCStaffByPart: number[] = [];
   #names: string[] = [];
   #midiPrograms: number[] = [];
-  #merge = false;
   #songInfo: Map<string, string> = new Map();
-  #onSecondStaff = false;
   // a part may have a second staff, which must be kept track of
   seconds: Set<number> = new Set();
 
-  visit({ tags, values }: NWCLines, visited: Set<number>): void {
-    for (let i = 0; i < tags.length; i++) {
-      switch (tags[i]) {
-        case "AddStaff":
-          if (this.#merge) {
-            this.#merge = false;
-            if (this.#onSecondStaff) {
-              this.seconds.add(this.#names.length);
-            }
-          } else {
-            this.parts.push(this.#names.length);
-            this.#onSecondStaff = false;
-          }
-          this.#names.push(values[i].Name[0].slice(1, -1));
-          break;
-        case "StaffProperties": {
-          const withNextStaff = new Set(values[i].WithNextStaff);
-          if (withNextStaff.has("Brace")) {
-            this.#merge = true;
-            if (!withNextStaff.has("Layer")) {
-              this.#onSecondStaff = true;
-            }
-          }
-          break;
+  visit(
+    { values, lineNumbersByTag }: NWCLines,
+    visited: Set<number>,
+  ): void {
+    if (lineNumbersByTag.SongInfo) {
+      for (const lineNumber of lineNumbersByTag.SongInfo) {
+        for (const [k, v] of Object.entries(values[lineNumber])) {
+          this.#songInfo.set(k, v[0]);
         }
-        case "StaffInstrument":
-          if (values[i].Patch) {
-            this.#midiPrograms[this.#names.length - 1] = +values[i].Patch[0] +
-              1;
-          }
-          break;
-        // is this related to staves?
-        case "SongInfo":
-          for (const [k, v] of Object.entries(values[i])) {
-            this.#songInfo.set(k, v[0]);
-          }
-          break;
-        default:
-          continue;
+        visited.add(lineNumber);
       }
-      visited.add(i);
     }
-  }
 
-  visitEnd() {
-    this.parts.push(this.#names.length);
+    if(lineNumbersByTag.StaffInstrument) {
+    // still not picked up by musescore, alas
+    for (const lineNumber of lineNumbersByTag.StaffInstrument) {
+      if (values[lineNumber].Patch) {
+        const staffIndex = countLessThan(lineNumber, lineNumbersByTag.AddStaff);
+        this.#midiPrograms[staffIndex] = +values[lineNumber].Patch[0] +
+          1;
+          visited.add(lineNumber);
+      }
+    }}
+
+    this.#names = lineNumbersByTag.AddStaff.map((lineNumber) =>
+      values[lineNumber].Name[0].slice(1, -1)
+    );
+    lineNumbersByTag.AddStaff.forEach((lineNumber) => visited.add(lineNumber));
+
+    const merge: Set<number> = new Set();
+    for (const lineNumber of lineNumbersByTag.StaffProperties) {
+      if (values[lineNumber].WithNextStaff) {
+        const withNextStaff = new Set(values[lineNumber].WithNextStaff);
+        if (withNextStaff.has("Brace")) {
+          const nextStaffIndex =
+            countLessThan(lineNumber, lineNumbersByTag.AddStaff) + 1;
+          merge.add(nextStaffIndex);
+          if (!withNextStaff.has("Layer")) {
+            this.seconds.add(
+              nextStaffIndex,
+            );
+          }
+          visited.add(lineNumber);
+        }
+      }
+    }
+    this.firstNWCStaffByPart = this.#names.map((_, i) => i).filter((i) =>
+      !merge.has(i)
+    );
+    // add one past the end for easier calculations later
+    this.firstNWCStaffByPart.push(this.#names.length);
   }
 
   allParts(
@@ -68,10 +71,10 @@ export class Staves {
   ): Element {
     const scoreParts = [];
     const parts = [];
-    for (let id = 1; id < this.parts.length; id++) {
+    for (let id = 1; id < this.firstNWCStaffByPart.length; id++) {
       const attributes = { id: `P${id}` };
-      const from = this.parts[id - 1];
-      const to = this.parts[id];
+      const from = this.firstNWCStaffByPart[id - 1];
+      const to = this.firstNWCStaffByPart[id];
       const program = this.#midiPrograms.slice(from, to).find((it) =>
         it !== undefined
       );

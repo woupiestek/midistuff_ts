@@ -1,5 +1,17 @@
 # Midistuff logs
 
+## 2026-05-30
+
+### hurdle
+
+Tick: convert form to kind of absolute time, then convert back to muscixmls
+incremental model? Measures are none negotiable, but notes can follow other
+notes.
+
+### focus on the bugs
+
+Whole notes can fill 3/4 rests. this requires special treatment in
+
 ## 2026-05-29
 
 ### codex & beads

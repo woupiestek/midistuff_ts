@@ -2,21 +2,36 @@ import { create, Element } from "./xml.ts";
 import { Elements, MusicXML } from "./musicxml.ts";
 import { NWCLines } from "./scanner.ts";
 
+// greatest number of subdivision of the whole note that nwc supports AFAICT: 256*3, where the 3 comes from triplets.
+// the format is flexible enough to support other tuplets by messing with the tempo an by leaving
 export const PER_WHOLE = 768;
 
+// a duration can support any number of notes
+//
 export class Durations {
-  #measure: number[] = [];
+  // idea: there is a global measure id, and this tracks the offset into the duration array of each measure
+  // i.e. the durations of measure m are in this.#firstDurationForMeasure[i]..this.#firstDurationForMeasure[i+1]??this.#durations.length
+  // takes less space than the opposite mapping (#firstDurationForMeasure by duration), but harder to work with
+  #firstDurationIndexForMeasure: number[] = [];
+  // this is the duration array. see, there are a number of durations per whole number
   #durations: number[] = [];
+  // this determines which pictures will be used for notes and rests
   #types: string[] = [];
-  #staffOffsets: number[] = [];
 
-  #directionTypes: Element[][] = [];
+  // similar idea with NWC staffs: record
+  #firstDurationIndexOfStaff: number[] = [];
+
+  // directions grouped by the first duration after the happen.
+  // the lift pedal directions are treat differently, however, as they may occur at the end of a measure.
+  #directionTypesByNextDurationIndex: Element[][] = [];
   // special directions that must occur at a different place.
-  #stopSustain: Set<number> = new Set();
+  #durationIndicesBeforeStopSustains: Set<number> = new Set();
+  // backup after this duration: used for chords with notes of different lengths, or a note and a short rest.
   #backup: Set<number> = new Set();
 
   #pushDirection(type: Element) {
-    (this.#directionTypes[this.#durations.length] ??= []).push(type);
+    (this.#directionTypesByNextDurationIndex[this.#durations.length] ??= [])
+      .push(type);
   }
 
   visit({ tags, values }: NWCLines, visited: Set<number>): void {
@@ -25,10 +40,10 @@ export class Durations {
       switch (tags[i]) {
         case "AddStaff":
           // this.#currentStaff++;
-          this.#staffOffsets.push(this.#durations.length);
+          this.#firstDurationIndexOfStaff.push(this.#durations.length);
           // fall through
         case "Bar":
-          this.#measure.push(this.#durations.length);
+          this.#firstDurationIndexForMeasure.push(this.#durations.length);
           if (this.#slurred) {
             this.#slurTypes.set(this.#durations.length - 1, "continue");
             this.#slurTypes.set(this.#durations.length, "continue");
@@ -48,7 +63,7 @@ export class Durations {
         case "SustainPedal":
           if (values[i].Status?.[0] === "Released") {
             // what about insert before?
-            this.#stopSustain.add(this.#durations.length);
+            this.#durationIndicesBeforeStopSustains.add(this.#durations.length);
           } else {
             this.#pushDirection(startSustain);
           }
@@ -195,6 +210,7 @@ export class Durations {
           this.#types.push("quarter");
           break;
         case "Whole":
+          // there is a bug here now, because a whole note rest in a shorter measure takes on the length of the measure...
           this.#types.push("whole");
           break;
         case "Half":
@@ -250,7 +266,11 @@ export class Durations {
   ): Element[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
-    const staves = this.#staffOffsets.flatMap((offset, index, offsets) =>
+    const staves = this.#firstDurationIndexOfStaff.flatMap((
+      offset,
+      index,
+      offsets,
+    ) =>
       Array.from({
         length: (offsets[index + 1] ?? this.#durations.length) - offset,
       }, () => secondStaves.has(index) ? staff2 : staff1)
@@ -258,7 +278,7 @@ export class Durations {
 
     // start with putting in most directions
     const byDuration: Element[][] = this.#durations.map((_, i) =>
-      (this.#directionTypes[i] ?? []).map((type) =>
+      (this.#directionTypesByNextDurationIndex[i] ?? []).map((type) =>
         xml.direction(type, staves[i])
       )
     );
@@ -268,14 +288,16 @@ export class Durations {
     );
     // then the stop sustain direction
     const stopSustain = create("pedal", { type: "stop" });
-    this.#stopSustain.forEach((i) =>
+    this.#durationIndicesBeforeStopSustains.forEach((i) =>
       byDuration[i - 1].push(xml.direction(stopSustain, staves[i - 1]))
     );
     // then the back up instruction, which tells musicxml to set the next note sooner, in case the chord contained two simultaneous durations.
     this.#backup.forEach((i) =>
       byDuration[i].push(xml.backup(this.#durations[i]))
     );
-    return this.#measure.map((m, i, a) => byDuration.slice(m, a[i + 1]).flat());
+    return this.#firstDurationIndexForMeasure.map((m, i, a) =>
+      byDuration.slice(m, a[i + 1]).flat()
+    );
   }
 
   #notes(
@@ -283,11 +305,14 @@ export class Durations {
     xml: MusicXML,
     elements: Elements,
   ): Element[][] {
-    const voices = Array((this.#staffOffsets.length) * 2).keys().map((k) =>
-      create("voice", undefined, `${k + 1}`)
-    ).toArray();
+    const voices = Array((this.#firstDurationIndexOfStaff.length) * 2).keys()
+      .map((k) => create("voice", undefined, `${k + 1}`)).toArray();
 
-    const byIndex = this.#staffOffsets.flatMap((offset, index, offsets) =>
+    const byIndex = this.#firstDurationIndexOfStaff.flatMap((
+      offset,
+      index,
+      offsets,
+    ) =>
       Array.from({
         length: (offsets[index + 1] ?? this.#durations.length) - offset,
       }, (_) => 2 * index)
