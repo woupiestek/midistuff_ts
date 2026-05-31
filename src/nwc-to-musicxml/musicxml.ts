@@ -17,6 +17,7 @@ export type Elements = {
 export class MusicXML {
   static readonly chord: Element = create("chord");
   static readonly rest: Element = create("rest");
+  static readonly fullMeasureRest: Element = create("rest", { measure: "yes" });
   static readonly timeMod: Element = create(
     "time-modification",
     undefined,

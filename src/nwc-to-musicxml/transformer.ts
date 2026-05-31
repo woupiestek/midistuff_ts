@@ -57,6 +57,7 @@ export class Transformer {
         lyrics: this.#lyrics.elements,
       },
       xml,
+      this.#bars.ticksPerMeasure(),
     );
     const allMeasures = this.#bars.multiple(
       this.#staves.firstNWCStaffByPart,

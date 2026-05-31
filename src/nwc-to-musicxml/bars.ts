@@ -295,4 +295,20 @@ export class Bars {
 
     return attrs;
   }
+
+  ticksPerMeasure(): number[] {
+    const result: number[] = [];
+    let numerator = 4;
+    let denominator = 4;
+    for (let measure = 0; measure < this.#measureCount; measure++) {
+      const time = this.#times.get(measure);
+      if (time) {
+        const [n, d] = time.split("/");
+        numerator = +n;
+        denominator = +d;
+      }
+      result[measure] = PER_WHOLE * numerator / denominator;
+    }
+    return result;
+  }
 }

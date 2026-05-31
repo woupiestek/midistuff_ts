@@ -1,5 +1,5 @@
 import { Elements } from "./musicxml.ts";
-import { NWCLines } from "./scanner.ts";
+import { countLessThan, NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 const ALTSTR = "vbn#x";
@@ -21,7 +21,52 @@ export class Positions {
   #signature = [...N7];
   #altersByTone = [...N7];
 
-  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+  #Pos: string[] = [];
+
+  visit(
+    { tags, values, lineNumbersByTag }: NWCLines,
+    visited: Set<number>,
+  ): void {
+    // const linesWithDurations = [
+    //   lineNumbersByTag.Rest,
+    //   lineNumbersByTag.Note,
+    //   lineNumbersByTag.Chord,
+    //   lineNumbersByTag.RestChord,
+    // ].flatMap((it) => it ?? []).toSorted((a, b) => a - b);
+    // const firstLineByMeasure = [lineNumbersByTag.AddStaff, lineNumbersByTag.Bar]
+    //   .flatMap((it) => it ?? []).toSorted((a, b) => a - b);
+
+    // // the meaning of a position on the staff
+    // // depends on keys and clefs
+    // // but also on accedentals on notes and ties.
+
+    // // set each measure to the default of 34: the is the number of steps between the center line of the treble clef, and the lowest tone that NWC supports.
+    // const measureByClef = lineNumbersByTag.Clef.map((lineNumber) =>
+    //   countLessThan(lineNumber, firstLineByMeasure)
+    // );
+    // const tones = lineNumbersByTag.Clef.map((lineNumber) => {
+    //   let tone = CLEF_TONE.get(values[lineNumber].Type[0]) ?? 34;
+    //   switch (values[lineNumber].OctaveShift[0]) {
+    //     case "Octave Up":
+    //       tone += 7;
+    //       break;
+    //     case "Octave Down":
+    //       tone -= 7;
+    //       break;
+    //     default:
+    //       break;
+    //   }
+    //   return tone;
+    // });
+    // const toneOriginsByMeasure = Array(measureByClef[0]).fill(34).concat(
+    //   tones.flatMap((tone, i) =>
+    //     Array.from({
+    //       length: (measureByClef[i + 1] ?? firstLineByMeasure.length) -
+    //         (measureByClef[i]),
+    //     }, () => tone)
+    //   ),
+    // );
+
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":
@@ -59,12 +104,15 @@ export class Positions {
         case "RestChord":
           if (values[i].Pos2) {
             for (const pos of values[i].Pos2) this.#pitch(pos);
-            this.#firstNoteByDuration.push(this.#tones.length);
+            this.#Pos.push(...values[i].Pos2);
+            this.#firstNoteByDuration.push(this.#Pos.length);
           }
           if (values[i].Pos) {
             for (const pos of values[i].Pos) this.#pitch(pos);
+            this.#Pos.push(...values[i].Pos);
           }
-          this.#firstNoteByDuration.push(this.#tones.length);
+          // this is why rests must be included.
+          this.#firstNoteByDuration.push(this.#Pos.length);
           break;
         default:
           continue;
@@ -74,8 +122,21 @@ export class Positions {
   }
 
   build(): Elements["positions"] {
+    const accidentalElements = Object.fromEntries(
+      ["flat-flat", "flat", "natural", "sharp", "double-sharp"].map((
+        type,
+        i,
+      ) => [ALTSTR[i], create("accidental", undefined, type)]),
+    );
+    const accidentals = new Map<number, Element>();
+    this.#Pos.forEach((pos, i) => {
+      if (ALTSTR.includes(pos[0])) {
+        accidentals.set(i, accidentalElements[pos[0]]);
+      }
+    });
+
     return {
-      accidentals: this.#accidentals,
+      accidentals,
       groups: this.#firstNoteByDuration,
       pitches: this.#pitches(),
       ...this.#ties(),
@@ -83,35 +144,23 @@ export class Positions {
   }
 
   #open: (string | null)[] = Array.from({ length: 68 }, () => null);
-  #startTie: Set<number> = new Set();
-  #stopTie: Set<number> = new Set();
-  // explicit accidentals
-  #accidentals: Map<number, Element> = new Map();
+  // #stopTie: Set<number> = new Set();
 
   // this is what musicians must do in their heads while reading sheet music?
   #pitch(pos: string) {
-    const accidentals = Object.fromEntries(
-      ["flat-flat", "flat", "natural", "sharp", "double-sharp"].map((
-        type,
-        i,
-      ) => [ALTSTR[i], create("accidental", undefined, type)]),
-    );
     const altered = ALTSTR.includes(pos[0]);
     const startTie = pos[pos.length - 1] === "^";
     const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
     const index = this.#tones.length;
     this.#tones.push(tone);
     const stopTie = this.#open[tone];
-    if (stopTie) this.#stopTie.add(index);
     if (altered) {
-      this.#accidentals.set(index, accidentals[pos[0]]);
       this.#altersByTone[tone % 7] = pos[0];
       this.#alters.push(pos[0]);
     } else if (stopTie) this.#alters.push(stopTie);
     else this.#alters.push(this.#altersByTone[tone % 7]);
     if (startTie) {
       this.#open[tone] = this.#alters[index];
-      this.#startTie.add(index);
     } else this.#open[tone] = null;
   }
 
@@ -154,21 +203,40 @@ export class Positions {
     const startTieds: Map<number, Element> = new Map();
     const stopTieds: Map<number, Element> = new Map();
     const startXmls: { [_: string]: Element } = {};
-    this.#startTie.forEach((note) => {
-      const number = (this.#tones[note] % 16 + 1).toString();
+    const stopXmls: { [_: string]: Element } = {};
+
+    // no, it is not the case that every tie ends at the next line of nwc,
+    // though AFAIK, this is not valid music notation
+    // I guess the multiple positions are the reason: if the pos2 notes are tied, then thei may connect to notes several lines down.
+    const open: Record<string, string> = {};
+    for (let note = 0; note < this.#Pos.length; note++) {
+      const pos = this.#Pos[note];
+      const altered = ALTSTR.includes(pos[0]);
+      const tied = pos[pos.length - 1] === "^";
+      const cleanPos = +pos.substring(+altered, pos.length - +tied);
+
+      if (open[cleanPos]) {
+        stopTieds.set(
+          note,
+          stopXmls[cleanPos] ??= create(
+            "tied",
+            { type: "stop", number: open[cleanPos] },
+          ),
+        );
+        delete open[cleanPos];
+      }
+
+      if (!tied) continue;
+
+      open[cleanPos] = ((+cleanPos + 34) % 16 + 1).toString();
       startTieds.set(
         note,
-        startXmls[number] ??= create("tied", { type: "start", number }),
+        startXmls[cleanPos] ??= create("tied", {
+          type: "start",
+          number: open[cleanPos],
+        }),
       );
-    });
-    const stopXmls: { [_: string]: Element } = {};
-    this.#stopTie.forEach((note) => {
-      const number = (this.#tones[note] % 16 + 1).toString();
-      stopTieds.set(
-        note,
-        stopXmls[number] ??= create("tied", { type: "stop", number }),
-      );
-    });
+    }
     return { startTieds, stopTieds };
   }
 }

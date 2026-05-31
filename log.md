@@ -1,5 +1,14 @@
 # Midistuff logs
 
+## 2029-05-31
+
+### data reorientation
+
+The AI is not as helpful as hoped, and I struggle with the reorientation of
+positions.
+
+Much better now.
+
 ## 2026-05-30
 
 ### hurdle

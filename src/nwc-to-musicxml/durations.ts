@@ -1,6 +1,6 @@
 import { create, Element } from "./xml.ts";
 import { Elements, MusicXML } from "./musicxml.ts";
-import { NWCLines } from "./scanner.ts";
+import { countLessThan, NWCLines } from "./scanner.ts";
 
 // greatest number of subdivision of the whole note that nwc supports AFAICT: 256*3, where the 3 comes from triplets.
 // the format is flexible enough to support other tuplets by messing with the tempo an by leaving
@@ -212,7 +212,6 @@ export class Durations {
           this.#types.push("quarter");
           break;
         case "Whole":
-          // there is a bug here now, because a whole note rest in a shorter measure takes on the length of the measure...
           this.#types.push("whole");
           break;
         case "Half":
@@ -265,6 +264,7 @@ export class Durations {
     secondStaves: Set<number>,
     elements: Elements,
     xml: MusicXML,
+    ticksPerMeasure: number[],
   ): Element[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
@@ -284,8 +284,9 @@ export class Durations {
         xml.direction(type, staves[i])
       )
     );
+
     // then the notes
-    this.#notes(staves, xml, elements).forEach((ns, i) =>
+    this.#notes(staves, xml, elements, ticksPerMeasure).forEach((ns, i) =>
       byDuration[i].push(...ns)
     );
     // then the stop sustain direction
@@ -306,6 +307,7 @@ export class Durations {
     staves: Element[],
     xml: MusicXML,
     elements: Elements,
+    ticksPerMeasure: number[],
   ): Element[][] {
     const voices = Array((this.#firstDurationIndexOfStaff.length) * 2).keys()
       .map((k) => create("voice", undefined, `${k + 1}`)).toArray();
@@ -332,13 +334,29 @@ export class Durations {
         : this.#dotted.has(i)
         ? [MusicXML.dot]
         : [];
-      const duration = xml.duration(this.#durations[i]);
       const from = i && elements.positions.groups[i - 1];
       const to = elements.positions.groups[i];
       if (to === from) {
+        const measure = countLessThan(i, this.#firstDurationIndexForMeasure);
+        const ticks = ticksPerMeasure[measure] ?? PER_WHOLE;
+        if (
+          this.#durations[i] === PER_WHOLE && ticks < PER_WHOLE
+        ) {
+          notes[i].push(xml.note(
+            MusicXML.fullMeasureRest,
+            xml.duration(ticks),
+            voices[byIndex[i]],
+            type,
+            ...dots,
+            timeMod,
+            staves[i],
+          ));
+          continue;
+        }
+
         notes[i].push(xml.note(
           MusicXML.rest,
-          duration,
+          xml.duration(this.#durations[i]),
           voices[byIndex[i]],
           type,
           ...dots,
@@ -359,7 +377,7 @@ export class Durations {
           grace,
           note > from ? MusicXML.chord : null, // no chord element in the first note
           elements.positions.pitches[note],
-          duration,
+          xml.duration(this.#durations[i]),
           elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
           elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
           voices[byIndex[i]],
