@@ -11,7 +11,7 @@ export type Elements = {
     startTieds: Map<number, Element>;
     stopTieds: Map<number, Element>;
   };
-  lyrics: Element[][];
+  lyrics: Map<number, Element[]>;
 };
 
 export class MusicXML {

@@ -47,14 +47,14 @@ export class Transformer {
       Array(length).keys().filter((i) => !visited.has(i)),
     );
     if (notVisited.size) {
-      console.warn("Unused lines:", ...notVisited);
+      console.warn("Unused lines:", ...notVisited.values().map((i) => i + 2));
     }
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(
       this.#staves.seconds,
       {
         positions: this.#positions.build(),
-        lyrics: this.#lyrics.get(),
+        lyrics: this.#lyrics.elements,
       },
       xml,
     );

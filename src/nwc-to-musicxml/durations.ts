@@ -34,12 +34,14 @@ export class Durations {
       .push(type);
   }
 
-  visit({ tags, values }: NWCLines, visited: Set<number>): void {
+  visit(
+    { tags, values }: NWCLines,
+    visited: Set<number>,
+  ): void {
     const startSustain = create("pedal", { type: "start" });
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":
-          // this.#currentStaff++;
           this.#firstDurationIndexOfStaff.push(this.#durations.length);
           // fall through
         case "Bar":
@@ -53,11 +55,11 @@ export class Durations {
         case "Rest":
         case "Chord":
         case "RestChord":
+          this.#options(values[i].Opts);
           if (values[i].Dur2) {
             this.#backup.add(this.#durations.length);
             this.#duration(values[i].Dur2);
           }
-          this.#options(values[i].Opts);
           this.#duration(values[i].Dur);
           break;
         case "SustainPedal":
@@ -374,7 +376,7 @@ export class Durations {
               ...notations,
             )
             : null,
-          ...elements.lyrics[note],
+          ...elements.lyrics.get(note) ?? [],
         ));
       }
     }

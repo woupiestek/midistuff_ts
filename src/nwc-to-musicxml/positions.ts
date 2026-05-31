@@ -16,7 +16,7 @@ const CLEF_TONE = new Map([
 export class Positions {
   #alters: string[] = [];
   #tones: number[] = [];
-  #groups: number[] = [];
+  #firstNoteByDuration: number[] = [];
   #tone = 34;
   #signature = [...N7];
   #altersByTone = [...N7];
@@ -59,12 +59,12 @@ export class Positions {
         case "RestChord":
           if (values[i].Pos2) {
             for (const pos of values[i].Pos2) this.#pitch(pos);
-            this.#groups.push(this.#tones.length);
+            this.#firstNoteByDuration.push(this.#tones.length);
           }
           if (values[i].Pos) {
             for (const pos of values[i].Pos) this.#pitch(pos);
           }
-          this.#groups.push(this.#tones.length);
+          this.#firstNoteByDuration.push(this.#tones.length);
           break;
         default:
           continue;
@@ -76,7 +76,7 @@ export class Positions {
   build(): Elements["positions"] {
     return {
       accidentals: this.#accidentals,
-      groups: this.#groups,
+      groups: this.#firstNoteByDuration,
       pitches: this.#pitches(),
       ...this.#ties(),
     };

@@ -53,25 +53,6 @@ export class Bars {
       }
     }
 
-    if (lineNumbersByTag.TimeSig) {
-      for (const lineNumber of lineNumbersByTag.TimeSig) {
-        const measure = countLessThan(lineNumber, AddStaff) +
-          countLessThan(lineNumber, Bar) - 1;
-        switch (values[lineNumber].Signature[0]) {
-          case "Common":
-            this.#times.set(measure, "4/4");
-            break;
-          case "AllaBreve":
-            this.#times.set(measure, "2/2");
-            break;
-          default:
-            this.#times.set(measure, values[lineNumber].Signature[0]);
-            break;
-        }
-        visited.add(lineNumber);
-      }
-    }
-
     if (lineNumbersByTag.Clef) {
       for (const lineNumber of lineNumbersByTag.Clef) {
         const measure = countLessThan(lineNumber, AddStaff) +
@@ -88,6 +69,25 @@ export class Bars {
             default:
               break;
           }
+        }
+        visited.add(lineNumber);
+      }
+    }
+
+    if (lineNumbersByTag.TimeSig) {
+      for (const lineNumber of lineNumbersByTag.TimeSig) {
+        const measure = countLessThan(lineNumber, AddStaff) +
+          countLessThan(lineNumber, Bar) - 1;
+        switch (values[lineNumber].Signature[0]) {
+          case "Common":
+            this.#times.set(measure, "4/4");
+            break;
+          case "AllaBreve":
+            this.#times.set(measure, "2/2");
+            break;
+          default:
+            this.#times.set(measure, values[lineNumber].Signature[0]);
+            break;
         }
         visited.add(lineNumber);
       }
