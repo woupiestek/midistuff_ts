@@ -7,13 +7,15 @@ import { countLessThan, NWCLines } from "./scanner.ts";
 export const PER_WHOLE = 768;
 
 // a duration can support any number of notes
-//
 export class Durations {
   // idea: there is a global measure id, and this tracks the offset into the duration array of each measure
   // i.e. the durations of measure m are in this.#firstDurationForMeasure[i]..this.#firstDurationForMeasure[i+1]??this.#durations.length
   // takes less space than the opposite mapping (#firstDurationForMeasure by duration), but harder to work with
   #firstDurationIndexForMeasure: number[] = [];
-  // this is the duration array. see, there are a number of durations per whole number
+  // this is the duration array.
+  // all data tied to indices in this array
+  // which is data oriented,
+  // but bad for independence.
   #durations: number[] = [];
   // this determines which pictures will be used for notes and rests
   #types: string[] = [];
@@ -46,20 +48,16 @@ export class Durations {
           // fall through
         case "Bar":
           this.#firstDurationIndexForMeasure.push(this.#durations.length);
-          if (this.#slurred) {
-            this.#slurTypes.set(this.#durations.length - 1, "continue");
-            this.#slurTypes.set(this.#durations.length, "continue");
-          }
           break;
         case "Note":
         case "Rest":
         case "Chord":
         case "RestChord":
-          this.#options(values[i].Opts);
           if (values[i].Dur2) {
             this.#backup.add(this.#durations.length);
             this.#duration(values[i].Dur2);
           }
+          this.#options(values[i].Opts);
           this.#duration(values[i].Dur);
           break;
         case "SustainPedal":
@@ -106,6 +104,31 @@ export class Durations {
           continue;
       }
       visited.add(i);
+    }
+
+    // create the slur types
+    for (let i = 0; i < this.#durations.length; i++) {
+      if (i > 0 && this.#slurredDuration.has(i - 1)) {
+        // stop breaking up slurs.
+        if (this.#backup.has(i)) {
+          this.#slurredDuration.add(i);
+          continue;
+        }
+        if (!this.#slurredDuration.has(i)) {
+          this.#slurTypes.set(i, "stop");
+        }
+      } else if (this.#slurredDuration.has(i)) {
+        this.#slurTypes.set(i, "start");
+      }
+    }
+    for (const i of this.#firstDurationIndexForMeasure) {
+      if (
+        this.#slurredDuration.has(i) && i > 0 &&
+        this.#slurredDuration.has(i - 1)
+      ) {
+        this.#slurTypes.set(i, "continue");
+        this.#slurTypes.set(i - 1, "continue");
+      }
     }
   }
 
@@ -167,7 +190,6 @@ export class Durations {
     }
   }
 
-  #slurred: boolean = false;
   #slurTypes: Map<number, "continue" | "start" | "stop"> = new Map();
   #grace: Set<number> = new Set();
   #triplet: Set<number> = new Set();
@@ -185,10 +207,11 @@ export class Durations {
     }
   }
 
+  #slurredDuration: Set<number> = new Set();
+
   #duration(dur: string[]) {
     const index = this.#durations.length;
     let duration = PER_WHOLE;
-    let slurred = false;
     for (const s of dur) {
       switch (s) {
         case "16th":
@@ -238,7 +261,7 @@ export class Durations {
           this.#addNotation(s);
           break;
         case "Slur":
-          slurred = true;
+          this.#slurredDuration.add(index);
           break;
         case "Grace":
           this.#grace.add(index);
@@ -247,14 +270,6 @@ export class Durations {
           console.error("Unused duration", s);
           break;
       }
-    }
-    if (slurred !== this.#slurred) {
-      if (slurred) {
-        this.#slurTypes.set(index, "start");
-      } else {
-        this.#slurTypes.set(index, "stop");
-      }
-      this.#slurred = slurred;
     }
     this.#durations.push(duration);
   }
@@ -342,27 +357,35 @@ export class Durations {
         if (
           this.#durations[i] === PER_WHOLE && ticks < PER_WHOLE
         ) {
-          notes[i].push(xml.note(
-            MusicXML.fullMeasureRest,
-            xml.duration(ticks),
+          notes[i].push(
+            create(
+              "note",
+              undefined,
+              MusicXML.fullMeasureRest,
+              xml.duration(ticks),
+              voices[byIndex[i]],
+              type,
+              ...dots,
+              timeMod,
+              staves[i],
+            ),
+          );
+          continue;
+        }
+
+        notes[i].push(
+          create(
+            "note",
+            undefined,
+            MusicXML.rest,
+            xml.duration(this.#durations[i]),
             voices[byIndex[i]],
             type,
             ...dots,
             timeMod,
             staves[i],
-          ));
-          continue;
-        }
-
-        notes[i].push(xml.note(
-          MusicXML.rest,
-          xml.duration(this.#durations[i]),
-          voices[byIndex[i]],
-          type,
-          ...dots,
-          timeMod,
-          staves[i],
-        ));
+          ),
+        );
         continue;
       }
       const grace = this.#grace.has(i) ? create("grace") : null;
@@ -373,29 +396,33 @@ export class Durations {
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
         ].filter((it) => it != null);
-        notes[i].push(xml.note(
-          grace,
-          note > from ? MusicXML.chord : null, // no chord element in the first note
-          elements.positions.pitches[note],
-          xml.duration(this.#durations[i]),
-          elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
-          elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
-          voices[byIndex[i]],
-          type,
-          ...dots,
-          elements.positions.accidentals.get(note) ?? null,
-          timeMod,
-          this.#stems.get(i) ?? null,
-          staves[i],
-          notations.length > 0
-            ? create(
-              "notations",
-              undefined,
-              ...notations,
-            )
-            : null,
-          ...elements.lyrics.get(note) ?? [],
-        ));
+        notes[i].push(
+          create(
+            "note",
+            undefined,
+            grace,
+            note > from ? MusicXML.chord : null, // no chord element in the first note
+            elements.positions.pitches[note],
+            xml.duration(this.#durations[i]),
+            elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
+            elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
+            voices[byIndex[i]],
+            type,
+            ...dots,
+            elements.positions.accidentals.get(note) ?? null,
+            timeMod,
+            this.#stems.get(i) ?? null,
+            staves[i],
+            notations.length > 0
+              ? create(
+                "notations",
+                undefined,
+                ...notations,
+              )
+              : null,
+            ...elements.lyrics.get(note) ?? [],
+          ),
+        );
       }
     }
     return notes;

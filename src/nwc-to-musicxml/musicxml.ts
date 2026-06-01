@@ -184,10 +184,6 @@ export class MusicXML {
     );
   }
 
-  note(...elements: (Element | null)[]): Element {
-    return create("note", undefined, ...elements);
-  }
-
   measure(
     number: number,
     ...elements: Element[]

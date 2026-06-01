@@ -1,5 +1,5 @@
 import { Elements } from "./musicxml.ts";
-import { countLessThan, NWCLines } from "./scanner.ts";
+import { NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 const ALTSTR = "vbn#x";
@@ -24,49 +24,9 @@ export class Positions {
   #Pos: string[] = [];
 
   visit(
-    { tags, values, lineNumbersByTag }: NWCLines,
+    { tags, values }: NWCLines,
     visited: Set<number>,
   ): void {
-    // const linesWithDurations = [
-    //   lineNumbersByTag.Rest,
-    //   lineNumbersByTag.Note,
-    //   lineNumbersByTag.Chord,
-    //   lineNumbersByTag.RestChord,
-    // ].flatMap((it) => it ?? []).toSorted((a, b) => a - b);
-    // const firstLineByMeasure = [lineNumbersByTag.AddStaff, lineNumbersByTag.Bar]
-    //   .flatMap((it) => it ?? []).toSorted((a, b) => a - b);
-
-    // // the meaning of a position on the staff
-    // // depends on keys and clefs
-    // // but also on accedentals on notes and ties.
-
-    // // set each measure to the default of 34: the is the number of steps between the center line of the treble clef, and the lowest tone that NWC supports.
-    // const measureByClef = lineNumbersByTag.Clef.map((lineNumber) =>
-    //   countLessThan(lineNumber, firstLineByMeasure)
-    // );
-    // const tones = lineNumbersByTag.Clef.map((lineNumber) => {
-    //   let tone = CLEF_TONE.get(values[lineNumber].Type[0]) ?? 34;
-    //   switch (values[lineNumber].OctaveShift[0]) {
-    //     case "Octave Up":
-    //       tone += 7;
-    //       break;
-    //     case "Octave Down":
-    //       tone -= 7;
-    //       break;
-    //     default:
-    //       break;
-    //   }
-    //   return tone;
-    // });
-    // const toneOriginsByMeasure = Array(measureByClef[0]).fill(34).concat(
-    //   tones.flatMap((tone, i) =>
-    //     Array.from({
-    //       length: (measureByClef[i + 1] ?? firstLineByMeasure.length) -
-    //         (measureByClef[i]),
-    //     }, () => tone)
-    //   ),
-    // );
-
     for (let i = 0; i < tags.length; i++) {
       switch (tags[i]) {
         case "AddStaff":

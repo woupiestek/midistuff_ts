@@ -1,5 +1,25 @@
 # Midistuff logs
 
+## 2029-06-01
+
+### data model
+
+- 'position': is the model for notes in a way.
+- 'duration': is notes, chords and rests: any number of simutaneous notes,
+  including rests, because they separate times
+- 'measure':
+- 'nws staff'
+- 'others': wedged in between durations
+
+Should we move to two vectors of durations an positions?
+
+Probably!
+
+The line is an organizing pronciple that works for everything in NWC The list of
+durations is a new rack to hang data off, but is is incidental: it does not
+relate to either NWC or MusicXML, and is is the source of the complexity of
+durations.
+
 ## 2029-05-31
 
 ### data reorientation
