@@ -1,7 +1,4 @@
-import {
-  assert,
-  assertEquals,
-} from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
 import { approximate, gcd, Ratio } from "./util.ts";
 
 Deno.test(function gdcDoesNotHang() {
@@ -50,5 +47,5 @@ Deno.test(function rationalApproximations() {
   const d = 2137;
   const n = 2037;
   const x = approximate(d / n, 20);
-  assert(x.equals(new Ratio(d, n)), `${x} !== ${new Ratio(d, n)}`);
+  console.assert(x.equals(new Ratio(d, n)), `${x} !== ${new Ratio(d, n)}`);
 });

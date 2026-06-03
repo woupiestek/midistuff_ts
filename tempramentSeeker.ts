@@ -1,8 +1,6 @@
-import { assert } from "@std/assert";
-
 function approximateLog(b: number, a: number) {
-  assert(a > b);
-  assert(b > 1);
+  console.assert(a > b);
+  console.assert(b > 1);
   const c = [1, 0];
   const d = [0, 1];
   for (let i = 2; i < 8; i++) {

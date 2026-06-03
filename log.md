@@ -1,6 +1,11 @@
 # Midistuff logs
 
-## 2029-06-01
+## 2026-06-03
+
+- jazzy: misplaced breath marks, weird solution
+- 2006-7-5: ending is a mess.
+
+## 2026-06-01
 
 ### data model
 

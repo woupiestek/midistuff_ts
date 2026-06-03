@@ -44,7 +44,7 @@ export class Lyrics {
       lineNumbersByTag.Note,
       lineNumbersByTag.Chord,
       lineNumbersByTag.RestChord,
-    ].flatMap((it) => it ?? []).toSorted((a, b) => a - b);
+    ].filter((it) => it).flat().sort((a, b) => a - b);
     const firstNoteOnLine: number[] = [0];
     linesWithNotes.forEach((lineNumber, i) => {
       firstNoteOnLine[i + 1] = (values[lineNumber].Pos2?.length ?? 0) +

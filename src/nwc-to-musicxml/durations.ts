@@ -8,47 +8,41 @@ export const PER_WHOLE = 768;
 
 // a duration can support any number of notes
 export class Durations {
-  // idea: there is a global measure id, and this tracks the offset into the duration array of each measure
-  // i.e. the durations of measure m are in this.#firstDurationForMeasure[i]..this.#firstDurationForMeasure[i+1]??this.#durations.length
-  // takes less space than the opposite mapping (#firstDurationForMeasure by duration), but harder to work with
-  #firstDurationIndexForMeasure: number[] = [];
+  #AddStaff: number[] = [];
   // this is the duration array.
-  // all data tied to indices in this array
-  // which is data oriented,
-  // but bad for independence.
   #durations: number[] = [];
   // this determines which pictures will be used for notes and rests
   #types: string[] = [];
 
-  // similar idea with NWC staffs: record
-  #firstDurationIndexOfStaff: number[] = [];
+  #lines: number[] = [];
 
-  // directions grouped by the first duration after the happen.
-  // the lift pedal directions are treat differently, however, as they may occur at the end of a measure.
-  #directionTypesByNextDurationIndex: Element[][] = [];
-  // special directions that must occur at a different place.
-  #durationIndicesBeforeStopSustains: Set<number> = new Set();
+  #AddMeasure: number[] = [];
+
   // backup after this duration: used for chords with notes of different lengths, or a note and a short rest.
+  // also records: next durations line is the same
   #backup: Set<number> = new Set();
 
-  #pushDirection(type: Element) {
-    (this.#directionTypesByNextDurationIndex[this.#durations.length] ??= [])
-      .push(type);
+  #directionsByLine: Element[][] = [];
+  #pushDirection(line: number, type: Element) {
+    (this.#directionsByLine[line] ??= []).push(type);
   }
 
+  #nextDurationForLine: number[] = [];
+  #numberOfLines = 0;
+
   visit(
-    { tags, values }: NWCLines,
+    { tags, values, lineNumbersByTag }: NWCLines,
     visited: Set<number>,
   ): void {
-    const startSustain = create("pedal", { type: "start" });
+    this.#numberOfLines = tags.length;
+    this.#AddStaff = lineNumbersByTag.AddStaff ?? [];
+    this.#AddMeasure = [lineNumbersByTag.AddStaff, lineNumbersByTag.Bar].filter(
+      (it) => it,
+    ).flat().sort((a, b) => a - b);
+
     for (let i = 0; i < tags.length; i++) {
+      this.#nextDurationForLine[i] = this.#durations.length;
       switch (tags[i]) {
-        case "AddStaff":
-          this.#firstDurationIndexOfStaff.push(this.#durations.length);
-          // fall through
-        case "Bar":
-          this.#firstDurationIndexForMeasure.push(this.#durations.length);
-          break;
         case "Note":
         case "Rest":
         case "Chord":
@@ -56,53 +50,33 @@ export class Durations {
           if (values[i].Dur2) {
             this.#backup.add(this.#durations.length);
             this.#duration(values[i].Dur2);
+            this.#lines.push(i);
           }
           this.#options(values[i].Opts);
           this.#duration(values[i].Dur);
+          this.#lines.push(i);
           break;
-        case "SustainPedal":
-          if (values[i].Status?.[0] === "Released") {
-            // what about insert before?
-            this.#durationIndicesBeforeStopSustains.add(this.#durations.length);
-          } else {
-            this.#pushDirection(startSustain);
-          }
-          break;
-        case "Dynamic":
-        case "DynamicVariance":
-          this.#dynamic(values[i].Style[0]);
-          break;
-        case "Tempo": {
-          const [type, dotted] = (values[i].Base?.[0] ?? "Quarter").split(" ");
-          this.#pushDirection(create(
-            "metronome",
-            undefined,
-            create("beat-unit", undefined, type.toLowerCase()),
-            dotted ? create("beat-unit-dot") : null,
-            create("per-minute", undefined, values[i].Tempo[0]),
-          ));
-          break;
-        }
         case "TempoVariance": {
           const style = values[i].Style[0];
           switch (style) {
             case "Breath Mark":
+              // why + 2?
+              this.#addNotation(this.#duration.length + 2, style);
+              break;
             case "Caesura":
             case "Fermata":
-              this.#addNotation(style);
+              this.#addNotation(this.#duration.length, style);
               break;
             default:
-              this.#addWord(style.toLowerCase());
+              this.#addWord(i, style.toLowerCase());
               break;
           }
           break;
         }
-        case "PerformanceStyle":
-          this.#addWord(values[i].Style[0].toLowerCase());
-          break;
         default:
           continue;
       }
+
       visited.add(i);
     }
 
@@ -110,6 +84,7 @@ export class Durations {
     for (let i = 0; i < this.#durations.length; i++) {
       if (i > 0 && this.#slurredDuration.has(i - 1)) {
         // stop breaking up slurs.
+        // actually, do this without backup!
         if (this.#backup.has(i)) {
           this.#slurredDuration.add(i);
           continue;
@@ -121,13 +96,62 @@ export class Durations {
         this.#slurTypes.set(i, "start");
       }
     }
-    for (const i of this.#firstDurationIndexForMeasure) {
-      if (
-        this.#slurredDuration.has(i) && i > 0 &&
-        this.#slurredDuration.has(i - 1)
-      ) {
-        this.#slurTypes.set(i, "continue");
-        this.#slurTypes.set(i - 1, "continue");
+
+    if (lineNumbersByTag.Bar) {
+      for (const line of lineNumbersByTag.Bar) {
+        const i = this.#nextDurationForLine[line];
+        if (
+          this.#slurredDuration.has(i) && i > 0 &&
+          this.#slurredDuration.has(i - 1)
+        ) {
+          this.#slurTypes.set(i, "continue");
+          this.#slurTypes.set(i - 1, "continue");
+        }
+      }
+    }
+
+    if (lineNumbersByTag.SustainPedal) {
+      const startSustain = create("pedal", { type: "start" });
+      const stopSustain = create("pedal", { type: "stop" });
+      for (const line of lineNumbersByTag.SustainPedal) {
+        this.#pushDirection(
+          line,
+          values[line].Status?.[0] === "Released" ? stopSustain : startSustain,
+        );
+        visited.add(line);
+      }
+    }
+
+    if (lineNumbersByTag.Tempo) {
+      for (const i of lineNumbersByTag.Tempo) {
+        const [type, dotted] = (values[i].Base?.[0] ?? "Quarter").split(" ");
+        this.#pushDirection(
+          i,
+          create(
+            "metronome",
+            undefined,
+            create("beat-unit", undefined, type.toLowerCase()),
+            dotted ? create("beat-unit-dot") : null,
+            create("per-minute", undefined, values[i].Tempo[0]),
+          ),
+        );
+        visited.add(i);
+      }
+    }
+
+    if (lineNumbersByTag.PerformanceStyle) {
+      for (const i of lineNumbersByTag.PerformanceStyle) {
+        this.#addWord(i, values[i].Style[0].toLowerCase());
+        visited.add(i);
+      }
+    }
+
+    if (lineNumbersByTag.Dynamic || lineNumbersByTag.DynamicVariance) {
+      const lines = [lineNumbersByTag.Dynamic, lineNumbersByTag.DynamicVariance]
+        .filter((it) => it).flat().sort((a, b) => a - b);
+      for (const line of lines) {
+        this.#dynamic(line, values[line].Style[0]);
+        visited.add(line);
       }
     }
   }
@@ -135,13 +159,13 @@ export class Durations {
   #notationsX: number[] = [];
   #notationsY: string[] = [];
 
-  #addNotation(style: string) {
-    this.#notationsX.push(this.#durations.length);
+  #addNotation(x: number, style: string) {
+    this.#notationsX.push(x);
     this.#notationsY.push(style);
   }
 
-  #addWord(word: string) {
-    this.#pushDirection(create("words", undefined, word));
+  #addWord(line: number, word: string) {
+    this.#pushDirection(line, create("words", undefined, word));
   }
 
   #wedged: boolean = false;
@@ -153,39 +177,48 @@ export class Durations {
     ) => [d, create("dynamics", undefined, create(d))]),
   );
 
-  #dynamic(arg1: string) {
+  #dynamic(line: number, arg1: string) {
     if (this.#wedged) {
-      this.#pushDirection(create("wedge", {
-        type: "stop",
-        number: this.#wedgeNumber.toString(),
-      }));
+      this.#pushDirection(
+        line,
+        create("wedge", {
+          type: "stop",
+          number: this.#wedgeNumber.toString(),
+        }),
+      );
       this.#wedgeNumber = this.#wedgeNumber % 16 + 1;
       this.#wedged = false;
     }
     switch (arg1) {
       case "Sforzando":
-        this.#pushDirection(this.#dynamics.sfz);
+        this.#pushDirection(line, this.#dynamics.sfz);
         break;
       case "Rinforzando":
-        this.#pushDirection(this.#dynamics.rfz);
+        this.#pushDirection(line, this.#dynamics.rfz);
         break;
       case "Crescendo":
-        this.#pushDirection(create("wedge", {
-          type: "crescendo",
-          number: this.#wedgeNumber.toString(),
-        }));
+        this.#pushDirection(
+          line,
+          create("wedge", {
+            type: "crescendo",
+            number: this.#wedgeNumber.toString(),
+          }),
+        );
         this.#wedged = true;
         break;
       case "Decrescendo":
       case "Diminuendo":
-        this.#pushDirection(create("wedge", {
-          type: "diminuendo",
-          number: this.#wedgeNumber.toString(),
-        }));
+        this.#pushDirection(
+          line,
+          create("wedge", {
+            type: "diminuendo",
+            number: this.#wedgeNumber.toString(),
+          }),
+        );
         this.#wedged = true;
         break;
       default:
-        this.#pushDirection(this.#dynamics[arg1]);
+        this.#pushDirection(line, this.#dynamics[arg1]);
         break;
     }
   }
@@ -258,7 +291,7 @@ export class Durations {
         case "Accent":
         case "Staccato":
         case "Tenuto":
-          this.#addNotation(s);
+          this.#addNotation(index, s);
           break;
         case "Slur":
           this.#slurredDuration.add(index);
@@ -283,65 +316,63 @@ export class Durations {
   ): Element[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
-    const staves = this.#firstDurationIndexOfStaff.flatMap((
-      offset,
+
+    // off by one again
+    const staffByLine = Array(this.#AddStaff.length + 1).keys().flatMap((
       index,
-      offsets,
     ) =>
       Array.from({
-        length: (offsets[index + 1] ?? this.#durations.length) - offset,
-      }, () => secondStaves.has(index) ? staff2 : staff1)
-    );
+        length: (this.#AddStaff[index] ?? this.#numberOfLines) -
+          (index && this.#AddStaff[index - 1]),
+      }, () => secondStaves.has(index - 1) ? staff2 : staff1)
+    ).toArray();
 
-    // start with putting in most directions
-    const byDuration: Element[][] = this.#durations.map((_, i) =>
-      (this.#directionTypesByNextDurationIndex[i] ?? []).map((type) =>
-        xml.direction(type, staves[i])
-      )
+    // start with directions
+    const byLine: Element[][] = this.#directionsByLine.map((types, line) =>
+      types && types.map((type) => xml.direction(type, staffByLine[line]))
     );
 
     // then the notes
-    this.#notes(staves, xml, elements, ticksPerMeasure).forEach((ns, i) =>
-      byDuration[i].push(...ns)
-    );
-    // then the stop sustain direction
-    const stopSustain = create("pedal", { type: "stop" });
-    this.#durationIndicesBeforeStopSustains.forEach((i) =>
-      byDuration[i - 1].push(xml.direction(stopSustain, staves[i - 1]))
-    );
-    // then the back up instruction, which tells musicxml to set the next note sooner, in case the chord contained two simultaneous durations.
-    this.#backup.forEach((i) =>
-      byDuration[i].push(xml.backup(this.#durations[i]))
-    );
-    return this.#firstDurationIndexForMeasure.map((m, i, a) =>
-      byDuration.slice(m, a[i + 1]).flat()
+    this.#notes(staffByLine, xml, elements, ticksPerMeasure, byLine);
+
+    // wanted: arrays of elements by measure.
+    // what if we'd just collected by line?
+    return this.#AddMeasure.map((line, i, lines) =>
+      byLine.slice(
+        line,
+        lines[i + 1] ?? this.#numberOfLines,
+      ).filter((it) => it).flat()
     );
   }
 
+  // by line as well...
   #notes(
-    staves: Element[],
+    staffByLine: Element[],
     xml: MusicXML,
     elements: Elements,
     ticksPerMeasure: number[],
-  ): Element[][] {
-    const voices = Array((this.#firstDurationIndexOfStaff.length) * 2).keys()
+    byLine: Element[][],
+  ) {
+    const voices = Array((this.#AddStaff.length) * 2).keys()
       .map((k) => create("voice", undefined, `${k + 1}`)).toArray();
 
-    const byIndex = this.#firstDurationIndexOfStaff.flatMap((
-      offset,
+    const byIndex = this.#AddStaff.flatMap((
+      line,
       index,
-      offsets,
+      lines,
     ) =>
       Array.from({
-        length: (offsets[index + 1] ?? this.#durations.length) - offset,
+        length: (this.#nextDurationForLine[lines[index + 1]] ??
+          this.#durations.length) -
+          this.#nextDurationForLine[line],
       }, (_) => 2 * index)
     );
     this.#backup.forEach((i) => byIndex[i]++);
 
     const notationContent = this.#notationContent();
-    const notes: Element[][] = [];
     for (let i = 0; i < this.#durations.length; i++) {
-      notes[i] = [];
+      const line = this.#lines[i];
+      byLine[line] ??= [];
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
       const dots = this.#doubleDotted.has(i)
@@ -352,12 +383,12 @@ export class Durations {
       const from = i && elements.positions.groups[i - 1];
       const to = elements.positions.groups[i];
       if (to === from) {
-        const measure = countLessThan(i, this.#firstDurationIndexForMeasure);
+        const measure = countLessThan(line, this.#AddMeasure) - 1;
         const ticks = ticksPerMeasure[measure] ?? PER_WHOLE;
         if (
           this.#durations[i] === PER_WHOLE && ticks < PER_WHOLE
         ) {
-          notes[i].push(
+          byLine[line].push(
             create(
               "note",
               undefined,
@@ -367,13 +398,13 @@ export class Durations {
               type,
               ...dots,
               timeMod,
-              staves[i],
+              staffByLine[line],
             ),
           );
           continue;
         }
 
-        notes[i].push(
+        byLine[line].push(
           create(
             "note",
             undefined,
@@ -383,7 +414,7 @@ export class Durations {
             type,
             ...dots,
             timeMod,
-            staves[i],
+            staffByLine[line],
           ),
         );
         continue;
@@ -396,7 +427,7 @@ export class Durations {
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
         ].filter((it) => it != null);
-        notes[i].push(
+        byLine[line].push(
           create(
             "note",
             undefined,
@@ -412,7 +443,7 @@ export class Durations {
             elements.positions.accidentals.get(note) ?? null,
             timeMod,
             this.#stems.get(i) ?? null,
-            staves[i],
+            staffByLine[line],
             notations.length > 0
               ? create(
                 "notations",
@@ -424,8 +455,11 @@ export class Durations {
           ),
         );
       }
+      // same line same time, nwc at least has that.
+      if (this.#lines[i + 1] === line) {
+        byLine[line].push(xml.backup(this.#durations[i]));
+      }
     }
-    return notes;
   }
 
   #notationContent(): { [_: number]: Element[] } {
