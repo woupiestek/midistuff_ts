@@ -27,57 +27,56 @@ export class Durations {
     (this.#directionsByLine[line] ??= []).push(type);
   }
 
-  #nextDurationForLine: number[] = [];
   #numberOfLines = 0;
 
   visit(
-    { tags, values, lineNumbersByTag }: NWCLines,
+    nwcLines: NWCLines,
     visited: Set<number>,
   ): void {
-    this.#numberOfLines = tags.length;
+    const { values, lineNumbersByTag } = nwcLines;
+    this.#numberOfLines = values.length;
     this.#AddStaff = lineNumbersByTag.AddStaff ?? [];
     this.#AddMeasure = [lineNumbersByTag.AddStaff, lineNumbersByTag.Bar].filter(
       (it) => it,
     ).flat().sort((a, b) => a - b);
 
-    for (let i = 0; i < tags.length; i++) {
-      this.#nextDurationForLine[i] = this.#durations.length;
-      switch (tags[i]) {
-        case "Note":
-        case "Rest":
-        case "Chord":
-        case "RestChord":
-          if (values[i].Dur2) {
-            this.#backup.add(this.#durations.length);
-            this.#duration(values[i].Dur2);
-            this.#lines.push(i);
-          }
-          this.#options(values[i].Opts);
-          this.#duration(values[i].Dur);
-          this.#lines.push(i);
-          break;
-        case "TempoVariance": {
-          const style = values[i].Style[0];
-          switch (style) {
-            case "Breath Mark":
-              // why + 2?
-              this.#addNotation(this.#duration.length + 2, style);
-              break;
-            case "Caesura":
-            case "Fermata":
-              this.#addNotation(this.#duration.length, style);
-              break;
-            default:
-              this.#addWord(i, style.toLowerCase());
-              break;
-          }
-          break;
-        }
-        default:
-          continue;
-      }
+    // some lines must be doubled.
+    const lines = [
+      lineNumbersByTag.Chord,
+      lineNumbersByTag.Note,
+      lineNumbersByTag.Rest,
+      lineNumbersByTag.RestChord,
+    ].filter((it) => it).flat().sort((a, b) => a - b);
 
-      visited.add(i);
+    for (const line of lines) {
+      if (values[line].Dur2) {
+        this.#backup.add(this.#durations.length);
+        this.#duration(values[line].Dur2);
+        this.#lines.push(line);
+      }
+      this.#options(this.#durations.length, values[line].Opts);
+      this.#duration(values[line].Dur);
+      this.#lines.push(line);
+      visited.add(line);
+    }
+
+    if (lineNumbersByTag.TempoVariance) {
+      for (const i of lineNumbersByTag.TempoVariance) {
+        const style = values[i].Style[0];
+        switch (style) {
+          case "Breath Mark":
+            // makes more sense, but why does it work!?
+            this.#addNotation(countLessThan(i, this.#lines) - 1, style);
+            break;
+          case "Caesura":
+          case "Fermata":
+            this.#addNotation(countLessThan(i, this.#lines), style);
+            break;
+          default:
+            this.#addWord(i, style.toLowerCase());
+            break;
+        }
+      }
     }
 
     // create the slur types
@@ -99,7 +98,7 @@ export class Durations {
 
     if (lineNumbersByTag.Bar) {
       for (const line of lineNumbersByTag.Bar) {
-        const i = this.#nextDurationForLine[line];
+        const i = countLessThan(line, this.#lines);
         if (
           this.#slurredDuration.has(i) && i > 0 &&
           this.#slurredDuration.has(i - 1)
@@ -146,14 +145,7 @@ export class Durations {
       }
     }
 
-    if (lineNumbersByTag.Dynamic || lineNumbersByTag.DynamicVariance) {
-      const lines = [lineNumbersByTag.Dynamic, lineNumbersByTag.DynamicVariance]
-        .filter((it) => it).flat().sort((a, b) => a - b);
-      for (const line of lines) {
-        this.#dynamic(line, values[line].Style[0]);
-        visited.add(line);
-      }
-    }
+    this.#visitDynamics(nwcLines, visited);
   }
 
   #notationsX: number[] = [];
@@ -168,58 +160,77 @@ export class Durations {
     this.#pushDirection(line, create("words", undefined, word));
   }
 
-  #wedged: boolean = false;
-  #wedgeNumber = 1;
+  #visitDynamics(nwcLines: NWCLines, visited: Set<number>) {
+    if (
+      !nwcLines.lineNumbersByTag.Dynamic &&
+      !nwcLines.lineNumbersByTag.DynamicVariance
+    ) return;
 
-  #dynamics = Object.fromEntries(
-    ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "sfz", "rfz"].map((
-      d,
-    ) => [d, create("dynamics", undefined, create(d))]),
-  );
+    const dynamics = Object.fromEntries(
+      ["ppp", "pp", "p", "mp", "mf", "f", "ff", "fff", "sfz", "rfz"].map((
+        d,
+      ) => [d, create("dynamics", undefined, create(d))]),
+    );
+    const lines = [
+      nwcLines.lineNumbersByTag.Dynamic,
+      nwcLines.lineNumbersByTag.DynamicVariance,
+    ]
+      .filter((it) => it).flat().sort((a, b) => a - b);
+    for (let i = 0, l = lines.length; i < l; i++) {
+      const line = lines[i];
+      visited.add(line);
+      const style = nwcLines.values[line].Style[0];
+      switch (style) {
+        case "Sforzando":
+          this.#pushDirection(line, dynamics.sfz);
+          break;
+        case "Rinforzando":
+          this.#pushDirection(line, dynamics.rfz);
+          break;
+        case "Crescendo":
+          {
+            const number = ((i % 16) + 1).toString();
+            this.#pushDirection(
+              line,
+              create("wedge", {
+                type: "crescendo",
+                number,
+              }),
+            );
+            this.#pushDirection(
+              lines[i + 1] ?? this.#numberOfLines,
+              create("wedge", {
+                type: "stop",
+                number,
+              }),
+            );
+          }
 
-  #dynamic(line: number, arg1: string) {
-    if (this.#wedged) {
-      this.#pushDirection(
-        line,
-        create("wedge", {
-          type: "stop",
-          number: this.#wedgeNumber.toString(),
-        }),
-      );
-      this.#wedgeNumber = this.#wedgeNumber % 16 + 1;
-      this.#wedged = false;
-    }
-    switch (arg1) {
-      case "Sforzando":
-        this.#pushDirection(line, this.#dynamics.sfz);
-        break;
-      case "Rinforzando":
-        this.#pushDirection(line, this.#dynamics.rfz);
-        break;
-      case "Crescendo":
-        this.#pushDirection(
-          line,
-          create("wedge", {
-            type: "crescendo",
-            number: this.#wedgeNumber.toString(),
-          }),
-        );
-        this.#wedged = true;
-        break;
-      case "Decrescendo":
-      case "Diminuendo":
-        this.#pushDirection(
-          line,
-          create("wedge", {
-            type: "diminuendo",
-            number: this.#wedgeNumber.toString(),
-          }),
-        );
-        this.#wedged = true;
-        break;
-      default:
-        this.#pushDirection(line, this.#dynamics[arg1]);
-        break;
+          break;
+        case "Decrescendo":
+        case "Diminuendo":
+          {
+            const number = ((i % 16) + 1).toString();
+            this.#pushDirection(
+              line,
+              create("wedge", {
+                type: "diminuendo",
+                number,
+              }),
+            );
+            this.#pushDirection(
+              lines[i + 1] ?? this.#numberOfLines,
+              create("wedge", {
+                type: "stop",
+                number,
+              }),
+            );
+          }
+          break;
+        default:
+          this.#pushDirection(line, dynamics[style]);
+          break;
+      }
     }
   }
 
@@ -230,13 +241,13 @@ export class Durations {
   #doubleDotted: Set<number> = new Set();
   #stems: Map<number, Element> = new Map();
 
-  #options(opts?: string[]) {
+  #options(index: number, opts?: string[]) {
     if (!opts) return;
     if (opts.includes("Stem=Up")) {
-      this.#stems.set(this.#durations.length, MusicXML.stem.up);
+      this.#stems.set(index, MusicXML.stem.up);
     }
     if (opts.includes("Stem=Down")) {
-      this.#stems.set(this.#durations.length, MusicXML.stem.down);
+      this.#stems.set(index, MusicXML.stem.down);
     }
   }
 
@@ -244,48 +255,48 @@ export class Durations {
 
   #duration(dur: string[]) {
     const index = this.#durations.length;
-    let duration = PER_WHOLE;
+    this.#durations.push(PER_WHOLE);
     for (const s of dur) {
       switch (s) {
         case "16th":
-          duration /= 16;
+          this.#durations[index] /= 16;
           this.#types.push("16th");
           break;
         case "32nd":
-          duration /= 32;
+          this.#durations[index] /= 32;
           this.#types.push("32nd");
           break;
         case "64th":
-          duration /= 64;
+          this.#durations[index] /= 64;
           this.#types.push("64th");
           break;
         case "8th":
-          duration /= 8;
+          this.#durations[index] /= 8;
           this.#types.push("eighth");
           break;
         case "4th":
-          duration /= 4;
+          this.#durations[index] /= 4;
           this.#types.push("quarter");
           break;
         case "Whole":
           this.#types.push("whole");
           break;
         case "Half":
-          duration /= 2;
+          this.#durations[index] /= 2;
           this.#types.push("half");
           break;
         case "Dotted":
-          duration *= 3 / 2;
+          this.#durations[index] *= 3 / 2;
           this.#dotted.add(index);
           break;
         case "DblDotted":
-          duration *= 7 / 4;
+          this.#durations[index] *= 7 / 4;
           this.#doubleDotted.add(index);
           break;
         case "Triplet=First":
         case "Triplet=End":
         case "Triplet":
-          duration *= 2 / 3;
+          this.#durations[index] *= 2 / 3;
           this.#triplet.add(index);
           break;
         case "Accent":
@@ -304,7 +315,6 @@ export class Durations {
           break;
       }
     }
-    this.#durations.push(duration);
   }
 
   allNotes(
@@ -355,17 +365,15 @@ export class Durations {
   ) {
     const voices = Array((this.#AddStaff.length) * 2).keys()
       .map((k) => create("voice", undefined, `${k + 1}`)).toArray();
-
-    const byIndex = this.#AddStaff.flatMap((
-      line,
-      index,
-      lines,
-    ) =>
+    const firstDurationByStaff = this.#AddStaff.map((line) =>
+      countLessThan(line, this.#lines)
+    );
+    firstDurationByStaff.push(this.#lines.length);
+    const byIndex = firstDurationByStaff.flatMap((j, i, a) =>
       Array.from({
-        length: (this.#nextDurationForLine[lines[index + 1]] ??
-          this.#durations.length) -
-          this.#nextDurationForLine[line],
-      }, (_) => 2 * index)
+        length: j -
+          (i && a[i - 1]),
+      }, () => i)
     );
     this.#backup.forEach((i) => byIndex[i]++);
 

@@ -70,7 +70,6 @@
   },
   "workspace": {
     "dependencies": [
-      "jsr:@std/assert@^1.0.19",
       "npm:typescript@^6.0.2"
     ]
   }
