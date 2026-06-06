@@ -1,5 +1,5 @@
 import { Elements } from "./musicxml.ts";
-import { NWCLines } from "./scanner.ts";
+import { countLessThan, NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 const ALTSTR = "vbn#x";
@@ -17,111 +17,189 @@ export class Positions {
   #alters: string[] = [];
   #tones: number[] = [];
   #firstNoteByDuration: number[] = [];
-  #tone = 34;
-  #signature = [...N7];
-  #altersByTone = [...N7];
-
-  #Pos: string[] = [];
+  #startTie = new Set<number>();
+  #stopTie = new Set<number>();
+  #accidentals = new Map<number, Element>();
 
   visit(
-    { tags, values }: NWCLines,
+    { values, lineNumbersByTag }: NWCLines,
     visited: Set<number>,
   ): void {
-    for (let i = 0; i < tags.length; i++) {
-      switch (tags[i]) {
-        case "AddStaff":
-          this.#signature = [...N7];
-          this.#altersByTone = [...N7];
-          break;
-        case "Clef":
-          this.#tone = CLEF_TONE.get(values[i].Type[0]) ?? 34;
-          if (!values[i].OctaveShift) break;
-          switch (values[i].OctaveShift[0]) {
-            case "Octave Up":
-              this.#tone += 7;
-              break;
-            case "Octave Down":
-              this.#tone -= 7;
-              break;
-            default:
-              break;
-          }
-          break;
-        case "Key":
-          this.#signature = [...N7];
-          this.#altersByTone = [...N7];
-          for (const x of values[i].Signature) {
-            const index = "CDEFGAB".indexOf(x[0]);
-            this.#signature[index] = this.#altersByTone[index] = x[1];
-          }
-          break;
-        case "Bar":
-          this.#altersByTone = [...this.#signature];
-          break;
-        case "Note":
-        case "Rest":
-        case "Chord":
-        case "RestChord":
-          if (values[i].Pos2) {
-            for (const pos of values[i].Pos2) this.#pitch(pos);
-            this.#Pos.push(...values[i].Pos2);
-            this.#firstNoteByDuration.push(this.#Pos.length);
-          }
-          if (values[i].Pos) {
-            for (const pos of values[i].Pos) this.#pitch(pos);
-            this.#Pos.push(...values[i].Pos);
-          }
-          // this is why rests must be included.
-          this.#firstNoteByDuration.push(this.#Pos.length);
-          break;
-        default:
-          continue;
-      }
-      visited.add(i);
-    }
-  }
+    const lines = [
+      lineNumbersByTag.Chord,
+      lineNumbersByTag.Note,
+      lineNumbersByTag.Rest,
+      lineNumbersByTag.RestChord,
+    ].filter((it) => it).flat().sort((a, b) => a - b);
 
-  build(): Elements["positions"] {
+    for (const line of lines) {
+      visited.add(line);
+      if (values[line].Dur2) {
+        this.#firstNoteByDuration.push(values[line].Pos2?.length ?? 0);
+      }
+      if (values[line].Dur) {
+        this.#firstNoteByDuration.push(values[line].Pos?.length ?? 0);
+      }
+    }
+    for (let i = 1; i < this.#firstNoteByDuration.length; i++) {
+      this.#firstNoteByDuration[i] += this.#firstNoteByDuration[i - 1];
+    }
+
+    // this still seems crazy complicated.
+    // let's document
+    // take lines with notes or rests on them and translate to chords.
+    const chords = lines.map((line) =>
+      [values[line].Pos2, values[line].Pos].filter((it) => it).flat()
+    );
+    // all data will be flattened into a single array, which is why we need these offsets here now.
+    const offsets = [0];
+    for (let i = 1; i <= chords.length; i++) {
+      offsets[i] = offsets[i - 1] + chords[i - 1].length;
+    }
+
+    // tone for the central line of the staff
+    const baseTones: { [_: number]: number } = {};
+    // then evey bar it resets to the last key signature.
+    const Bar = lineNumbersByTag.Bar ?? [];
+    // the signature by the index of the first bar where it is valid
+    const signatureByBar: { [_: number]: string } = {};
+    const signatureByLine: { [_: number]: string } = {};
+    // reset at the start of each staff
+    if (lineNumbersByTag.AddStaff) {
+      lineNumbersByTag.AddStaff.forEach((line) => {
+        visited.add(line);
+        const index = countLessThan(line, lines);
+        baseTones[index] = 34;
+        signatureByLine[index] =
+          signatureByBar[countLessThan(line, Bar)] =
+            N7;
+      });
+    }
+    // set to key signatures where they appear
+    // issue: Key is optional... so what do the Bars below do?
+    if (lineNumbersByTag.Key) {
+      lineNumbersByTag.Key.forEach((line) => {
+        visited.add(line);
+        const signature = [...N7];
+        for (const x of values[line].Signature) {
+          const index = "CDEFGAB".indexOf(x[0]);
+          signature[index] = x[1];
+        }
+        signatureByLine[countLessThan(line, lines)] =
+          signatureByBar[countLessThan(line, Bar)] =
+            signature.join("");
+      });
+    }
+
+    // reset to key signature every bar, don't override!
+    {
+      let signature = N7;
+      Bar.forEach((line, index) => {
+        visited.add(line);
+        if (signatureByBar[index]) signature = signatureByBar[index];
+        signatureByLine[countLessThan(line, lines)] ??= signature;
+      });
+    }
+
+    // adjust center tones to clef
+    if (lineNumbersByTag.Clef) {
+      lineNumbersByTag.Clef.forEach((line) => {
+        visited.add(line);
+        let tone = CLEF_TONE.get(values[line].Type[0]) ?? 34;
+        if (values[line].OctaveShift?.[0] === "Octave Up") {
+          tone += 7;
+        }
+        if (values[line].OctaveShift?.[0] === "Octave Down") {
+          tone -= 7;
+        }
+        baseTones[countLessThan(line, lines)] = tone;
+      });
+    }
+
     const accidentalElements = Object.fromEntries(
       ["flat-flat", "flat", "natural", "sharp", "double-sharp"].map((
         type,
         i,
       ) => [ALTSTR[i], create("accidental", undefined, type)]),
     );
-    const accidentals = new Map<number, Element>();
-    this.#Pos.forEach((pos, i) => {
-      if (ALTSTR.includes(pos[0])) {
-        accidentals.set(i, accidentalElements[pos[0]]);
-      }
-    });
 
+    const addStaff = new Set(
+      (lineNumbersByTag.AddStaff ?? []).map((line) =>
+        countLessThan(line, lines)
+      ),
+    );
+
+    // fall back to imperative solution
+    // I just wanna make it work.
+    const open: (number)[] = Array.from({ length: 68 }, () => -1);
+    let signature = [...N7];
+    let baseTone = 34;
+    chords.forEach((chord, i) => {
+      if (addStaff.has(i)) {
+        signature = [...N7];
+        baseTone = 34;
+      }
+      // adjust these if AddStaff, Clef or Key,
+      if (signatureByLine[i]) signature = [...signatureByLine[i]];
+      if (baseTones[i]) baseTone = baseTones[i];
+      chord.forEach((pos, j) => {
+        // parse the NWC position
+        const altered = ALTSTR.includes(pos[0]);
+        const tie = pos[pos.length - 1] === "^";
+        const tone = baseTone + +pos.substring(+altered, pos.length - +tie);
+        // put the result in their proper place
+        const index = offsets[i] + j;
+        this.#tones[index] = tone;
+        // more stop ties needed!
+
+        if (altered) {
+          this.#accidentals.set(
+            index,
+            accidentalElements[
+              signature[tone % 7] =
+                this.#alters[index] =
+                  pos[0]
+            ],
+          );
+        }
+
+        if (open[tone] >= 0) {
+          console.assert(
+            !altered || pos[0] === this.#alters[open[tone]],
+            `invalid alteration of tied note on line ${lines[i] + 2}`,
+          );
+          this.#stopTie.add(index);
+          this.#alters[index] = this.#alters[open[tone]];
+        }
+        if (altered) {
+          this.#accidentals.set(
+            index,
+            accidentalElements[
+              signature[tone % 7] =
+                this.#alters[index] =
+                  pos[0]
+            ],
+          );
+        } else {
+          this.#alters[index] = signature[tone % 7];
+        }
+        if (tie) {
+          this.#startTie.add(index);
+          open[tone] = index;
+        } else {
+          open[tone] = -1;
+        }
+      });
+    });
+  }
+
+  build(): Elements["positions"] {
     return {
-      accidentals,
+      accidentals: this.#accidentals,
       groups: this.#firstNoteByDuration,
       pitches: this.#pitches(),
       ...this.#ties(),
     };
-  }
-
-  #open: (string | null)[] = Array.from({ length: 68 }, () => null);
-  // #stopTie: Set<number> = new Set();
-
-  // this is what musicians must do in their heads while reading sheet music?
-  #pitch(pos: string) {
-    const altered = ALTSTR.includes(pos[0]);
-    const startTie = pos[pos.length - 1] === "^";
-    const tone = +pos.substring(+altered, pos.length - +startTie) + this.#tone;
-    const index = this.#tones.length;
-    this.#tones.push(tone);
-    const stopTie = this.#open[tone];
-    if (altered) {
-      this.#altersByTone[tone % 7] = pos[0];
-      this.#alters.push(pos[0]);
-    } else if (stopTie) this.#alters.push(stopTie);
-    else this.#alters.push(this.#altersByTone[tone % 7]);
-    if (startTie) {
-      this.#open[tone] = this.#alters[index];
-    } else this.#open[tone] = null;
   }
 
   #pitches(): Element[] {
@@ -164,36 +242,23 @@ export class Positions {
     const stopTieds: Map<number, Element> = new Map();
     const startXmls: { [_: string]: Element } = {};
     const stopXmls: { [_: string]: Element } = {};
-
-    // no, it is not the case that every tie ends at the next line of nwc,
-    // though AFAIK, this is not valid music notation
-    // I guess the multiple positions are the reason: if the pos2 notes are tied, then thei may connect to notes several lines down.
-    const open: Record<string, string> = {};
-    for (let note = 0; note < this.#Pos.length; note++) {
-      const pos = this.#Pos[note];
-      const altered = ALTSTR.includes(pos[0]);
-      const tied = pos[pos.length - 1] === "^";
-      const cleanPos = +pos.substring(+altered, pos.length - +tied);
-
-      if (open[cleanPos]) {
-        stopTieds.set(
-          note,
-          stopXmls[cleanPos] ??= create(
-            "tied",
-            { type: "stop", number: open[cleanPos] },
-          ),
-        );
-        delete open[cleanPos];
-      }
-
-      if (!tied) continue;
-
-      open[cleanPos] = ((+cleanPos + 34) % 16 + 1).toString();
+    for (const note of this.#startTie) {
+      const number = (this.#tones[note] % 16 + 1).toString();
       startTieds.set(
         note,
-        startXmls[cleanPos] ??= create("tied", {
+        startXmls[number] ??= create("tied", {
           type: "start",
-          number: open[cleanPos],
+          number,
+        }),
+      );
+    }
+    for (const note of this.#stopTie) {
+      const number = (this.#tones[note] % 16 + 1).toString();
+      stopTieds.set(
+        note,
+        stopXmls[number] ??= create("tied", {
+          type: "stop",
+          number,
         }),
       );
     }

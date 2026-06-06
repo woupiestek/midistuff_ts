@@ -370,10 +370,7 @@ export class Durations {
     );
     firstDurationByStaff.push(this.#lines.length);
     const byIndex = firstDurationByStaff.flatMap((j, i, a) =>
-      Array.from({
-        length: j -
-          (i && a[i - 1]),
-      }, () => i)
+      Array.from({ length: j - (i && a[i - 1]) }, () => i)
     );
     this.#backup.forEach((i) => byIndex[i]++);
 

@@ -18,7 +18,7 @@ function getPathValue(path: Map<number, number>, key: number): number {
 
 function diffOperations(expected: string[], actual: string[]): DiffOperation[] {
   const maxDistance = expected.length + actual.length;
-  let path = new Map<number, number>([[1, 0]]);
+  const path = new Map<number, number>([[1, 0]]);
   const trace: Map<number, number>[] = [];
 
   for (let distance = 0; distance <= maxDistance; distance++) {
