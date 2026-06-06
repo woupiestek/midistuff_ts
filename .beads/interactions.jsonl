@@ -1,0 +1,1 @@
+{"id":"int-406419e4","kind":"field_change","created_at":"2026-06-06T14:51:06.6719376Z","actor":"Wouter Pieter Stekelenburg","issue_id":"midistuff-2tu","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Implemented Myers-style line alignment for regression XML diffs and added focused insertion/deletion tests."}}
