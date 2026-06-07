@@ -16,7 +16,6 @@ const CLEF_TONE = new Map([
 export class Positions {
   #alters: string[] = [];
   #tones: number[] = [];
-  #firstNoteByDuration: number[] = [];
   #startTie = new Set<number>();
   #stopTie = new Set<number>();
   #accidentals = new Map<number, Element>();
@@ -28,22 +27,8 @@ export class Positions {
     const lines = [
       lineNumbersByTag.Chord,
       lineNumbersByTag.Note,
-      lineNumbersByTag.Rest,
       lineNumbersByTag.RestChord,
     ].filter((it) => it).flat().sort((a, b) => a - b);
-
-    for (const line of lines) {
-      visited.add(line);
-      if (values[line].Dur2) {
-        this.#firstNoteByDuration.push(values[line].Pos2?.length ?? 0);
-      }
-      if (values[line].Dur) {
-        this.#firstNoteByDuration.push(values[line].Pos?.length ?? 0);
-      }
-    }
-    for (let i = 1; i < this.#firstNoteByDuration.length; i++) {
-      this.#firstNoteByDuration[i] += this.#firstNoteByDuration[i - 1];
-    }
 
     // this still seems crazy complicated.
     // let's document
@@ -131,7 +116,7 @@ export class Positions {
 
     // fall back to imperative solution
     // I just wanna make it work.
-    const open: (number)[] = Array.from({ length: 68 }, () => -1);
+    const open: number[] = Array.from({ length: 68 }, () => -1);
     let signature = [...N7];
     let baseTone = 34;
     chords.forEach((chord, i) => {
@@ -163,15 +148,25 @@ export class Positions {
           );
         }
 
+        // note the conflict:
+        // a tie with a note with different alteration is not possible
+        // but what if the alteration is repeated?
         if (open[tone] >= 0) {
-          console.assert(
-            !altered || pos[0] === this.#alters[open[tone]],
-            `invalid alteration of tied note on line ${lines[i] + 2}`,
-          );
           this.#stopTie.add(index);
           this.#alters[index] = this.#alters[open[tone]];
-        }
-        if (altered) {
+          if (altered) {
+            console.assert(
+              pos[0] === this.#alters[open[tone]],
+              `invalid alteration of tied note on line ${lines[i] + 1}`,
+            );
+            this.#accidentals.set(
+              index,
+              accidentalElements[
+                signature[tone % 7] = pos[0]
+              ],
+            );
+          }
+        } else if (altered) {
           this.#accidentals.set(
             index,
             accidentalElements[
@@ -196,7 +191,6 @@ export class Positions {
   build(): Elements["positions"] {
     return {
       accidentals: this.#accidentals,
-      groups: this.#firstNoteByDuration,
       pitches: this.#pitches(),
       ...this.#ties(),
     };

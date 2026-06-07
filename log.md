@@ -4,13 +4,13 @@
 
 ### issues
 
-X sarabande: corruption complaints
-
+- ~~sarabande: corruption complaints~~
 - 2010-2-21 1!: musescore won't play the last measure. Not sure if the source is
   wrong.
-- solve the multiple mess.
+- ~~solve the multiple mess.~~
 - find a better way to do chords with two durations
 - maybe some voice intelligence?
+- ~~what is up with the ties now!?~~
 
 ### ideas
 

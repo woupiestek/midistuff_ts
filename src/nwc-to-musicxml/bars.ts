@@ -4,8 +4,8 @@ import { countLessThan, NWCLines } from "./scanner.ts";
 import { create, Element } from "./xml.ts";
 
 export class Bars {
-  firstMeasureForNWCStaff: number[] = [0];
-  #measureCount = 0;
+  #lines: number[] = [];
+  #staves: number[] = [0];
   #barStyles: Map<number, string> = new Map();
   #endings: Map<number, string[]> = new Map();
 
@@ -25,15 +25,14 @@ export class Bars {
     if (!AddStaff || !Bar) {
       return;
     }
-    this.firstMeasureForNWCStaff = lineNumbersByTag.AddStaff.map(
+    this.#lines = [AddStaff, Bar].flat().sort((a, b) => a - b);
+    this.#staves = AddStaff.map(
       (lineNumber, staffNumber) => {
         visited.add(lineNumber);
         return countLessThan(lineNumber, Bar) + staffNumber;
       },
     );
-    this.#measureCount = AddStaff.length + Bar.length;
-    this.firstMeasureForNWCStaff.push(this.#measureCount);
-
+    this.#staves.push(this.#lines.length);
     for (let i = 0; i < Bar.length; i++) {
       const lineNumber = Bar[i];
       const style = values[lineNumber].Style;
@@ -46,8 +45,7 @@ export class Bars {
 
     if (lineNumbersByTag.Ending) {
       for (const lineNumber of lineNumbersByTag.Ending) {
-        const measure = countLessThan(lineNumber, AddStaff) +
-          countLessThan(lineNumber, Bar) - 1;
+        const measure = countLessThan(lineNumber, this.#lines) - 1;
         this.#endings.set(measure, values[lineNumber].Endings);
         visited.add(lineNumber);
       }
@@ -55,8 +53,7 @@ export class Bars {
 
     if (lineNumbersByTag.Clef) {
       for (const lineNumber of lineNumbersByTag.Clef) {
-        const measure = countLessThan(lineNumber, AddStaff) +
-          countLessThan(lineNumber, Bar) - 1;
+        const measure = countLessThan(lineNumber, this.#lines) - 1;
         this.#clefs.set(measure, values[lineNumber].Type[0]);
         if (values[lineNumber].OctaveShift) {
           switch (values[lineNumber].OctaveShift[0]) {
@@ -76,8 +73,7 @@ export class Bars {
 
     if (lineNumbersByTag.TimeSig) {
       for (const lineNumber of lineNumbersByTag.TimeSig) {
-        const measure = countLessThan(lineNumber, AddStaff) +
-          countLessThan(lineNumber, Bar) - 1;
+        const measure = countLessThan(lineNumber, this.#lines) - 1;
         switch (values[lineNumber].Signature[0]) {
           case "Common":
             this.#times.set(measure, "4/4");
@@ -95,8 +91,7 @@ export class Bars {
 
     if (lineNumbersByTag.Key) {
       for (const lineNumber of lineNumbersByTag.Key) {
-        const measure = countLessThan(lineNumber, AddStaff) +
-          countLessThan(lineNumber, Bar) - 1;
+        const measure = countLessThan(lineNumber, this.#lines) - 1;
         let fifths = 0;
         for (const x of values[lineNumber].Signature) {
           if (x[1] === "#") fifths++;
@@ -107,8 +102,8 @@ export class Bars {
       }
     }
 
-    for (let i = 1; i < this.firstMeasureForNWCStaff.length; i++) {
-      const measure = this.firstMeasureForNWCStaff[i];
+    for (let i = 1; i < this.#staves.length; i++) {
+      const measure = this.#staves[i];
       this.#barStyles.set(measure, "SectionClose");
     }
 
@@ -118,7 +113,7 @@ export class Bars {
           const endingBar = values[lineNumber].EndingBar[0].replaceAll(" ", "");
           const staff = countLessThan(lineNumber, lineNumbersByTag.AddStaff);
           this.#barStyles.set(
-            this.firstMeasureForNWCStaff[staff + 1],
+            this.#staves[staff + 1],
             endingBar,
           );
           visited.add(lineNumber);
@@ -145,52 +140,55 @@ export class Bars {
     // something that noteworthy does.
     const keep = new Set<number>();
 
-    for (let part = 0; part < parts.length - 1; part++) {
-      const gns: Element[][] = [];
-      const es = new Map<number, string[]>();
-      const lbss = new Map<number, string>();
-      const rbss = new Map<number, string>();
-      for (let staff = parts[part]; staff < parts[part + 1]; staff++) {
-        let backup = xml.backup(PER_WHOLE);
-        for (
-          let measure = this.firstMeasureForNWCStaff[staff];
-          measure < this.firstMeasureForNWCStaff[staff + 1];
-          measure++
-        ) {
-          const time = this.#times.get(measure);
-          if (time) {
-            const [n, d] = time.split("/");
-            backup = xml.backup(PER_WHOLE * +n / +d);
-            // break;
-          }
-          const m = measure - this.firstMeasureForNWCStaff[staff];
-          gns[m] ||= [];
-          if (allNotes[measure].length) {
-            gns[m].push(...allNotes[measure], backup);
-            keep.add(m);
-          }
+    const _parts = new Set(parts.map((staff) => this.#staves[staff]));
+    let part = -1;
+    const _staves = new Set(this.#staves);
+    let staff = -1;
+    let backup = xml.backup(PER_WHOLE);
 
-          const ending = this.#endings.get(measure);
-          if (ending) {
-            es.set(m, ending);
-          }
-          const leftBarstyle = this.#barStyles.get(measure);
-          if (leftBarstyle) {
-            lbss.set(m, leftBarstyle);
-          }
-          const rightBarstyle = this.#barStyles.get(measure + 1);
-          if (rightBarstyle) {
-            rbss.set(m, rightBarstyle);
-          }
-        }
+    for (let measure = 0; measure < this.#lines.length; measure++) {
+      if (_parts.has(measure)) {
+        part++;
+        groupedNotes[part] = [];
+        endings[part] = new Map();
+        leftBarstyles[part] = new Map();
+        rightBarstyles[part] = new Map();
+      }
+      if (_staves.has(measure)) {
+        staff++;
+        backup = xml.backup(PER_WHOLE);
+      }
+      const gns: Element[][] = groupedNotes[part];
+      const es = endings[part];
+      const lbss = leftBarstyles[part];
+      const rbss = rightBarstyles[part];
+
+      const time = this.#times.get(measure);
+      if (time) {
+        const [n, d] = time.split("/");
+        backup = xml.backup(PER_WHOLE * +n / +d);
+      }
+      const m = measure - this.#staves[staff];
+      gns[m] ||= [];
+      if (allNotes[measure].length) {
+        gns[m].push(...allNotes[measure], backup);
+        keep.add(m);
       }
 
-      gns.forEach((measure) => measure.pop());
-      groupedNotes[part] = gns;
-      endings[part] = es;
-      leftBarstyles[part] = lbss;
-      rightBarstyles[part] = rbss;
+      const ending = this.#endings.get(measure);
+      if (ending) {
+        es.set(m, ending);
+      }
+      const leftBarstyle = this.#barStyles.get(measure);
+      if (leftBarstyle) {
+        lbss.set(m, leftBarstyle);
+      }
+      const rightBarstyle = this.#barStyles.get(measure + 1);
+      if (rightBarstyle) {
+        rbss.set(m, rightBarstyle);
+      }
     }
+    groupedNotes.forEach((gns) => gns.forEach((measure) => measure.pop()));
 
     const result: Element[][] = [];
 
@@ -243,14 +241,15 @@ export class Bars {
     );
 
     // from k to part & measure?
-    const X = parts.map((s) => this.firstMeasureForNWCStaff[s]).flatMap((
+    const X = parts.map((s) => this.#staves[s]).flatMap((
       m,
       i,
       a,
-    ) => Array.from({ length: (a[i + 1] ?? this.#measureCount) - m }, () => i));
+    ) => Array.from({ length: (a[i + 1] ?? this.#lines.length) - m }, () => i));
     let length = 0;
-    const Y = this.firstMeasureForNWCStaff.flatMap((m, i) => {
-      const l = (this.firstMeasureForNWCStaff[i + 1] ?? this.#measureCount) - m;
+    const Y = this.#staves.flatMap((m, i) => {
+      const l = (this.#staves[i + 1] ?? this.#lines.length) -
+        m;
       if (l > length) length = l;
       return Array(l).keys().toArray();
     });
@@ -269,13 +268,13 @@ export class Bars {
       const [beats, beatType] = time.split("/");
       add(xml.time(beats, beatType), k);
     });
-    const staves = this.firstMeasureForNWCStaff.flatMap((
+    const staves = this.#staves.flatMap((
       offset,
       index,
       offsets,
     ) =>
       Array.from({
-        length: (offsets[index + 1] ?? this.#measureCount) - offset,
+        length: (offsets[index + 1] ?? this.#lines.length) - offset,
       }, () => secondStaves.has(index) ? 2 : 1)
     );
     this.#clefs.forEach((clef, k) =>
@@ -294,21 +293,5 @@ export class Bars {
     });
 
     return attrs;
-  }
-
-  ticksPerMeasure(): number[] {
-    const result: number[] = [];
-    let numerator = 4;
-    let denominator = 4;
-    for (let measure = 0; measure < this.#measureCount; measure++) {
-      const time = this.#times.get(measure);
-      if (time) {
-        const [n, d] = time.split("/");
-        numerator = +n;
-        denominator = +d;
-      }
-      result[measure] = PER_WHOLE * numerator / denominator;
-    }
-    return result;
   }
 }

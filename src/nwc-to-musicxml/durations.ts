@@ -31,6 +31,8 @@ export class Durations {
 
   #numberOfLines = 0;
 
+  #toPositions: number[] = [];
+
   visit(
     nwcLines: NWCLines,
     visited: Set<number>,
@@ -60,6 +62,20 @@ export class Durations {
       this.#options(this.#durations.length, values[line].Opts);
       this.#duration(values[line].Dur);
       visited.add(line);
+    }
+
+    // how far to read into the array of positions per duration.
+    for (const line of lines) {
+      visited.add(line);
+      if (values[line].Dur2) {
+        this.#toPositions.push(values[line].Pos2?.length ?? 0);
+      }
+      if (values[line].Dur) {
+        this.#toPositions.push(values[line].Pos?.length ?? 0);
+      }
+    }
+    for (let i = 1; i < this.#toPositions.length; i++) {
+      this.#toPositions[i] += this.#toPositions[i - 1];
     }
 
     if (lineNumbersByTag.TempoVariance) {
@@ -149,8 +165,38 @@ export class Durations {
     }
 
     this.#visitDynamics(nwcLines, visited);
+
+    // deal with full measure rests
+    const rests = new Set(lineNumbersByTag.Rest);
+    const wholeNoteRests = this.#lines.keys().filter((i) =>
+      rests.has(this.#lines[i]) &&
+      this.#durations[i] === PER_WHOLE
+    );
+    const tickPerMeasure = (lineNumbersByTag.TimeSig ?? []).map((line) => {
+      const s = values[line].Signature[0];
+      switch (values[line].Signature[0]) {
+        case "AllaBreve":
+        case "Common":
+          return PER_WHOLE;
+        default:
+          break;
+      }
+      const [n, d] = s.split("/");
+      return +n * PER_WHOLE / +d;
+    });
+    wholeNoteRests.forEach((i) => {
+      const tpm = tickPerMeasure[
+        countLessThan(this.#lines[i], lineNumbersByTag.TimeSig ?? []) - 1
+      ] ?? PER_WHOLE;
+      if (tpm > PER_WHOLE) return;
+      this.#fullMeasureRest.add(i);
+      if (tpm < PER_WHOLE) {
+        this.#durations[i] = tpm;
+      }
+    });
   }
 
+  #fullMeasureRest = new Set<number>();
   #notationsX: number[] = [];
   #notationsY: string[] = [];
 
@@ -325,7 +371,6 @@ export class Durations {
     secondStaves: Set<number>,
     elements: Elements,
     xml: MusicXML,
-    ticksPerMeasure: number[],
   ): Element[][] {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
@@ -352,7 +397,7 @@ export class Durations {
     });
 
     // then the notes
-    this.#notes(staffByLine, xml, elements, ticksPerMeasure, byLine);
+    this.#notes(staffByLine, xml, elements, byLine);
 
     // that's it
 
@@ -374,7 +419,6 @@ export class Durations {
     staffByLine: Element[],
     xml: MusicXML,
     elements: Elements,
-    ticksPerMeasure: number[],
     byLine: Map<number, Element[]>,
   ) {
     const voices = Array.from(
@@ -398,35 +442,16 @@ export class Durations {
         : this.#dotted.has(i)
         ? [MusicXML.dot]
         : [];
-      const from = i && elements.positions.groups[i - 1];
-      const to = elements.positions.groups[i];
+      const from = i && this.#toPositions[i - 1];
+      const to = this.#toPositions[i];
       if (to === from) {
-        const measure = countLessThan(line, this.#AddMeasure) - 1;
-        const ticks = ticksPerMeasure[measure] ?? PER_WHOLE;
-        if (
-          this.#durations[i] === PER_WHOLE && ticks < PER_WHOLE
-        ) {
-          byLine.get(line)!.push(
-            create(
-              "note",
-              undefined,
-              MusicXML.fullMeasureRest,
-              xml.duration(ticks),
-              voice,
-              type,
-              ...dots,
-              timeMod,
-              staffByLine[line],
-            ),
-          );
-          continue;
-        }
-
         byLine.get(line)!.push(
           create(
             "note",
             undefined,
-            MusicXML.rest,
+            this.#fullMeasureRest.has(i)
+              ? MusicXML.fullMeasureRest
+              : MusicXML.rest,
             xml.duration(this.#durations[i]),
             voice,
             type,
