@@ -6,13 +6,13 @@ import { scan } from "./scanner.ts";
 import { Bars } from "./bars.ts";
 import { Staves } from "./staves.ts";
 
-const TECHNICAL_TAGS = new Set([
+const TECHNICAL_TAGS = [
   "Editor",
   "Font",
   "PgMargins",
   "PgSetup",
   "Spacer",
-]);
+];
 
 export class Transformer {
   #positions: Positions;
@@ -31,13 +31,11 @@ export class Transformer {
 
   transform(source: string): string {
     const lines = scan(source);
-    const length = lines.tags.length;
+    const length = lines.values.length;
     const visited: Set<number> = new Set(
-      Array(length).keys().filter((i) => TECHNICAL_TAGS.has(lines.tags[i])),
+      TECHNICAL_TAGS.flatMap((tag) => lines.lineNumbersByTag[tag]),
     );
-    lines.tags.forEach((it, ix) => {
-      if (TECHNICAL_TAGS.has(it)) visited.add(ix);
-    });
+    lines.skipped.forEach((it) => visited.add(it));
     this.#staves.visit(lines, visited);
     this.#bars.visit(lines, visited);
     this.#durations.visit(lines, visited);
@@ -47,7 +45,7 @@ export class Transformer {
       Array(length).keys().filter((i) => !visited.has(i)),
     );
     if (notVisited.size) {
-      console.warn("Unused lines:", ...notVisited.values().map((i) => i + 2));
+      console.warn("Unused lines:", ...notVisited.values().map((i) => i + 1));
     }
     const xml = new MusicXML();
     const allNotes = this.#durations.allNotes(

@@ -22,9 +22,11 @@ export class Durations {
   // also records: next durations line is the same
   #backup: Set<number> = new Set();
 
-  #directionsByLine: Element[][] = [];
+  #directionLine: number[] = [];
+  #directionType: Element[] = [];
   #pushDirection(line: number, type: Element) {
-    (this.#directionsByLine[line] ??= []).push(type);
+    this.#directionLine.push(line);
+    this.#directionType.push(type);
   }
 
   #numberOfLines = 0;
@@ -49,6 +51,7 @@ export class Durations {
     ].filter((it) => it).flat().sort((a, b) => a - b);
 
     for (const line of lines) {
+      this.#lines.push(line);
       if (values[line].Dur2) {
         this.#backup.add(this.#durations.length);
         this.#duration(values[line].Dur2);
@@ -56,7 +59,6 @@ export class Durations {
       }
       this.#options(this.#durations.length, values[line].Opts);
       this.#duration(values[line].Dur);
-      this.#lines.push(line);
       visited.add(line);
     }
 
@@ -80,22 +82,13 @@ export class Durations {
     }
 
     // create the slur types
-    for (let i = 0; i < this.#durations.length; i++) {
-      if (i > 0 && this.#slurredDuration.has(i - 1)) {
-        // stop breaking up slurs.
-        // actually, do this without backup!
-        if (this.#backup.has(i)) {
-          this.#slurredDuration.add(i);
-          continue;
-        }
-        if (!this.#slurredDuration.has(i)) {
-          this.#slurTypes.set(i, "stop");
-        }
-      } else if (this.#slurredDuration.has(i)) {
-        this.#slurTypes.set(i, "start");
+    for (const dur of this.#backup) {
+      if (
+        this.#slurredDuration.has(dur + 1) || this.#slurredDuration.has(dur - 1)
+      ) {
+        this.#slurredDuration.add(dur);
       }
     }
-
     if (lineNumbersByTag.Bar) {
       for (const line of lineNumbersByTag.Bar) {
         const i = countLessThan(line, this.#lines);
@@ -106,6 +99,16 @@ export class Durations {
           this.#slurTypes.set(i, "continue");
           this.#slurTypes.set(i - 1, "continue");
         }
+      }
+    }
+    for (const dur of this.#slurredDuration) {
+      if (dur > 0 && !this.#slurredDuration.has(dur - 1)) {
+        this.#slurTypes.set(dur, "start");
+      }
+      if (
+        dur + 1 < this.#durations.length && !this.#slurredDuration.has(dur + 1)
+      ) {
+        this.#slurTypes.set(dur + 1, "stop");
       }
     }
 
@@ -327,7 +330,7 @@ export class Durations {
     const staff1 = create("staff", undefined, "1");
     const staff2 = create("staff", undefined, "2");
 
-    // off by one again
+    // note the shift by one!
     const staffByLine = Array(this.#AddStaff.length + 1).keys().flatMap((
       index,
     ) =>
@@ -338,21 +341,32 @@ export class Durations {
     ).toArray();
 
     // start with directions
-    const byLine: Element[][] = this.#directionsByLine.map((types, line) =>
-      types && types.map((type) => xml.direction(type, staffByLine[line]))
+    const byLine: Map<number, Element[]> = new Map(
+      this.#directionLine.map((line) => [line, []]),
     );
+    this.#directionLine.map((line, i) => {
+      byLine.get(line)!.push(xml.direction(
+        this.#directionType[i],
+        staffByLine[line],
+      ));
+    });
 
     // then the notes
     this.#notes(staffByLine, xml, elements, ticksPerMeasure, byLine);
 
-    // wanted: arrays of elements by measure.
-    // what if we'd just collected by line?
-    return this.#AddMeasure.map((line, i, lines) =>
-      byLine.slice(
-        line,
-        lines[i + 1] ?? this.#numberOfLines,
-      ).filter((it) => it).flat()
-    );
+    // that's it
+
+    const result: Element[][] = Array.from({
+      length: this.#AddMeasure.length,
+    }, () => []);
+    const keys = [...byLine.keys()].sort((a, b) => a - b);
+    const measures = this.#AddMeasure.map((line) => countLessThan(line, keys));
+    let m = 0;
+    for (const key of keys) {
+      while (keys[measures[m + 1]] <= key) m++;
+      result[m].push(...byLine.get(key)!);
+    }
+    return result;
   }
 
   // by line as well...
@@ -361,23 +375,22 @@ export class Durations {
     xml: MusicXML,
     elements: Elements,
     ticksPerMeasure: number[],
-    byLine: Element[][],
+    byLine: Map<number, Element[]>,
   ) {
-    const voices = Array((this.#AddStaff.length) * 2).keys()
-      .map((k) => create("voice", undefined, `${k + 1}`)).toArray();
-    const firstDurationByStaff = this.#AddStaff.map((line) =>
-      countLessThan(line, this.#lines)
+    const voices = Array.from(
+      { length: (this.#AddStaff.length) * 2 },
+      (_, k) => create("voice", undefined, `${k + 1}`),
     );
-    firstDurationByStaff.push(this.#lines.length);
-    const byIndex = firstDurationByStaff.flatMap((j, i, a) =>
-      Array.from({ length: j - (i && a[i - 1]) }, () => i)
-    );
-    this.#backup.forEach((i) => byIndex[i]++);
-
     const notationContent = this.#notationContent();
+    let staff = -1;
+    const staves = new Set(
+      this.#AddStaff.map((line) => countLessThan(line, this.#lines)),
+    );
     for (let i = 0; i < this.#durations.length; i++) {
+      if (staves.has(i)) staff++;
+      const voice = voices[2 * staff + +this.#backup.has(i)];
       const line = this.#lines[i];
-      byLine[line] ??= [];
+      if (!byLine.has(line)) byLine.set(line, []);
       const type = xml.type(this.#types[i]);
       const timeMod = this.#triplet.has(i) ? MusicXML.timeMod : null;
       const dots = this.#doubleDotted.has(i)
@@ -393,13 +406,13 @@ export class Durations {
         if (
           this.#durations[i] === PER_WHOLE && ticks < PER_WHOLE
         ) {
-          byLine[line].push(
+          byLine.get(line)!.push(
             create(
               "note",
               undefined,
               MusicXML.fullMeasureRest,
               xml.duration(ticks),
-              voices[byIndex[i]],
+              voice,
               type,
               ...dots,
               timeMod,
@@ -409,13 +422,13 @@ export class Durations {
           continue;
         }
 
-        byLine[line].push(
+        byLine.get(line)!.push(
           create(
             "note",
             undefined,
             MusicXML.rest,
             xml.duration(this.#durations[i]),
-            voices[byIndex[i]],
+            voice,
             type,
             ...dots,
             timeMod,
@@ -432,7 +445,7 @@ export class Durations {
           elements.positions.stopTieds.get(note) ?? null,
           elements.positions.startTieds.get(note) ?? null,
         ].filter((it) => it != null);
-        byLine[line].push(
+        byLine.get(line)!.push(
           create(
             "note",
             undefined,
@@ -442,7 +455,7 @@ export class Durations {
             xml.duration(this.#durations[i]),
             elements.positions.startTieds.has(note) ? MusicXML.tie.start : null,
             elements.positions.stopTieds.has(note) ? MusicXML.tie.stop : null,
-            voices[byIndex[i]],
+            voice,
             type,
             ...dots,
             elements.positions.accidentals.get(note) ?? null,
@@ -462,7 +475,7 @@ export class Durations {
       }
       // same line same time, nwc at least has that.
       if (this.#lines[i + 1] === line) {
-        byLine[line].push(xml.backup(this.#durations[i]));
+        byLine.get(line)!.push(xml.backup(this.#durations[i]));
       }
     }
   }
@@ -500,8 +513,11 @@ export class Durations {
     const slur: {
       [_: string]: { [_: number]: Element };
     } = { stop: {}, start: {}, continue: {} };
-    this.#slurTypes.forEach((slurType, i) => {
-      (notations[i] ||= []).push(
+    // put back in order...
+    const keys = [...this.#slurTypes.keys()].sort((a, b) => a - b);
+    for (const key of keys) {
+      const slurType = this.#slurTypes.get(key)!;
+      (notations[key] ??= []).push(
         slur[slurType][slurNumber] ??= create("slur", {
           type: slurType,
           number: slurNumber.toString(),
@@ -511,7 +527,7 @@ export class Durations {
         slurNumber %= 16;
         slurNumber += 1;
       }
-    });
+    }
     return notations;
   }
 }

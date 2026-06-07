@@ -1,5 +1,25 @@
 # Midistuff logs
 
+## 2026-06-07
+
+### issues
+
+X sarabande: corruption complaints
+
+- 2010-2-21 1!: musescore won't play the last measure. Not sure if the source is
+  wrong.
+- solve the multiple mess.
+- find a better way to do chords with two durations
+- maybe some voice intelligence?
+
+### ideas
+
+For the Dur2/Pos2 situations: collect by measure and add the backups? I guess
+
+### duration mapping
+
+So I had a model in which we look at the time when everyty
+
 ## 2026-06-03
 
 - jazzy: misplaced breath marks, weird solution

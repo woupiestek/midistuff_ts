@@ -1,27 +1,25 @@
 export type NWCLines = {
-  tags: string[];
   lineNumbersByTag: Record<string, number[]>;
   values: Record<string, string[]>[];
+  skipped: number[];
 };
 
 export function scan(source: string): NWCLines {
-  const lines = source.split("\n").map((line) => line.trim()).filter((line) =>
-    line.length > 0
-  );
-  const result: NWCLines = { tags: [], values: [], lineNumbersByTag: {} };
-  let lineNumber = 0;
-  for (const line of lines) {
-    const columns = line.split("|");
-    if (columns[0] !== "") continue; // wait
+  const lines = source.split("\n");
+  const result: NWCLines = { values: [], lineNumbersByTag: {}, skipped: [] };
+  for (let i = 0; i < lines.length; i++) {
+    const columns = lines[i].trim().split("|");
+    if (columns.length < 2) {
+      result.skipped.push(i);
+      continue;
+    }
     const tag = columns[1].trim();
-    result.tags.push(tag);
-    (result.lineNumbersByTag[tag] ??= []).push(lineNumber++);
-    result.values.push(Object.fromEntries(
-      columns.slice(2).map((value) => {
-        const [k, v] = value.split(":");
-        return [k, v.split(",")];
-      }),
-    ));
+    (result.lineNumbersByTag[tag] ??= []).push(i);
+    result.values[i] = {};
+    for (const value of columns.slice(2)) {
+      const [k, v] = value.split(":");
+      result.values[i][k] = v.split(",");
+    }
   }
   return result;
 }
