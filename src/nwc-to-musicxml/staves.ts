@@ -8,36 +8,29 @@ import { countLessThan, NWCLines } from "./scanner.ts";
 export class Staves {
   firstNWCStaffByPart: number[] = [];
   #names: string[] = [];
-  #midiPrograms: number[] = [];
+  #midi: {
+    channels: number[];
+    volumes: number[];
+    pans: number[];
+    programs: number[];
+    names: string[];
+  } = { channels: [], volumes: [], pans: [], programs: [], names: [] };
   #songInfo: Map<string, string> = new Map();
   // a part may have a second staff, which must be kept track of
   seconds: Set<number> = new Set();
 
   visit(
-    { values, lineNumbersByTag }: NWCLines,
+    nwcLines: NWCLines,
     visited: Set<number>,
   ): void {
+    const { values, lineNumbersByTag } = nwcLines;
+
     if (lineNumbersByTag.SongInfo) {
       for (const lineNumber of lineNumbersByTag.SongInfo) {
         for (const [k, v] of Object.entries(values[lineNumber])) {
           this.#songInfo.set(k, v[0]);
         }
         visited.add(lineNumber);
-      }
-    }
-
-    if (lineNumbersByTag.StaffInstrument) {
-      // still not picked up by musescore, alas
-      for (const lineNumber of lineNumbersByTag.StaffInstrument) {
-        if (values[lineNumber].Patch) {
-          const staffIndex = countLessThan(
-            lineNumber,
-            lineNumbersByTag.AddStaff,
-          );
-          this.#midiPrograms[staffIndex] = +values[lineNumber].Patch[0] +
-            1;
-          visited.add(lineNumber);
-        }
       }
     }
 
@@ -70,7 +63,46 @@ export class Staves {
     );
     // add one past the end for easier calculations later
     this.firstNWCStaffByPart.push(this.#names.length);
+    this.#vistsMidi(nwcLines);
   }
+
+  #vistsMidi({ values, lineNumbersByTag }: NWCLines) {
+    const length = lineNumbersByTag.AddStaff.length;
+    const parts: number[] = Array.from(lineNumbersByTag.AddStaff, () => 0);
+    for (let i = 0; i < length - 1; i++) {
+      const line = lineNumbersByTag.StaffProperties[2 * i];
+      parts[i + 1] = parts[i] + +!values[line].WithNextStaff?.includes("Brace");
+    }
+
+    for (let i = 0; i < length; i++) {
+      const properties = values[lineNumbersByTag.StaffProperties[2 * i + 1]];
+      const channel = +properties.Channel?.[0];
+      if (!Number.isNaN(channel)) this.#midi.channels[parts[i]] = channel;
+      const volume = +properties.Volume?.[0];
+      if (!Number.isNaN(volume)) {
+        this.#midi.volumes[parts[i]] = Math.round(((volume + 1) / 128) * 100);
+      }
+      const stereoPan = +properties.StereoPan?.[0];
+      if (!Number.isNaN(stereoPan)) {
+        this.#midi.pans[parts[i]] = Math.round(180 * (stereoPan / 64 - 1));
+      }
+
+      const instrument = values[lineNumbersByTag.StaffInstrument[i]];
+      const patch = +instrument.Patch?.[0];
+      if (!Number.isNaN(patch)) this.#midi.programs[parts[i]] = patch + 1;
+      const name = instrument.Name?.[0];
+      if (name) {
+        const m = this.#midi.names[parts[i]];
+        const n = name.substring(1, name.length - 1);
+        this.#midi.names[parts[i]] = m && m !== n
+          ? m + "," +
+            n
+          : n;
+      }
+    }
+  }
+
+  #MIDI_KEYS = ["midi-channel", "midi-name", "midi-program", "volume", "pan"];
 
   allParts(
     allMeasures: Element[][],
@@ -81,9 +113,19 @@ export class Staves {
       const attributes = { id: `P${id}` };
       const from = this.firstNWCStaffByPart[id - 1];
       const to = this.firstNWCStaffByPart[id];
-      const program = this.#midiPrograms.slice(from, to).find((it) =>
-        it !== undefined
+
+      const midiInstrument: (Element | null)[] = [
+        this.#midi.channels[id - 1],
+        this.#midi.names[id - 1],
+        this.#midi.programs[id - 1],
+        this.#midi.volumes[id - 1],
+        this.#midi.pans[id - 1],
+      ].map((value, i) =>
+        value === undefined
+          ? null
+          : create(this.#MIDI_KEYS[i], undefined, value.toString())
       );
+
       scoreParts.push(
         create(
           "score-part",
@@ -93,17 +135,11 @@ export class Staves {
             undefined,
             this.#names.slice(from, to).join(", "),
           ),
-          program
-            ? create(
-              "midi-instrument",
-              undefined,
-              create(
-                "midi-program",
-                undefined,
-                program.toString(),
-              ),
-            )
-            : null,
+          midiInstrument.every((it) => it === null) ? null : create(
+            "midi-instrument",
+            undefined,
+            ...midiInstrument,
+          ),
         ),
       );
 

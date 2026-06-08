@@ -1,5 +1,11 @@
 # Midistuff logs
 
+## 2026-06-08
+
+### midi setting
+
+As far as set per staff, they are now in there.
+
 ## 2026-06-07
 
 ### issues

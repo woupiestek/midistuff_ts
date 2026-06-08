@@ -10,3 +10,15 @@ Data oriented design: perhaps typescript is not ideals for taking advantage of
 fewer cache misses and branch mispredictions, but the maintainer may be... each
 loop devoted to one task, and if statements at the top level of control flow: it
 sound like maintainable code to me, even if unfamiliar.
+
+### testing
+
+No unit test here, just a regression test script, to use as follows.
+
+`deno run --allow-all src\nwc-to-musicxml\regression_test.ts`
+
+Reason:
+
+- unit tests get in the way of big refactors that are part of exploring a new
+  codeing style.
+- it is not a big project.
