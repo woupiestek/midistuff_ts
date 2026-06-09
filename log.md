@@ -1,5 +1,11 @@
 # Midistuff logs
 
+## 2026-06-09
+
+### sounds!
+
+Now the instruments from NWC come to MuseScore.
+
 ## 2026-06-08
 
 ### midi setting

@@ -1,5 +1,6 @@
 import { create, Element } from "./xml.ts";
 import { countLessThan, NWCLines } from "./scanner.ts";
+import { GM_INSTRUMENTS } from "./instruments.ts";
 
 // noteworthy can layer staffs, musicxml cannot
 // moreover, the notion of a part is different.
@@ -63,19 +64,22 @@ export class Staves {
     );
     // add one past the end for easier calculations later
     this.firstNWCStaffByPart.push(this.#names.length);
-    this.#vistsMidi(nwcLines);
+    this.#vistsMidi(nwcLines, visited);
   }
 
-  #vistsMidi({ values, lineNumbersByTag }: NWCLines) {
+  #vistsMidi({ values, lineNumbersByTag }: NWCLines, visited: Set<number>) {
     const length = lineNumbersByTag.AddStaff.length;
     const parts: number[] = Array.from(lineNumbersByTag.AddStaff, () => 0);
     for (let i = 0; i < length - 1; i++) {
       const line = lineNumbersByTag.StaffProperties[2 * i];
       parts[i + 1] = parts[i] + +!values[line].WithNextStaff?.includes("Brace");
+      visited.add(line);
     }
 
     for (let i = 0; i < length; i++) {
-      const properties = values[lineNumbersByTag.StaffProperties[2 * i + 1]];
+      const line1 = lineNumbersByTag.StaffProperties[2 * i + 1];
+      visited.add(line1);
+      const properties = values[line1];
       const channel = +properties.Channel?.[0];
       if (!Number.isNaN(channel)) this.#midi.channels[parts[i]] = channel;
       const volume = +properties.Volume?.[0];
@@ -87,7 +91,9 @@ export class Staves {
         this.#midi.pans[parts[i]] = Math.round(180 * (stereoPan / 64 - 1));
       }
 
-      const instrument = values[lineNumbersByTag.StaffInstrument[i]];
+      const line2 = lineNumbersByTag.StaffInstrument[i];
+      visited.add(line2);
+      const instrument = values[line2];
       const patch = +instrument.Patch?.[0];
       if (!Number.isNaN(patch)) this.#midi.programs[parts[i]] = patch + 1;
       const name = instrument.Name?.[0];
@@ -114,7 +120,24 @@ export class Staves {
       const from = this.firstNWCStaffByPart[id - 1];
       const to = this.firstNWCStaffByPart[id];
 
-      const midiInstrument: (Element | null)[] = [
+      const scoreInstrument: Element | null = this.#midi.programs[id - 1]
+        ? create(
+          "score-instrument",
+          undefined,
+          create(
+            "instrument-name",
+            undefined,
+            GM_INSTRUMENTS.name[this.#midi.programs[id - 1] - 1],
+          ),
+          create(
+            "instrument-sound",
+            undefined,
+            GM_INSTRUMENTS.instrumentSound[this.#midi.programs[id - 1] - 1],
+          ),
+        )
+        : null;
+
+      const midiInstrument: Element[] = [
         this.#midi.channels[id - 1],
         this.#midi.names[id - 1],
         this.#midi.programs[id - 1],
@@ -124,7 +147,7 @@ export class Staves {
         value === undefined
           ? null
           : create(this.#MIDI_KEYS[i], undefined, value.toString())
-      );
+      ).filter((it) => it != null);
 
       scoreParts.push(
         create(
@@ -135,11 +158,14 @@ export class Staves {
             undefined,
             this.#names.slice(from, to).join(", "),
           ),
-          midiInstrument.every((it) => it === null) ? null : create(
-            "midi-instrument",
-            undefined,
-            ...midiInstrument,
-          ),
+          scoreInstrument,
+          midiInstrument.length
+            ? create(
+              "midi-instrument",
+              undefined,
+              ...midiInstrument,
+            )
+            : null,
         ),
       );
 

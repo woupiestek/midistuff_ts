@@ -17,6 +17,8 @@ No unit test here, just a regression test script, to use as follows.
 
 `deno run --allow-all src\nwc-to-musicxml\regression_test.ts`
 
+The other script stored the output for testing with musescore.
+
 Reason:
 
 - unit tests get in the way of big refactors that are part of exploring a new

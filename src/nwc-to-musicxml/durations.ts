@@ -80,6 +80,7 @@ export class Durations {
 
     if (lineNumbersByTag.TempoVariance) {
       for (const i of lineNumbersByTag.TempoVariance) {
+        visited.add(i);
         const style = values[i].Style[0];
         switch (style) {
           case "Breath Mark":
@@ -94,6 +95,14 @@ export class Durations {
             this.#addWord(i, style.toLowerCase());
             break;
         }
+      }
+    }
+
+    if (lineNumbersByTag.Text) {
+      for (const line of lineNumbersByTag.Text) {
+        const text = values[line].Text[0];
+        this.#addWord(line, text.substring(1, text.length - 1));
+        visited.add(line);
       }
     }
 
