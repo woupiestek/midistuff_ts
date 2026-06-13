@@ -1,5 +1,5 @@
 function escapeXml(unsafe: string) {
-  return unsafe.replace(/[<>&'"]/g, (c) => {
+  return unsafe.replace(/[<>&'"\n]/g, (c) => {
     switch (c) {
       case "<":
         return "&lt;";
@@ -11,6 +11,8 @@ function escapeXml(unsafe: string) {
         return "&apos;";
       case '"':
         return "&quot;";
+      case '\n': 
+        return "&#xA;";
     }
     return c;
   });
@@ -29,7 +31,7 @@ export class Element {
   #add(key: string, value: string) {
     this.#keys[this.#size] = key;
     this.#values[this.#size] = value;
-    this.#parents[this.#size] = 0;
+    this.#parents[this.#size] = this.#size;
     this.#size++;
     return this;
   }
@@ -61,10 +63,7 @@ export class Element {
     this.#parents.push(...that.#parents);
     this.#keys.push(...that.#keys);
     this.#values.push(...that.#values);
-    this.#parents[this.#size] = 0;
-    for (let i = 1; i < that.#size; i++) {
-      this.#parents[this.#size + i] += this.#size;
-    }
+    this.#parents[this.#size] = this.#size;
     this.#size += that.#size;
     return this;
   }
@@ -84,14 +83,13 @@ export class Element {
   }
 
   stringify() {
-    const as: string[] = [];
-    const cs: string[] = [];
+    const as: string[] = new Array(this.#size + 1);
+    const cs: string[] = new Array(this.#size + 1);
     for (let i = this.#size - 1; i >= 0; i--) {
-      let p = this.#parents[i];
-      if (p === i) p = this.#size;
+      const j = i > 0 ? i - this.#parents[i] : this.#size;
       switch (this.#keys[i]) {
         case Element.#comment:
-          cs[p] = `<!-- ${(this.#values[i])} -->${cs[p] ?? ""}`;
+          cs[j] = `<!--${(this.#values[i])}-->${cs[j] ?? ""}`;
           break;
         case Element.#element: {
           const tag = this.#values[i];
@@ -104,15 +102,15 @@ export class Element {
           } else {
             c += "/>";
           }
-          cs[p] = c + (cs[p] ?? "");
+          cs[j] = c + (cs[j] ?? "");
           break;
         }
         case Element.#text:
-          cs[p] = (this.#values[i]) + (cs[p] ?? "");
+          cs[j] = (this.#values[i]) + (cs[j] ?? "");
           break;
         default:
-          as[p] = `${(this.#keys[i])}="${(this.#values[i])}"${
-            as[p] ? " " + as[p] : ""
+          as[j] = `${(this.#keys[i])}="${(this.#values[i])}"${
+            as[j] ? " " + as[j] : ""
           }`;
           break;
       }
@@ -139,4 +137,39 @@ export function create(
     }
   }
   return element;
+}
+
+// insert newlines and spaces at the end of tags, where it is safe to do so.
+export function indent(xml: string): string[] {
+  const ends = Array(xml.length).keys().filter((i) => xml[i] === ">").toArray();
+  for (let i = 0; i < ends.length; i++) {
+    const end = ends[i];
+    if (xml[end - 1] === "/" || xml[end - 1] === "?") ends[i]--;
+    else if (xml.substring(end - 2, end) == "--") ends[i] -= 2;
+  }
+  const depth: number[] = [0];
+  for (let i = 0; i < ends.length; i++) {
+    depth[i + 1] = depth[i];
+    if (xml[ends[i]] === ">") {
+      for (let k = ends[i]; k >= 2; k--) {
+        if (xml.substring(k - 2, k) === "</") {
+          depth[i + 1] -= 1;
+          break;
+        }
+        if (xml[k - 1] === "<") {
+          depth[i + 1] += 1;
+          break;
+        }
+        if (xml[k - 1] === "!") {
+          break;
+        }
+      }
+    }
+  }
+  const lines = ends.map((_, i) =>
+    "  ".repeat(depth[i]) +
+    xml.substring(i && ends[i - 1], ends[i]).trim()
+  );
+  lines.push(xml.substring(ends[ends.length - 1]).trim());
+  return lines;
 }
