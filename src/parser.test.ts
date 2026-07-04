@@ -118,25 +118,43 @@ Deno.test(function parseRepeat() {
   // );
 });
 
-// Deno.test(function parseOperations() {
-//   const { main: node } = new Parser(
-//     new Tokens(
-//       "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
-//     ),
-//   );
-//   if (node.type !== NodeType.ARRAY) {
-//     fail(`wrong type ${NodeType[node.type]}`);
-//   }
-//   assertEquals(node.options?.key, -3);
-//   assertEquals(
-//     node.children.slice(0, 3).map((it) =>
-//       it.type === NodeType.EVENT ? it.value : ""
-//     ),
-//     ["program_64", "vivace", "fff"],
-//   );
-//   assertEquals(node.options?.duration?.numerator, 5);
-//   assertEquals(node.options?.duration?.denominator, 16);
-// });
+Deno.test(function parseOperations() {
+  const { indents, contents } = new Parser(
+    new Tokens(
+      "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
+    ),
+  ).test();
+  // FIXME: the indents are wrong here, but I don't know why yet
+  assertEquals(indents, [0, 1, 1, 2, 3, 3, 3, 3, 4, 3, 3, 3, 3, 4]);
+  assertEquals(contents, [
+    "KEY",
+    "INTEGER",
+    "DURATION",
+    "LEFT_BRACKET",
+    "TEXT",
+    "TEXT",
+    "TEXT",
+    "DURATION",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "INTEGER",
+    "DURATION",
+    "REST",
+  ]);
+  // if (node.type !== NodeType.ARRAY) {
+  //   fail(`wrong type ${NodeType[node.type]}`);
+  // }
+  // assertEquals(node.options?.key, -3);
+  // assertEquals(
+  //   node.children.slice(0, 3).map((it) =>
+  //     it.type === NodeType.EVENT ? it.value : ""
+  //   ),
+  //   ["program_64", "vivace", "fff"],
+  // );
+  // assertEquals(node.options?.duration?.numerator, 5);
+  // assertEquals(node.options?.duration?.denominator, 16);
+});
 
 // Deno.test(function parseCombination() {
 //   const { main: node, sections } = new Parser(

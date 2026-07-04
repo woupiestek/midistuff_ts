@@ -5,7 +5,7 @@ Deno.test("some simple example", () => {
   assertEquals(
     new Element("boterham").addText("pindakaas").addComment("boter")
       .addAttribute("graan", "volkoren").stringify(),
-    '<boterham graan="volkoren">pindakaas<!-- boter --></boterham>',
+    '<boterham graan="volkoren">pindakaas<!--boter--></boterham>',
   );
 });
 

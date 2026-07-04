@@ -11,7 +11,7 @@ function escapeXml(unsafe: string) {
         return "&apos;";
       case '"':
         return "&quot;";
-      case '\n': 
+      case "\n":
         return "&#xA;";
     }
     return c;

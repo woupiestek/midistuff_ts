@@ -1,5 +1,12 @@
 # Midistuff logs
 
+## 2026-06-13
+
+### some todo
+
+- clefs halfway through measure
+- proper ritenuto
+
 ## 2026-06-09
 
 ### sounds!

@@ -34,6 +34,9 @@ export class Nodes {
   }
 
   #node(parent: number) {
+    console.log(
+      `node ${parent} ${this.#current} ${TokenType[this.#currentType()]}`,
+    );
     switch (this.#currentType()) {
       case TokenType.DURATION:
         this.#node(this.#emit(NodeType.DURATION, parent, this.#current++));
@@ -55,10 +58,12 @@ export class Nodes {
         break;
       case TokenType.KEY:
         this.#node(this.#emit(NodeType.KEY, parent, this.#current++));
+        this.#node(parent); // next option...
+        // next option...
         break;
       case TokenType.LEFT_BRACE:
         {
-          const node = this.#emit(NodeType.SET, parent, this.#current++);
+          const node = this.#emit(NodeType.ARRAY, parent, this.#current++);
           while (!this.#match(TokenType.RIGHT_BRACE)) {
             this.#node(node);
           }
