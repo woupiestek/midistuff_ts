@@ -2,8 +2,12 @@ param (
   [string]$file = ""
 )
 
-deno run --allow-all .\src\writer3.ts $file .\target\temp.mid
+if (-not (Test-Path .\target)) {
+  New-Item -ItemType Directory .\target | Out-Null
+}
 
-Start-Process -FilePath "wmplayer.exe" -ArgumentList .\target\temp.mid
+deno run --allow-read --allow-write .\src\writer3.ts $file .\target\temp.mid
+deno run --allow-read --allow-write .\src\render_wav.ts $file .\target\temp.wav
 
-# deno run --unstable-ffi --allow-env --allow-write --allow-read --allow-ffi .\src\player4.ts $file $from $to
+$wav = (Resolve-Path .\target\temp.wav).Path
+(New-Object Media.SoundPlayer $wav).PlaySync()
