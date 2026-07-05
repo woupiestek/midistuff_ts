@@ -1,4 +1,3 @@
-import {} from "https://deno.land/std@0.184.0/path/_constants.ts";
 import { Ratio } from "./util.ts";
 
 export enum TokenType {
@@ -32,7 +31,7 @@ const KEYWORDS: Record<string, TokenType> = {
 
 export class Tokens {
   types: TokenType[] = [];
-  froms: number[] = [];
+  tos: number[] = [];
   #current: number = 0;
   constructor(readonly source: string) {
     while (!this.#done()) {
@@ -40,9 +39,9 @@ export class Tokens {
     }
   }
 
-  #emit(type: TokenType, from: number) {
+  #emit(type: TokenType) {
     this.types.push(type);
-    this.froms.push(from);
+    this.tos.push(this.#current);
   }
 
   #done() {
@@ -60,20 +59,23 @@ export class Tokens {
     return this.source.charCodeAt(this.#current++);
   }
 
+  from(token: number): number {
+    let from = token && this.tos[token - 1];
+    for (;;) {
+      while (Tokens.#white(this.source.charCodeAt(from))) from++;
+      if (this.source[from] === "%") {
+        while (from < this.source.length && this.source[from] !== "\n") from++;
+      } else {
+        return from;
+      }
+    }
+  }
+
   getText(token: number): string {
     if (this.types[token] !== TokenType.TEXT) throw new Error("no text here");
-    let to = this.froms[token] + 1;
-    for (;;) {
-      if (this.source[to] === "'") {
-        if (this.source[to + 1] === "'") {
-          to += 2;
-        } else {
-          break;
-        }
-      }
-      to++;
-    }
-    return this.source.slice(this.froms[token] + 1, to).replace("''", "'");
+    const from = this.from(token);
+    const to = this.tos[token];
+    return this.source.slice(from + 1, to - 1).replace("''", "'");
   }
 
   #text(): boolean {
@@ -137,14 +139,10 @@ export class Tokens {
     ) {
       throw new Error("no identifier here");
     }
-    let to = this.froms[token] + 1;
-    for (
-      ;
-      to < this.source.length &&
-      Tokens.#ic(this.source.charCodeAt(to));
-      to++
-    );
-    return this.source.slice(this.froms[token], to);
+    // main concern: comments and whitespace
+    const from = this.from(token);
+    const to = this.tos[token];
+    return this.source.slice(from, to);
   }
 
   #identifier() {
@@ -163,7 +161,7 @@ export class Tokens {
   }
 
   getIntegerValue(token: number): number {
-    const from = this.froms[token];
+    const from = this.from(token);
     if (this.source[from] === "-") {
       return -this.#positiveIntegerValue(from + 1)[0];
     }
@@ -185,7 +183,7 @@ export class Tokens {
   }
 
   getRatio(token: number): Ratio {
-    const [numerator, next] = this.#positiveIntegerValue(this.froms[token] + 1);
+    const [numerator, next] = this.#positiveIntegerValue(this.from(token) + 1);
     if (this.source[next] === "/") {
       const [denominator] = this.#positiveIntegerValue(next + 1);
       return new Ratio(numerator || 1, denominator || 1);
@@ -203,18 +201,17 @@ export class Tokens {
 
   #next() {
     this.#skip();
-    const from = this.#current;
     if (this.#done()) return;
     const code = this.#pop();
     if (Tokens.#isDigit(code)) {
-      return this.#emit(this.#integer(), from);
+      return this.#emit(this.#integer());
     }
     if (Tokens.#isLetter(code)) {
+      const from = this.#current - 1;
       this.#identifier();
       return this.#emit(
-        KEYWORDS[this.source.slice(from, this.#current)] ||
+        KEYWORDS[this.source.slice(from, this.#current)] ??
           TokenType.IDENTIFIER,
-        from,
       );
     }
     let type = TokenType.ERROR;
@@ -263,13 +260,13 @@ export class Tokens {
       default:
         break;
     }
-    return this.#emit(type, from);
+    return this.#emit(type);
   }
 
   getLineAndColumn(token: number) {
     let line = 1, i = 0;
     let start = 0;
-    for (; i < this.froms[token]; i++) {
+    for (; i < this.from(token); i++) {
       if (this.source[i] === "\n") {
         line++;
         start = i;
@@ -278,6 +275,6 @@ export class Tokens {
         start = i;
       }
     }
-    return [line, this.froms[token] - start + 1];
+    return [line, this.from(token) - start + 1];
   }
 }

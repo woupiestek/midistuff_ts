@@ -90,12 +90,12 @@ export class Parser {
   }
 
   #done() {
-    return this.#current === this.tokens.froms.length;
+    return this.#current === this.tokens.tos.length;
   }
 
   #error(message: string) {
     const [line, column] = this.tokens.getLineAndColumn(this.#current - 1);
-    const from = this.tokens.froms[this.#current - 1];
+    const from = this.tokens.from(this.#current - 1);
     // add a few characters of the source?
     return new Error(
       `Error at [${line};${column}] '\u2026${
