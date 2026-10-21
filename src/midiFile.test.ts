@@ -1,7 +1,5 @@
-import {
-  assertEquals,
-  fail,
-} from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals, fail } from "node:assert";
 import { Printer } from "./midiFilePrinter.ts";
 import { Scanner } from "./midiFileScanner.ts";
 import { MessageType } from "./midiTypes.ts";
@@ -10,7 +8,7 @@ function scanner(printer: Printer): Scanner {
   return new Scanner(new Uint8Array(printer.pop()));
 }
 
-Deno.test(function printAndScanVariableLengthNumber() {
+test("printAndScanVariableLengthNumber", function printAndScanVariableLengthNumber() {
   const printer = new Printer();
   for (let i = 1; i < 2.68e8; i *= 5) {
     printer.variableLengthNumber(i);
@@ -19,13 +17,13 @@ Deno.test(function printAndScanVariableLengthNumber() {
   }
 });
 
-Deno.test(function printAndScanText() {
+test("printAndScanText", function printAndScanText() {
   const printer = new Printer();
   printer.text("Hello, world!");
   assertEquals(scanner(printer).text(), "Hello, world!");
 });
 
-Deno.test(function printAndScanFixedLengthNumber() {
+test("printAndScanFixedLengthNumber", function printAndScanFixedLengthNumber() {
   const printer = new Printer();
   for (let length = 1; length < 4; length++) {
     for (let i = 1; i < Math.pow(128, length); i *= 5) {
@@ -36,7 +34,7 @@ Deno.test(function printAndScanFixedLengthNumber() {
   }
 });
 
-Deno.test(function printAndScanHeader() {
+test("printAndScanHeader", function printAndScanHeader() {
   const printer = new Printer();
   printer.header(1, 10, { type: "metrical", ppqn: 30 });
   const { format, numberOfTracks, timing } = scanner(printer).header();
@@ -46,7 +44,7 @@ Deno.test(function printAndScanHeader() {
   else fail("unexpected timing type");
 });
 
-Deno.test(function printAndScanTrack() {
+test("printAndScanTrack", function printAndScanTrack() {
   const printer = new Printer();
   printer.track({
     waits: [10],
@@ -60,7 +58,7 @@ Deno.test(function printAndScanTrack() {
   assertEquals(events[0].velocity, 64);
 });
 
-Deno.test(function printAndScanTrackWithRunningStatus() {
+test("printAndScanTrackWithRunningStatus", function printAndScanTrackWithRunningStatus() {
   const printer = new Printer();
   printer.track({
     waits: [10, 10],

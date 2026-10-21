@@ -1,8 +1,9 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { MIDI } from "./midi4.ts";
 import { Parser } from "./parser4.ts";
 
-Deno.test(function simpleMelody() {
+test("simpleMelody", function simpleMelody() {
   const messages = new MIDI(
     new Parser("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
   ).messages;
@@ -12,7 +13,7 @@ Deno.test(function simpleMelody() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function durations() {
+test("durations", function durations() {
   assertEquals(
     new MIDI(new Parser("_13/16[0]").parse()).realTime,
     1625,
@@ -23,7 +24,7 @@ Deno.test(function durations() {
   );
 });
 
-Deno.test(function simpleChord() {
+test("simpleChord", function simpleChord() {
   const messages = new MIDI(new Parser("_/2{ 0 2- 4 }").parse()).messages;
   assertEquals(messages.length, 6);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 3);
@@ -31,7 +32,7 @@ Deno.test(function simpleChord() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 2);
 });
 
-Deno.test(function simpleRepeat() {
+test("simpleRepeat", function simpleRepeat() {
   const messages = new MIDI(new Parser("[$C = _/4 0 $C]").parse()).messages;
   assertEquals(messages.length, 4);
   assertEquals(messages.filter((it) => it.message[0] === 128).length, 2);
@@ -39,7 +40,7 @@ Deno.test(function simpleRepeat() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function simpleProgram() {
+test("simpleProgram", function simpleProgram() {
   const messages = new MIDI(
     new Parser("['program_64' _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]").parse(),
   ).messages;
@@ -50,7 +51,7 @@ Deno.test(function simpleProgram() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function otherParamsChange() {
+test("otherParamsChange", function otherParamsChange() {
   const messages = new MIDI(
     new Parser("key 3 ['vivace' 'fff' _/8 0 1 2 0 _/8 r ]").parse(),
   ).messages;
@@ -62,7 +63,7 @@ Deno.test(function otherParamsChange() {
 });
 
 // trouble here
-Deno.test(function jacob() {
+test("jacob", function jacob() {
   const messages = new MIDI(
     new Parser(
       "['allegro' 'f' \n" +

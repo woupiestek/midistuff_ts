@@ -1,25 +1,23 @@
-import {
-  assertEquals,
-  fail,
-} from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals, fail } from "node:assert";
 import { Node, NodeType, Parser } from "./parser3.ts";
 import { Tokens, TokenType } from "./tokens.ts";
 
-Deno.test(function parseRest() {
+test("parseRest", function parseRest() {
   const { main: node } = new Parser(new Tokens("_/4 r")).parse();
   if (node.type !== NodeType.REST) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.duration?.numerator, 1);
   assertEquals(node.options?.duration?.denominator, 4);
 });
 
-Deno.test(function parseSimpleRest() {
+test("parseSimpleRest", function parseSimpleRest() {
   const { main: node } = new Parser(new Tokens("r")).parse();
   if (node.type !== NodeType.REST) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.options?.duration?.numerator, undefined);
   assertEquals(node.options?.duration?.denominator, undefined);
 });
 
-Deno.test(function parseNote() {
+test("parseNote", function parseNote() {
   const { main: node } = new Parser(new Tokens("_3/4 -7++")).parse();
   if (node.type !== NodeType.NOTE) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.degree, -7);
@@ -28,7 +26,7 @@ Deno.test(function parseNote() {
   assertEquals(node.options?.duration?.denominator, 4);
 });
 
-Deno.test(function parseSimpleNote() {
+test("parseSimpleNote", function parseSimpleNote() {
   const { main: node } = new Parser(new Tokens("-7")).parse();
   if (node.type !== NodeType.NOTE) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.degree, -7);
@@ -37,7 +35,7 @@ Deno.test(function parseSimpleNote() {
   assertEquals(node.options?.duration?.denominator, undefined);
 });
 
-Deno.test(function parseSet() {
+test("parseSet", function parseSet() {
   const { main: node } = new Parser(new Tokens("_/4[ _/8 0 1 2 0 _/8 r ]"))
     .parse();
   if (node.type !== NodeType.ARRAY) {
@@ -46,7 +44,7 @@ Deno.test(function parseSet() {
   assertEquals(node.children.length, 5);
 });
 
-Deno.test(function parsePitchSet() {
+test("parsePitchSet", function parsePitchSet() {
   const { main: node } = new Parser(new Tokens("_5/16[ 0 2 4 ]")).parse();
   if (node.type !== NodeType.ARRAY) {
     fail(`wrong type ${NodeType[node.type]}`);
@@ -56,14 +54,14 @@ Deno.test(function parsePitchSet() {
   assertEquals(node.options?.duration?.denominator, 16);
 });
 
-Deno.test(function parseJoin() {
+test("parseJoin", function parseJoin() {
   const { main: node } = new Parser(new Tokens("_/2{ 0  2-  4 }")).parse();
   if (node.type === NodeType.ERROR) throw node.error;
   if (node.type !== NodeType.SET) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(node.children.length, 3);
 });
 
-Deno.test(function parseMark() {
+test("parseMark", function parseMark() {
   const { main: node, sections } = new Parser(
     new Tokens("$line_1 = _/4[ _/8 0 1 2 0 _/8 r ]"),
   ).parse();
@@ -75,7 +73,7 @@ Deno.test(function parseMark() {
   if (child.type !== NodeType.ARRAY) fail("wrong child type");
 });
 
-Deno.test(function parseResolvedRepeat() {
+test("parseResolvedRepeat", function parseResolvedRepeat() {
   const { main: node, sections } = new Parser(new Tokens("[ C = 0 C ]"))
     .parse();
   assertEquals(sections.marks.length, 1);
@@ -92,7 +90,7 @@ Deno.test(function parseResolvedRepeat() {
   }
 });
 
-Deno.test(function parseRepeat() {
+test("parseRepeat", function parseRepeat() {
   const { main: node } = new Parser(new Tokens("$line_1")).parse();
   if (node.type !== NodeType.ERROR) fail(`wrong type ${NodeType[node.type]}`);
   assertEquals(
@@ -101,7 +99,7 @@ Deno.test(function parseRepeat() {
   );
 });
 
-Deno.test(function parseOperations() {
+test("parseOperations", function parseOperations() {
   const { main: node } = new Parser(
     new Tokens(
       "key -3 _5/16[ 'program_64' 'vivace'  'fff' _/8 0 1 2 0 _/8 r ]",
@@ -121,7 +119,7 @@ Deno.test(function parseOperations() {
   assertEquals(node.options?.duration?.denominator, 16);
 });
 
-Deno.test(function parseCombination() {
+test("parseCombination", function parseCombination() {
   const { main: node, sections } = new Parser(
     new Tokens(
       "['allegro' 'f' \
@@ -145,7 +143,7 @@ Deno.test(function parseCombination() {
   assertEquals(node.children[1], Node.event("f"));
 });
 
-Deno.test(function parseError() {
+test("parseError", function parseError() {
   const tokens = new Tokens("{ 3h 2 4 }");
   const { main } = new Parser(tokens).parse();
   if (main.type !== NodeType.ERROR) {
@@ -158,7 +156,7 @@ Deno.test(function parseError() {
   );
 });
 
-Deno.test(function noFalseAccidentals() {
+test("noFalseAccidentals", function noFalseAccidentals() {
   const { main: node } = new Parser(new Tokens("[_/8 0 -3 _/2 0 _/8 r]"))
     .parse();
   if (node.type !== NodeType.ARRAY) {
@@ -170,7 +168,7 @@ Deno.test(function noFalseAccidentals() {
   assertEquals(accidents, [0, 0, 0, -1]);
 });
 
-Deno.test(function noFalseDurations() {
+test("noFalseDurations", function noFalseDurations() {
   const { main: node } = new Parser(new Tokens("[_/8 2 3 _/2 4 _/8 r]"))
     .parse();
   if (node.type !== NodeType.ARRAY) {
@@ -188,7 +186,7 @@ Deno.test(function noFalseDurations() {
   assertEquals(durations, [0.125, undefined, 0.5, 0.125]);
 });
 
-Deno.test(function addMetaData() {
+test("addMetaData", function addMetaData() {
   const { main, metadata } = new Parser(
     new Tokens(
       "0,{ 'tempo'= 500000 'title'='one note' 'cresc poco a poco'={'from'=43'to'=85} 'parts'=['piano' 'viola']}",

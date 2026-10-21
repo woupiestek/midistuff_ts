@@ -1,9 +1,10 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Interpreter } from "./interpreter3.ts";
 import { Parser } from "./parser3.ts";
 import { Tokens } from "./tokens.ts";
 
-Deno.test(function simpleMelody() {
+test("simpleMelody", function simpleMelody() {
   const messages = new Interpreter(
     new Parser(new Tokens("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]")).parse(),
     0,
@@ -15,7 +16,7 @@ Deno.test(function simpleMelody() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function durations() {
+test("durations", function durations() {
   assertEquals(
     new Interpreter(new Parser(new Tokens("_13/16[0]")).parse(), 0, 1000)
       .realTime,
@@ -28,7 +29,7 @@ Deno.test(function durations() {
   );
 });
 
-Deno.test(function simpleChord() {
+test("simpleChord", function simpleChord() {
   const messages =
     new Interpreter(new Parser(new Tokens("_/2{ 0 2- 4 }")).parse(), 0, 1000)
       .messages;
@@ -38,7 +39,7 @@ Deno.test(function simpleChord() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 2);
 });
 
-Deno.test(function simpleRepeat() {
+test("simpleRepeat", function simpleRepeat() {
   const messages =
     new Interpreter(new Parser(new Tokens("[$C = _/4 0 $C]")).parse(), 0, 1000)
       .messages;
@@ -48,7 +49,7 @@ Deno.test(function simpleRepeat() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function simpleProgram() {
+test("simpleProgram", function simpleProgram() {
   const messages = new Interpreter(
     new Parser(new Tokens("['program_64' _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]"))
       .parse(),
@@ -62,7 +63,7 @@ Deno.test(function simpleProgram() {
   assertEquals(messages.filter((it) => it.message[1] === 60).length, 4);
 });
 
-Deno.test(function otherParamsChange() {
+test("otherParamsChange", function otherParamsChange() {
   const messages = new Interpreter(
     new Parser(new Tokens("key 3 ['vivace' 'fff' _/8 0 1 2 0 _/8 r ]")).parse(),
     0,
@@ -75,7 +76,7 @@ Deno.test(function otherParamsChange() {
   assertEquals(messages.filter((it) => it.message[2] === 113).length, 8);
 });
 
-Deno.test(function jacob() {
+test("jacob", function jacob() {
   const messages = new Interpreter(
     new Parser(
       new Tokens(

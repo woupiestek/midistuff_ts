@@ -15,7 +15,7 @@ sound like maintainable code to me, even if unfamiliar.
 
 No unit test here, just a regression test script, to use as follows.
 
-`deno run --allow-all src\nwc-to-musicxml\regression_test.ts`
+`bun test src/nwc-to-musicxml/regression_test.ts`
 
 The other script stored the output for testing with musescore.
 

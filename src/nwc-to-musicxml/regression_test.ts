@@ -1,3 +1,6 @@
+import { readdir, readFile } from "node:fs/promises";
+import { join, parse } from "node:path";
+import { test } from "bun:test";
 import { Transformer } from "./transformer.ts";
 
 const samplesDir = "samples";
@@ -136,7 +139,7 @@ function changedOperations(
   );
 }
 
-Deno.test("diffOperations keeps alignment after an inserted line", () => {
+test("diffOperations keeps alignment after an inserted line", () => {
   const changes = changedOperations(
     ["<a>", "<b>", "<c>"],
     ["<a>", "<inserted>", "<b>", "<c>"],
@@ -149,7 +152,7 @@ Deno.test("diffOperations keeps alignment after an inserted line", () => {
   }
 });
 
-Deno.test("diffOperations keeps alignment after a deleted line", () => {
+test("diffOperations keeps alignment after a deleted line", () => {
   const changes = changedOperations(
     ["<a>", "<removed>", "<b>", "<c>"],
     ["<a>", "<b>", "<c>"],
@@ -164,16 +167,16 @@ Deno.test("diffOperations keeps alignment after a deleted line", () => {
 
 if (import.meta.main) {
   const list = [];
-  for await (const entry of Deno.readDir(samplesDir)) {
-    if (entry.name.endsWith(".nwctxt")) {
-      list.push(entry.name.substring(0, entry.name.length - 7));
+  for (const name of await readdir(samplesDir)) {
+    if (name.endsWith(".nwctxt")) {
+      list.push(parse(name).name);
     }
   }
 
   for (const fileName of list) {
     console.log("Processing", fileName);
-    const source = await Deno.readTextFile(`${samplesDir}\\${fileName}.nwctxt`);
-    const target = await Deno.readTextFile(`${targetDir}\\${fileName}.xml`);
+    const source = await readFile(join(samplesDir, `${fileName}.nwctxt`), "utf8");
+    const target = await readFile(join(targetDir, `${fileName}.xml`), "utf8");
     try {
       const result = new Transformer().transform(source);
       if (result === target) {

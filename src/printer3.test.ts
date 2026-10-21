@@ -1,9 +1,10 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Parser } from "./parser3.ts";
 import { Printer } from "./printer3.ts";
 import { Tokens } from "./tokens.ts";
 
-Deno.test(function parseCombination() {
+test("parseCombination", function parseCombination() {
   const text = "[\n  'allegro' 'f' $A = [_/8 0 1 2 0 _/8 r] $A\n" +
     "  $B = [_/8 2 3 _/2 4 _/8 r] $B\n" +
     "  $C = _/8 [4 _/16 5 4 _/16 3 _/4 2 _/4 0 r] $C\n" +

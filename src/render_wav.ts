@@ -1,3 +1,4 @@
+import { readFile, writeFile } from "node:fs/promises";
 import { MidiPlanner } from "./midi3.ts";
 import { MessageType } from "./midiTypes.ts";
 import { Parser } from "./parser3.ts";
@@ -8,9 +9,10 @@ const TAIL_SECONDS = 0.35;
 const ATTACK_SECONDS = 0.006;
 const RELEASE_SECONDS = 0.035;
 
-if (Deno.args.length < 2) {
+const args = Bun.argv.slice(2);
+if (args.length < 2) {
   console.error("Usage: render_wav [source] [target]\n");
-  Deno.exit(64);
+  process.exit(64);
 }
 
 type Note = {
@@ -20,13 +22,13 @@ type Note = {
   stop: number;
 };
 
-const source = await Deno.readTextFile(Deno.args[0]);
+const source = await readFile(args[0], "utf8");
 const planner = new MidiPlanner(
   new Parser(new Tokens(source)).parse(),
 );
 const notes = collectNotes(planner);
 const wav = renderWav(notes, planner.time * secondsPerUnit(planner.bpm));
-await Deno.writeFile(Deno.args[1], wav);
+await writeFile(args[1], wav);
 
 function collectNotes(planner: MidiPlanner): Note[] {
   const active = new Map<string, Note[]>();

@@ -1,10 +1,11 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Filer } from "./filer3.ts";
 import { Parser } from "./parser3.ts";
 import { MessageType } from "./midiTypes.ts";
 import { Tokens } from "./tokens.ts";
 
-Deno.test(function simpleMelody() {
+test("simpleMelody", function simpleMelody() {
   const { file } = new Filer(
     new Parser(new Tokens("[ _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]")).parse(),
   );
@@ -28,7 +29,7 @@ Deno.test(function simpleMelody() {
   );
 });
 
-Deno.test(function durations() {
+test("durations", function durations() {
   assertEquals(
     new Filer(new Parser(new Tokens("_13/16[0]")).parse()).time,
     312,
@@ -39,7 +40,7 @@ Deno.test(function durations() {
   );
 });
 
-Deno.test(function simpleChord() {
+test("simpleChord", function simpleChord() {
   const { file } = new Filer(new Parser(new Tokens("_/2{ 0 2- 4 }")).parse());
   assertEquals(file.tracks[1].waits.length, 7);
   assertEquals(
@@ -60,12 +61,12 @@ Deno.test(function simpleChord() {
   );
 });
 
-Deno.test(function simpleRepeat() {
+test("simpleRepeat", function simpleRepeat() {
   const { file } = new Filer(new Parser(new Tokens("[$C = _/4 0 $C]")).parse());
   assertEquals(file.tracks[1].waits.length, 5);
 });
 
-Deno.test(function simpleProgram() {
+test("simpleProgram", function simpleProgram() {
   const { file } = new Filer(
     new Parser(new Tokens("['program_64' _/8 0 _/4 1 _/4 2 _/4 0 _/8 r ]"))
       .parse(),
@@ -73,14 +74,14 @@ Deno.test(function simpleProgram() {
   assertEquals(file.tracks[1].waits.length, 10);
 });
 
-Deno.test(function otherParamsChange() {
+test("otherParamsChange", function otherParamsChange() {
   const { file } = new Filer(
     new Parser(new Tokens("key 3 ['vivace' 'fff' _/8 0 1 2 0 _/8 r ]")).parse(),
   );
   assertEquals(file.tracks[1].waits.length, 9);
 });
 
-Deno.test(function jacob() {
+test("jacob", function jacob() {
   const { file } = new Filer(
     new Parser(
       new Tokens(

@@ -1,17 +1,19 @@
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { parse } from "node:path";
 import { Transformer } from "./transformer.ts";
 
 const list = [];
-for await (const entry of Deno.readDir(".")) {
-  if (entry.name.endsWith(".nwctxt")) {
-    list.push(entry.name.substring(0, entry.name.length - 7));
+for (const name of await readdir(".")) {
+  if (name.endsWith(".nwctxt")) {
+    list.push(parse(name).name);
   }
 }
 console.log("selected for coversion:", list);
 
 for (const fileName of list) {
-  const source = await Deno.readTextFile(`${fileName}.nwctxt`, {});
+  const source = await readFile(`${fileName}.nwctxt`, "utf8");
   try {
-    await Deno.writeTextFile(
+    await writeFile(
       `${fileName}.xml`,
       new Transformer().transform(source),
     );

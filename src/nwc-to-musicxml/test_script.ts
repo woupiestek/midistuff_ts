@@ -1,5 +1,11 @@
+import { access, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { join } from "node:path";
 import { scan } from "./scanner.ts";
 import { Transformer } from "./transformer.ts";
+
+const execFileAsync = promisify(execFile);
 
 const samplesDir = "samples";
 const targetDir = "target";
@@ -8,10 +14,10 @@ const nwcConv =
 
 async function exists(path: string): Promise<boolean> {
   try {
-    await Deno.stat(path);
+    await access(path);
     return true;
   } catch (e) {
-    if (e instanceof Deno.errors.NotFound) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") {
       return false;
     }
     throw e;
@@ -31,50 +37,46 @@ function decodeNwcText(bytes: Uint8Array): string {
 }
 
 async function convertNwcToNwcTxt(): Promise<void> {
-  for await (const entry of Deno.readDir(samplesDir)) {
-    if (!entry.isFile || !entry.name.endsWith(".nwc")) {
+  for (const name of await readdir(samplesDir)) {
+    if (!name.endsWith(".nwc")) {
       continue;
     }
 
-    const fileName = entry.name.substring(0, entry.name.length - 4);
-    const nwctxtPath = `${samplesDir}\\${fileName}.nwctxt`;
+    const fileName = name.substring(0, name.length - 4);
+    const nwctxtPath = join(samplesDir, `${fileName}.nwctxt`);
     if (await exists(nwctxtPath)) {
       continue;
     }
 
-    const command = new Deno.Command(nwcConv, {
-      args: [`${samplesDir}\\${entry.name}`, "NWCTXT"],
-    });
-    const output = await command.output();
-    if (!output.success) {
-      const stderr = new TextDecoder().decode(output.stderr);
-      throw new Error(`nwc-conv failed for ${entry.name}: ${stderr}`);
-    }
-
-    await Deno.writeTextFile(nwctxtPath, decodeNwcText(output.stdout));
+    const { stdout } = await execFileAsync(
+      nwcConv,
+      [join(samplesDir, name), "NWCTXT"],
+      { encoding: "buffer" },
+    );
+    await writeFile(nwctxtPath, decodeNwcText(Buffer.from(stdout)));
   }
 }
 
-await Deno.mkdir(targetDir, { recursive: true });
+await mkdir(targetDir, { recursive: true });
 await convertNwcToNwcTxt();
 
 const list = [];
-for await (const entry of Deno.readDir(samplesDir)) {
-  if (entry.name.endsWith(".nwctxt")) {
-    list.push(entry.name.substring(0, entry.name.length - 7));
+for (const name of await readdir(samplesDir)) {
+  if (name.endsWith(".nwctxt")) {
+    list.push(name.substring(0, name.length - 7));
   }
 }
 
 for (const fileName of list) {
   console.log("Processing", fileName);
-  const source = await Deno.readTextFile(`${samplesDir}\\${fileName}.nwctxt`);
+  const source = await readFile(join(samplesDir, `${fileName}.nwctxt`), "utf8");
   try {
-    await Deno.writeTextFile(
-      `.\\${targetDir}\\${fileName}.json`,
+    await writeFile(
+      join(targetDir, `${fileName}.json`),
       JSON.stringify(scan(source), null, 2),
     );
-    await Deno.writeTextFile(
-      `.\\${targetDir}\\${fileName}.xml`,
+    await writeFile(
+      join(targetDir, `${fileName}.xml`),
       new Transformer().transform(source),
     );
   } catch (e) {

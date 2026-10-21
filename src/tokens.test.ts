@@ -1,7 +1,8 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Tokens, TokenType } from "./tokens.ts";
 
-Deno.test(function tokens() {
+test("tokens", function tokens() {
   const tokens = new Tokens(
     ", [ ] r = { } _3/4 1739 -17--   % this should be ignored!\n\n\n\n\n\\asdfghjklz1234567890 mp 'make '' it 😉 hard\n' key $line_1",
   );

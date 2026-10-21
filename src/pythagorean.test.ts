@@ -1,7 +1,8 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Pyth } from "./pythagorean.ts";
 
-Deno.test(function fromMidiLimits() {
+test("fromMidiLimits", function fromMidiLimits() {
   // b
   assertEquals(Pyth.fromMidi(59), new Pyth(25, 9));
   // c
@@ -14,13 +15,13 @@ Deno.test(function fromMidiLimits() {
   assertEquals(Pyth.fromMidi(68), new Pyth(29, 10));
 });
 
-Deno.test(function fromMidiAndBack() {
+test("fromMidiAndBack", function fromMidiAndBack() {
   for (let tone = 60; tone < 72; tone++) {
     assertEquals(tone, Pyth.fromMidi(tone).toMidi());
   }
 });
 
-Deno.test(function fromPitchAndBack() {
+test("fromPitchAndBack", function fromPitchAndBack() {
   for (let key = -4; key <= 4; key++) {
     for (let degree = -12; degree <= 12; degree++) {
       for (let alter = -1; alter <= 1; alter++) {
@@ -33,7 +34,7 @@ Deno.test(function fromPitchAndBack() {
   }
 });
 
-Deno.test(function toPitch() {
+test("toPitch", function toPitch() {
   assertEquals(new Pyth(0, 0).toPitch(-6), { degree: 0, alter: 1 });
   assertEquals(new Pyth(0, 0).toPitch(0), { degree: 0, alter: 0 });
   assertEquals(new Pyth(0, 0).toPitch(2), { degree: 0, alter: -1 });

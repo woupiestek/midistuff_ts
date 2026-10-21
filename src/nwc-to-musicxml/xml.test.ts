@@ -1,7 +1,8 @@
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { test } from "bun:test";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Element } from "./xml.ts";
 
-Deno.test("some simple example", () => {
+test("some simple example", () => {
   assertEquals(
     new Element("boterham").addText("pindakaas").addComment("boter")
       .addAttribute("graan", "volkoren").stringify(),
@@ -9,7 +10,7 @@ Deno.test("some simple example", () => {
   );
 });
 
-Deno.test("big tree", () => {
+test("big tree", () => {
   let node = new Element("leaf");
   const chars = Array(128).keys().map((i) => String.fromCharCode(i)).filter(
     (ch) => /[!-~]/.test(ch),

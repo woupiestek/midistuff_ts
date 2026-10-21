@@ -1,0 +1,14 @@
+{
+  "name": "midistuff",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch main.ts",
+    "test": "bun test",
+    "test:coverage": "bun test --coverage",
+    "print": "bun src/print3.ts",
+    "write": "bun src/writer3.ts",
+    "musicxml": "bun src/nwc-to-musicxml/main.ts",
+    "musicxml:regression": "bun test src/nwc-to-musicxml/regression_test.ts"
+  }
+}

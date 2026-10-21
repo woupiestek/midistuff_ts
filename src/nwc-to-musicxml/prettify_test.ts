@@ -1,8 +1,9 @@
+import { readFile } from "node:fs/promises";
 import { indent } from "./xml.ts";
 
 try {
-  const source = await Deno.readTextFile(".\\target\\vocalacc.xml");
-  //await Deno.writeTextFile(
+  const source = await readFile("./target/vocalacc.xml", "utf8");
+  //await writeFile(
   //  ".\\target\\Zonder titel.musicxml",
   indent(source).forEach((line) => console.log(line));
   //  );

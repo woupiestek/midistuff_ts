@@ -1,12 +1,14 @@
+import { readFile } from "node:fs/promises";
 import { Parser } from "./parser3.ts";
 import { Printer } from "./printer3.ts";
 import { Tokens } from "./tokens.ts";
 
-if (Deno.args.length < 1) {
+const args = Bun.argv.slice(2);
+if (args.length < 1) {
   console.error("Usage: print [path]\n");
-  Deno.exit(64);
+  process.exit(64);
 }
 
-const data = await Deno.readTextFile(Deno.args[0]);
+const data = await readFile(args[0], "utf8");
 const printer = new Printer();
 console.log(printer.pretty(64, new Parser(new Tokens(data)).parse()));

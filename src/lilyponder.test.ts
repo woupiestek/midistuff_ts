@@ -1,11 +1,12 @@
+import { test } from "bun:test";
 import { FourFourSplitter, Lilyponder } from "./lilyponder.ts";
-import { assertEquals } from "https://deno.land/std@0.178.0/testing/asserts.ts";
+import { deepStrictEqual as assertEquals } from "node:assert";
 import { Ratio } from "./util.ts";
 import { Transformer } from "./transformer.ts";
 import { Parser } from "./parser3.ts";
 import { Tokens } from "./tokens.ts";
 
-Deno.test(function durationsInContext() {
+test("durationsInContext", function durationsInContext() {
   const expected = [
     ["16"],
     ["8"],
@@ -70,7 +71,7 @@ Deno.test(function durationsInContext() {
 
 const transformer = new Transformer();
 const lilyponder = new Lilyponder();
-Deno.test(function simpleExample() {
+test("simpleExample", function simpleExample() {
   assertEquals(Ratio.int(0).compare(Ratio.int(1)), -1);
   const sample = "['treble' 0 1 2 0 ]";
   const result = lilyponder.process(
